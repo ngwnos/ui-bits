@@ -249,7 +249,6 @@ export default function SelectionGrid({
     const isLastRow = row === lastRowIndex;
     const marginLeft = isLastRow && col === 0 ? alignmentOffsetPx : 0;
     const isSelected = selectedIndex === index;
-    const borderWidth = 1;
     const appearance = invertGradients ? visual.inverted : visual.normal;
     const hasTopNeighbor = index - rowCapacity >= 0;
     const hasBottomNeighbor = index + rowCapacity < gridCellCount;
@@ -277,12 +276,12 @@ export default function SelectionGrid({
           width: `${cellSizePx}px`,
           height: `${cellSizePx}px`,
           flex: `0 0 ${cellSizePx}px`,
-          border: `${borderWidth}px solid ${isSelected ? colorB : colorA}`,
           borderRadius: `${topLeftRadius}px ${topRightRadius}px ${bottomRightRadius}px ${bottomLeftRadius}px`,
           boxSizing: "border-box",
           marginLeft,
           cursor: "pointer",
           outline: "none",
+          boxShadow: isSelected ? `inset 0 0 0 2px ${colorB}` : "none",
           backgroundRepeat: "no-repeat",
           ...backgroundStyle,
         }}
@@ -438,7 +437,6 @@ export default function SelectionGrid({
               width: "100%",
               height: `${baseCellSize}px`,
               borderRadius: 3,
-              border: `1px solid ${colorA}`,
               boxSizing: "border-box",
               background: previewGradient,
               cursor: "pointer",

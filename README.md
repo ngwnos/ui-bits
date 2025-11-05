@@ -2,7 +2,7 @@
 
 > ⚠️ WARNING: THIS IS AI SLOP. DO NOT TRUST ANY OF THIS CODE. I DON'T EVEN KNOW HOW IT WORKS.
 
-An experimental playground of UI bits we plan to grow into a broader library. Today it exposes a single low-frequency oscillator slider so you can embed the demo control without cloning the whole Vite app.
+Right now this package only exports the low-frequency oscillator slider from the sandbox. More UI pieces may land here later.
 
 ## Install
 

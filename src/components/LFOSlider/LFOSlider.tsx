@@ -10,6 +10,7 @@ import {
 import type { LfoSettings, Waveform } from "../../lfo";
 import { useStoreMirror } from "../../useStoreMirror";
 import type { MirrorFn } from "../../useStoreMirror";
+import "./lfoslider.css";
 export type SliderBorder = 'left' | 'right' | 'none';
 
 const visuallyHiddenStyle: React.CSSProperties = {

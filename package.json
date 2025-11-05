@@ -6,6 +6,7 @@
   "main": "./dist/lfoslider.cjs.js",
   "module": "./dist/lfoslider.es.js",
   "types": "./dist/types/library.d.ts",
+  "style": "./dist/ui-bits.css",
   "files": [
     "dist"
   ],
@@ -15,6 +16,7 @@
       "import": "./dist/lfoslider.es.js",
       "require": "./dist/lfoslider.cjs.js"
     },
+    "./style.css": "./dist/ui-bits.css",
     "./components/LFOSlider": {
       "types": "./dist/types/components/LFOSlider/LFOSlider.d.ts",
       "import": "./dist/lfoslider.es.js",

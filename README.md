@@ -1,16 +1,18 @@
 # ui-bits
 
-Reusable low-frequency oscillator slider components extracted from the demo app. This package ships the slider, helper hooks, and math utilities so you can embed them directly into any React project without cloning the playground.
+> ⚠️ WARNING: THIS IS AI SLOP. DO NOT TRUST ANY OF THIS CODE. I DON'T EVEN KNOW HOW IT WORKS.
 
-## Installation
+An experimental playground of UI bits we plan to grow into a broader library. Today it exposes a single low-frequency oscillator slider so you can embed the demo control without cloning the whole Vite app.
+
+## Install
 
 ```sh
 bun add ui-bits
 ```
 
-`react` and `react-dom` are peer dependencies; keep them in your host app.
+Bring your own `react` and `react-dom` peer dependencies.
 
-## Quick start
+## Use it
 
 ```tsx
 import { FrameLoopProvider, LFOSlider } from 'ui-bits';
@@ -19,30 +21,12 @@ import 'ui-bits/style.css';
 export function Oscillator() {
   return (
     <FrameLoopProvider>
-      <LFOSlider
-        label="Cutoff"
-        min={20}
-        max={20000}
-        step={1}
-        drawerHandle
-        onUserChange={(value) => console.log(value)}
-      />
+      <LFOSlider label="Cutoff" min={20} max={20000} step={1} drawerHandle />
     </FrameLoopProvider>
   );
 }
 ```
 
-Import `ui-bits/style.css` once near your app entry point so the utility classes used by the slider resolve correctly.
+`ui-bits/style.css` wires up the utility classes the component expects. Beyond `LFOSlider`, helpers like `FrameLoopProvider`, `useFrame`, `useStoreMirror`, and the math utilities are re-exported from the package entry.
 
-## API surface
-
-- `LFOSlider` & `LFOSliderProps`: the primary control with drawer, LFO, and external value modes.
-- `FrameLoopProvider` & `useFrame(fn)`: wraps sliders that animate via LFO or external feeds.
-- `useStoreMirror(readValue, mirrorFn, throttleMs?, epsilon?)`: stream slider values into your own store.
-- `lfo` utilities: `clamp`, `snapToStep`, `splitFromValue`, `valueFromSplit`, `lfoValue`, `phaseCaptureForTriangle`, plus `LfoSettings` and `Waveform` types.
-
-See `src/components/LFOSlider/LFOSlider.tsx` for advanced props such as `readExternal`, `onAnimatedUpdate`, and drawer callbacks.
-
-## Demo app
-
-The Vite playground under `bun run dev` still lives in this repo for experimentation. It includes the Flexoki-themed store, color pickers, and layout helpers that are not part of the published package.
+The original Vite demo is still available via `bun run dev` if you want to poke around, but consumable code should come from the published package.

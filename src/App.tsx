@@ -383,6 +383,7 @@ function EditableRectPOC() {
   const horizontalPadding = Math.max(columnGap * 2, 16);
   const tabs = [
     { value: 'lfo-slider', label: 'LFO Slider' },
+    { value: 'dropdown', label: 'Dropdown' },
   ];
   const tabsRootStyle: React.CSSProperties = {
     display: 'flex',
@@ -671,6 +672,11 @@ function EditableRectPOC() {
           <LfoSliderTab />
         </Tabs.Content>
         </Tabs.Root>
+        <Tabs.Content value="dropdown" style={tabBodyStyle}>
+          <p style={{ fontSize: CONTROL_FONT_SIZE, color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'] }}>
+            Dropdown component coming soon.
+          </p>
+        </Tabs.Content>
       </div>
     </FrameLoopProvider>
   );

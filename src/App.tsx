@@ -687,6 +687,7 @@ function EditableRectPOC() {
               colorA={flexoki.base['950']}
               colorB={flexoki.base['50']}
               textColor={previewDarkMode ? flexoki.base['50'] : "#ffffff"}
+              maxHeightUnits={5}
             />
           </Tabs.Content>
         </Tabs.Root>

@@ -14,6 +14,7 @@ import {
   type GradientDefinition,
 } from "../../gradients/matplotlib";
 import { loadTilePixels, colorizeTile } from "../../utils/tileColorize";
+import "./selectionGrid.css";
 
 type PaletteInfo = {
   data: Uint8ClampedArray;
@@ -81,6 +82,7 @@ export type SelectionGridProps = {
   colorB: string;
   textColor: string;
   allowEmptySelection?: boolean;
+  maxHeightUnits?: number;
 };
 
 export default function SelectionGrid({
@@ -91,6 +93,7 @@ export default function SelectionGrid({
   colorB,
   textColor,
   allowEmptySelection = false,
+  maxHeightUnits,
 }: SelectionGridProps) {
   const [tileTextures, setTileTextures] = React.useState<Map<string, { normal: string | null; inverted: string | null }>>(new Map());
   const [tileAssignments, setTileAssignments] = React.useState<Record<string, string>>({});
@@ -225,6 +228,7 @@ export default function SelectionGrid({
   const baseCellSize = Math.max(8, sliderBox.height || 0);
   const cellSizePx = baseCellSize * squareScale;
   const rowCapacity = sliderBox.width ? Math.max(1, Math.floor(sliderBox.width / cellSizePx)) : 1;
+  const rowCount = rowCapacity ? Math.ceil(gridCellCount / rowCapacity) : gridCellCount;
   const lastRowCount = rowCapacity >= gridCellCount ? gridCellCount : gridCellCount % rowCapacity || rowCapacity;
   const leftoverSlots = rowCapacity > lastRowCount ? rowCapacity - lastRowCount : 0;
   const lastRowIndex = rowCapacity ? Math.floor((gridCellCount - 1) / rowCapacity) : 0;
@@ -344,6 +348,13 @@ export default function SelectionGrid({
     boxShadow: `0 0 0 1px ${buttonActiveBackground}`,
   };
 
+  const resolvedMaxHeightUnits = typeof maxHeightUnits === "number" && Number.isFinite(maxHeightUnits) && maxHeightUnits > 0
+    ? maxHeightUnits
+    : null;
+  const totalRowUnits = rowCount * squareScale;
+  const gridMaxHeightPx = resolvedMaxHeightUnits != null ? resolvedMaxHeightUnits * baseCellSize : null;
+  const clampGridHeight = resolvedMaxHeightUnits != null && totalRowUnits > resolvedMaxHeightUnits;
+
   const activeGradient = selectedIndex != null ? MATPLOTLIB_GRADIENTS[selectedIndex] : null;
   const previewGradient = activeGradient ? createGradientCss(activeGradient.stops, invertGradients) : "transparent";
   const previewLabelBase = activeGradient ? activeGradient.name : "None";
@@ -407,6 +418,9 @@ export default function SelectionGrid({
             flexDirection: "column",
             alignItems: "stretch",
             width: `${containerWidthPx}px`,
+            borderBottomLeftRadius: 3,
+            borderBottomRightRadius: 3,
+            overflow: "hidden",
           }}
         >
           <div
@@ -448,12 +462,21 @@ export default function SelectionGrid({
             {previewLabel}
           </div>
           <div
+            className="selection-grid__cells"
             style={{
               display: "inline-flex",
               flexWrap: "wrap",
               gap: 0,
               alignContent: "flex-start",
               width: "100%",
+              ...(gridMaxHeightPx != null
+                ? {
+                  maxHeight: `${gridMaxHeightPx}px`,
+                  overflowY: clampGridHeight ? "auto" : undefined,
+                  msOverflowStyle: "none",
+                  scrollbarWidth: "none",
+                }
+                : {}),
             }}
           >
             {cells}

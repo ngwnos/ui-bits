@@ -1,0 +1,3 @@
+.selection-grid__cells::-webkit-scrollbar {
+  display: none;
+}

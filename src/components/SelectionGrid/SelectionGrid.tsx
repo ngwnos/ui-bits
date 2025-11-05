@@ -100,8 +100,26 @@ export default function SelectionGrid({
   const [tileTextures, setTileTextures] = React.useState<Map<string, { normal: string | null; inverted: string | null }>>(new Map());
   const [tileAssignments, setTileAssignments] = React.useState<Record<string, string>>({});
 
+  const selectionGridState = useSelectionGridState(gridId);
+  const selectionGridActions = useSelectionGridActions();
+  const {
+    squareScale,
+    squareAlignment,
+    selectedIndex,
+    invertGradients,
+    allowEmptySelection: stateAllowEmptySelection,
+    useTerrainTiles,
+  } = selectionGridState;
+
   React.useEffect(() => {
     let cancelled = false;
+    if (!useTerrainTiles) {
+      setTileAssignments({});
+      setTileTextures(new Map());
+      return () => {
+        cancelled = true;
+      };
+    }
     const loadAndColorize = async () => {
       try {
         const tileUrls = await loadTileList();
@@ -138,11 +156,11 @@ export default function SelectionGrid({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [useTerrainTiles]);
 
   const gradientVisuals = React.useMemo<GradientVisual[]>(() => GRADIENT_BASE_DATA.map((base) => {
-    const textures = tileTextures.get(base.name);
-    const tileUrl = tileAssignments[base.name] ?? "";
+    const textures = useTerrainTiles ? tileTextures.get(base.name) : undefined;
+    const tileUrl = useTerrainTiles ? (tileAssignments[base.name] ?? "") : "";
     const tileName = tileUrl.split("/").pop() ?? tileUrl;
     return {
       name: base.name,
@@ -158,21 +176,11 @@ export default function SelectionGrid({
         cssFallback: createGradientCss(base.stops, true),
       },
     };
-  }), [tileAssignments, tileTextures]);
+  }), [tileAssignments, tileTextures, useTerrainTiles]);
 
   const gridCellCount = gradientVisuals.length;
   const sliderContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [sliderBox, setSliderBox] = React.useState<{ width: number; height: number }>({ width: 260, height: 48 });
-  const selectionGridState = useSelectionGridState(gridId);
-  const selectionGridActions = useSelectionGridActions();
-  const {
-    squareScale,
-    squareAlignment,
-    selectedIndex,
-    invertGradients,
-    allowEmptySelection: stateAllowEmptySelection,
-  } = selectionGridState;
-
   const paletteSignatureRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {

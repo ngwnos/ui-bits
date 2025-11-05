@@ -16,6 +16,7 @@ export interface SelectionGridState {
   invertGradients: boolean;
   allowEmptySelection: boolean;
   colorPalette: string[];
+  useTerrainTiles: boolean;
 }
 
 export interface SliderDefinition {
@@ -88,6 +89,7 @@ export const SELECTION_GRID_BASE_STATE: SelectionGridState = {
   invertGradients: false,
   allowEmptySelection: false,
   colorPalette: [...DEFAULT_SELECTION_PALETTE],
+  useTerrainTiles: true,
 };
 
 function selectionGridStatesEqual(a: SelectionGridState, b: SelectionGridState): boolean {
@@ -99,6 +101,7 @@ function selectionGridStatesEqual(a: SelectionGridState, b: SelectionGridState):
     && a.allowEmptySelection === b.allowEmptySelection
     && a.colorPalette.length === b.colorPalette.length
     && a.colorPalette.every((color, index) => color === b.colorPalette[index])
+    && a.useTerrainTiles === b.useTerrainTiles
   );
 }
 
@@ -120,6 +123,7 @@ export function normalizeSelectionGridState(base: SelectionGridState): Selection
     colorPalette: Array.isArray(base.colorPalette) && base.colorPalette.length === 256
       ? [...base.colorPalette]
       : [...DEFAULT_SELECTION_PALETTE],
+    useTerrainTiles: Boolean(base.useTerrainTiles ?? true),
   };
   if (!normalized.allowEmptySelection && normalized.selectedIndex == null) {
     normalized.selectedIndex = 0;

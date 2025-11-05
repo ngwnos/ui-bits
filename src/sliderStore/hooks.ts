@@ -102,6 +102,7 @@ export function useSelectionGridActions() {
     setSelectionGridAllowEmpty: (id: SelectionGridId, allowEmptySelection: boolean) => dispatch({ type: "updateSelectionGrid", id, patch: { allowEmptySelection } }),
     setSelectionGridInvert: (id: SelectionGridId, invertGradients: boolean) => dispatch({ type: "updateSelectionGrid", id, patch: { invertGradients } }),
     toggleSelectionGridInvert: (id: SelectionGridId) => dispatch({ type: "toggleSelectionGridInvert", id }),
+    setSelectionGridUseTerrainTiles: (id: SelectionGridId, useTerrainTiles: boolean) => dispatch({ type: "updateSelectionGrid", id, patch: { useTerrainTiles } }),
     setSelectionGridPalette: (id: SelectionGridId, palette: string[]) => dispatch({ type: "setSelectionGridPalette", id, palette }),
   }), [dispatch]);
 }

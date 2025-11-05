@@ -3,16 +3,18 @@ import * as Tabs from "@radix-ui/react-tabs";
 import {
   ArrowLeftRight,
   AudioWaveform,
-  Minus,
+  Columns4,
   ListChevronsDownUp,
   ListChevronsUpDown,
+  Minus,
+  Mountain,
   Moon,
   Pause,
   Play,
   Square,
   SquareDashed,
-  X,
   Sun,
+  X,
 } from "lucide-react";
 import { CustomColorPopover, SelectionGrid } from "./components";
 import LFOSlider, { FrameLoopProvider, type SliderBorder } from "./components/LFOSlider";
@@ -25,6 +27,8 @@ import {
   useSliderLayout,
   useSliderState,
   useSliderStoreState,
+  useSelectionGridState,
+  useSelectionGridActions,
   type SliderRuntimeState,
   type SliderId,
 } from "./sliderStore";
@@ -313,6 +317,8 @@ function ConnectedSlider({
 function EditableRectPOC() {
   const { columns, customSliderId } = useSliderLayout();
   const actions = useSliderActions();
+  const selectionGridState = useSelectionGridState(DEFAULT_SELECTION_GRID_ID);
+  const selectionGridActions = useSelectionGridActions();
   const customState = useSliderState(customSliderId);
   const [previewDarkMode, setPreviewDarkMode] = React.useState<boolean>(false);
   const [activeTab, setActiveTab] = React.useState<string>('lfo-slider');
@@ -452,6 +458,13 @@ function EditableRectPOC() {
     background: buttonBackground,
     color: buttonForeground,
   };
+  const terrainToggleStyle: React.CSSProperties = selectionGridState.useTerrainTiles
+    ? iconButtonStyle
+    : {
+      ...iconButtonStyle,
+      background: flexoki.base['500'],
+      color: flexoki.base['50'],
+    };
   const fontSizeControlStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -680,6 +693,23 @@ function EditableRectPOC() {
             </p>
           </Tabs.Content>
           <Tabs.Content value="selection-grid" style={tabBodyStyle}>
+            <button
+              type="button"
+              onClick={() => selectionGridActions.setSelectionGridUseTerrainTiles(
+                DEFAULT_SELECTION_GRID_ID,
+                !selectionGridState.useTerrainTiles,
+              )}
+              aria-pressed={selectionGridState.useTerrainTiles}
+              aria-label={selectionGridState.useTerrainTiles ? "Show gradient previews" : "Show terrain tile previews"}
+              title={selectionGridState.useTerrainTiles ? "Switch to plain gradients" : "Enable terrain textures"}
+              style={terrainToggleStyle}
+            >
+              {selectionGridState.useTerrainTiles ? (
+                <Mountain size={controlIconSize} strokeWidth={2} />
+              ) : (
+                <Columns4 size={controlIconSize} strokeWidth={2} />
+              )}
+            </button>
             <SelectionGrid
               gridId={DEFAULT_SELECTION_GRID_ID}
               previewDarkMode={previewDarkMode}

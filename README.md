@@ -13,13 +13,59 @@ bun add github:ngwnos/ui-bits
 ## Use it
 
 ```tsx
-import { FrameLoopProvider, LFOSlider } from 'ui-bits';
+import { FrameLoopProvider, LFOSlider, type LFOSliderProps } from 'ui-bits';
 import 'ui-bits/style.css';
+
+const sliderProps: LFOSliderProps = {
+  label: 'Cutoff',
+  min: 20,
+  max: 20000,
+  step: 1,
+  defaultValue: 440,
+  width: 260,
+  drawerLines: [400, 16000],
+  leftColor: '#2f2f2f',
+  rightColor: '#f0f0f0',
+  border: 'left', // 'left' | 'right' | 'none'
+  fontSize: 16,
+  drawerHandle: true,
+  drawerFeatureEnabled: true,
+  phase: 0,
+  mode: 'auto', // 'auto' | 'manual' | 'lfo' | 'external'
+  lfo: {
+    enabled: true,
+    frequency: 0.5,
+    depth: 1,
+    offset: 0.5,
+    phase: 0,
+    waveform: 'sine', // 'sine' | 'triangle' | 'saw' | 'square'
+    invert: false,
+  },
+  readExternal: () => undefined,
+  mirrorToStore: (value, tSec) => console.log('mirror', value, tSec),
+  mirrorEveryMs: 16,
+  epsilon: 1e-3,
+  onUserChange: (value) => console.log('user', value),
+  onAnimatedUpdate: (value) => console.log('animated', value),
+  onDrawerOpenChange: (open) => console.log('drawer', open),
+  onDrawerLinesChange: (lines) => console.log('lines', lines),
+  onLfoEnabledChange: (enabled) => console.log('lfo enabled', enabled),
+  onWaveformChange: (waveform) => console.log('waveform', waveform),
+  onFrequencyChange: (frequency) => console.log('frequency', frequency),
+  onPhaseChange: (phase) => console.log('phase', phase),
+  initialWaveform: 'sine',
+  initialFrequency: 0.5,
+  initialPhase: 0,
+  columnDrawerOpen: false,
+  columnLfoEnabled: true,
+  className: 'my-slider',
+  style: { marginTop: 24 },
+};
 
 export function Oscillator() {
   return (
     <FrameLoopProvider>
-      <LFOSlider label="Cutoff" min={20} max={20000} step={1} drawerHandle />
+      <LFOSlider {...sliderProps} />
     </FrameLoopProvider>
   );
 }

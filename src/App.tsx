@@ -1,4 +1,5 @@
 import React from "react";
+import * as Tabs from "@radix-ui/react-tabs";
 import {
   ArrowLeftRight,
   AudioWaveform,
@@ -306,6 +307,7 @@ function EditableRectPOC() {
   const actions = useSliderActions();
   const customState = useSliderState(customSliderId);
   const [previewDarkMode, setPreviewDarkMode] = React.useState<boolean>(false);
+  const [activeTab, setActiveTab] = React.useState<string>('lfo-slider');
   const handleTogglePalette = () => {
     setPreviewDarkMode((value) => !value);
   };
@@ -379,6 +381,47 @@ function EditableRectPOC() {
   const toggleIconSize = Math.max(columnButtonSize - 4, 12);
   const controlIconSize = Math.max(columnButtonSize - 6, 12);
   const horizontalPadding = Math.max(columnGap * 2, 16);
+  const tabs = [
+    { value: 'lfo-slider', label: 'LFO Slider' },
+  ];
+  const tabsRootStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: layoutGap,
+    width: '100%',
+    alignItems: 'center',
+  };
+  const tabsListStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  };
+  const tabBorderColor = previewDarkMode ? flexoki.base['200'] : flexoki.base['600'];
+  const tabActiveBg = previewDarkMode ? flexoki.base['200'] : flexoki.base['700'];
+  const tabActiveColor = previewDarkMode ? flexoki.base['900'] : flexoki.paper;
+  const tabInactiveColor = previewDarkMode ? flexoki.base['200'] : flexoki.base['700'];
+  const tabBodyStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: layoutGap,
+    width: '100%',
+  };
+  const getTabTriggerStyle = (value: string): React.CSSProperties => ({
+    padding: '0.35rem 0.9rem',
+    borderRadius: 6,
+    border: `1px solid ${tabBorderColor}`,
+    background: activeTab === value ? tabActiveBg : 'transparent',
+    color: activeTab === value ? tabActiveColor : tabInactiveColor,
+    fontSize: CONTROL_FONT_SIZE,
+    fontWeight: 600,
+    cursor: 'pointer',
+    lineHeight: 1,
+    transition: 'background 120ms ease, color 120ms ease, border-color 120ms ease',
+    boxShadow: activeTab === value ? `0 0 0 1px ${tabActiveBg}` : 'none',
+  });
   const buttonBackground = previewDarkMode ? flexoki.base['100'] : flexoki.base['700'];
   const buttonForeground = previewDarkMode ? flexoki.base['700'] : flexoki.base['50'];
   const iconButtonStyle: React.CSSProperties = {
@@ -428,6 +471,174 @@ function EditableRectPOC() {
     actions.setColumnBorder([customSliderId], customNextBorder);
   };
 
+  const LfoSliderTab: React.FC = () => (
+    <>
+      <button
+        type="button"
+        onClick={handleTogglePalette}
+        aria-pressed={previewDarkMode}
+        aria-label={previewDarkMode ? 'Switch to light preview' : 'Switch to dark preview'}
+        style={{
+          width: columnButtonSize,
+          height: columnButtonSize,
+          borderRadius: 3,
+          border: `1px solid ${previewDarkMode ? flexoki.purple['100'] : flexoki.yellow['700']}`,
+          background: previewDarkMode ? flexoki.purple['700'] : flexoki.yellow['100'],
+          color: previewDarkMode ? flexoki.purple['100'] : flexoki.yellow['700'],
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: CONTROL_FONT_SIZE,
+          fontWeight: 600,
+          lineHeight: 1,
+          userSelect: 'none',
+          padding: 2,
+        }}
+      >
+        {previewDarkMode ? (
+          <Moon size={toggleIconSize} strokeWidth={1.8} />
+        ) : (
+          <Sun size={toggleIconSize} strokeWidth={1.8} />
+        )}
+      </button>
+      <div style={fontSizeControlStyle}>
+        <button
+          type="button"
+          aria-label="Decrease font size"
+          title="Decrease font size"
+          style={fontSizeButtonStyle}
+          onClick={() => setSliderFontSize((prev) => Math.max(MIN_FONT_SIZE, prev - 1))}
+          disabled={sliderFontSize <= MIN_FONT_SIZE}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1 }}>−</span>
+        </button>
+        <span>Font Size: {sliderFontSize}</span>
+        <button
+          type="button"
+          aria-label="Increase font size"
+          title="Increase font size"
+          style={fontSizeButtonStyle}
+          onClick={() => setSliderFontSize((prev) => Math.min(MAX_FONT_SIZE, prev + 1))}
+          disabled={sliderFontSize >= MAX_FONT_SIZE}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
+        </button>
+      </div>
+      <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'], textAlign: 'center' }}>
+        Examples using{' '}
+        <a
+          href="https://stephango.com/flexoki"
+          style={{ color: previewDarkMode ? flexoki.blue['200'] : flexoki.blue['500'], textDecoration: 'underline' }}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Flexoki
+        </a>{' '}
+        colors:
+      </h2>
+      <div
+        style={{
+          display: 'grid',
+          width: '100%',
+          gap: columnGap,
+          justifyItems: 'stretch',
+          alignItems: 'flex-start',
+          gridTemplateColumns: singleColumnLayout
+            ? `minmax(0, ${MAX_COLUMN_WIDTH}px)`
+            : 'repeat(3, minmax(0, 1fr))',
+          justifyContent: singleColumnLayout ? 'center' : 'stretch',
+        }}
+      >
+        {columns.map((column, columnIndex) => (
+          <ColumnView
+            key={column.id}
+            column={column}
+            columnIndex={columnIndex}
+            columnButtonSize={columnButtonSize}
+            rowGap={rowGap}
+            fontSize={sliderFontSize}
+            isDarkMode={previewDarkMode}
+            maxColumnWidth={singleColumnLayout ? MAX_COLUMN_WIDTH : undefined}
+          />
+        ))}
+      </div>
+      <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'] }}>Custom colors:</h2>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+        }}
+      >
+        <CustomColorPopover
+          label="Left color"
+          previewColor={customState.leftColor}
+          accentColor={customState.rightColor}
+          isDarkMode={previewDarkMode}
+          triggerStyle={iconButtonStyle}
+          onSelect={(color) => actions.setSliderColors(customSliderId, color, customState.rightColor)}
+        />
+        <button
+          type="button"
+          onClick={() => actions.setSliderDrawerFeatureEnabled(customSliderId, !customDrawerEnabled)}
+          aria-pressed={customDrawerEnabled}
+          aria-label={customDrawerEnabled ? 'Disable custom slider drawer' : 'Enable custom slider drawer'}
+          title="Toggle custom slider drawer"
+          style={customDrawerButtonStyle}
+        >
+          {customDrawerEnabled ? (
+            <AudioWaveform size={controlIconSize} strokeWidth={2} />
+          ) : (
+            <Minus size={controlIconSize} strokeWidth={2} />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={handleSwapCustomColors}
+          aria-label="Swap custom slider colors"
+          title="Swap colors"
+          style={iconButtonStyle}
+        >
+          <ArrowLeftRight
+            size={controlIconSize}
+            strokeWidth={2}
+            style={{ transform: customSwapFlipped ? 'scaleX(-1)' : 'scaleX(1)', transition: 'transform 160ms ease' }}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={handleCycleCustomBorder}
+          aria-label="Cycle custom slider border"
+          title={"Border color left/right/none"}
+          style={iconButtonStyle}
+        >
+          {React.createElement(BORDER_ICONS[customBorder], { size: controlIconSize, strokeWidth: 2 })}
+        </button>
+        <CustomColorPopover
+          label="Right color"
+          previewColor={customState.rightColor}
+          accentColor={customState.leftColor}
+          isDarkMode={previewDarkMode}
+          triggerStyle={iconButtonStyle}
+          onSelect={(color) => actions.setSliderColors(customSliderId, customState.leftColor, color)}
+        />
+      </div>
+      <div
+        ref={customSliderWrapperRef}
+        style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+      >
+        <ConnectedSlider
+          sliderId={customSliderId}
+          fontSize={sliderFontSize}
+          widthOverride={customSliderWidth}
+          isFullWidth
+        />
+      </div>
+    </>
+  );
+
   return (
     <FrameLoopProvider>
       <div
@@ -448,169 +659,18 @@ function EditableRectPOC() {
           transition: 'none',
         }}
       >
-        <button
-          type="button"
-          onClick={handleTogglePalette}
-          aria-pressed={previewDarkMode}
-          aria-label={previewDarkMode ? 'Switch to light preview' : 'Switch to dark preview'}
-          style={{
-            width: columnButtonSize,
-            height: columnButtonSize,
-            borderRadius: 3,
-            border: `1px solid ${previewDarkMode ? flexoki.purple['100'] : flexoki.yellow['700']}`,
-            background: previewDarkMode ? flexoki.purple['700'] : flexoki.yellow['100'],
-            color: previewDarkMode ? flexoki.purple['100'] : flexoki.yellow['700'],
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: CONTROL_FONT_SIZE,
-            fontWeight: 600,
-            lineHeight: 1,
-            userSelect: 'none',
-            padding: 2,
-          }}
-        >
-          {previewDarkMode ? (
-            <Moon size={toggleIconSize} strokeWidth={1.8} />
-          ) : (
-            <Sun size={toggleIconSize} strokeWidth={1.8} />
-          )}
-        </button>
-        <div style={fontSizeControlStyle}>
-          <button
-            type="button"
-            aria-label="Decrease font size"
-            title="Decrease font size"
-            style={fontSizeButtonStyle}
-            onClick={() => setSliderFontSize((prev) => Math.max(MIN_FONT_SIZE, prev - 1))}
-            disabled={sliderFontSize <= MIN_FONT_SIZE}
-          >
-            <span style={{ fontSize: 18, lineHeight: 1 }}>−</span>
-          </button>
-          <span>Font Size: {sliderFontSize}</span>
-          <button
-            type="button"
-            aria-label="Increase font size"
-            title="Increase font size"
-            style={fontSizeButtonStyle}
-            onClick={() => setSliderFontSize((prev) => Math.min(MAX_FONT_SIZE, prev + 1))}
-            disabled={sliderFontSize >= MAX_FONT_SIZE}
-          >
-            <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
-          </button>
-        </div>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'], textAlign: 'center' }}>
-          Examples using{' '}
-          <a
-            href="https://stephango.com/flexoki"
-            style={{ color: previewDarkMode ? flexoki.blue['200'] : flexoki.blue['500'], textDecoration: 'underline' }}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Flexoki
-          </a>{' '}
-          colors:
-        </h2>
-        <div
-          style={{
-            display: 'grid',
-            width: '100%',
-            gap: columnGap,
-            justifyItems: 'stretch',
-            alignItems: 'flex-start',
-            gridTemplateColumns: singleColumnLayout
-              ? `minmax(0, ${MAX_COLUMN_WIDTH}px)`
-              : 'repeat(3, minmax(0, 1fr))',
-            justifyContent: singleColumnLayout ? 'center' : 'stretch',
-          }}
-        >
-          {columns.map((column, columnIndex) => (
-          <ColumnView
-            key={column.id}
-            column={column}
-            columnIndex={columnIndex}
-            columnButtonSize={columnButtonSize}
-            rowGap={rowGap}
-            fontSize={sliderFontSize}
-            isDarkMode={previewDarkMode}
-            maxColumnWidth={singleColumnLayout ? MAX_COLUMN_WIDTH : undefined}
-          />
-        ))}
-        </div>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'] }}>Custom colors:</h2>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-          }}
-        >
-          <CustomColorPopover
-            label="Left color"
-            previewColor={customState.leftColor}
-            accentColor={customState.rightColor}
-            isDarkMode={previewDarkMode}
-            triggerStyle={iconButtonStyle}
-            onSelect={(color) => actions.setSliderColors(customSliderId, color, customState.rightColor)}
-          />
-          <button
-            type="button"
-            onClick={() => actions.setSliderDrawerFeatureEnabled(customSliderId, !customDrawerEnabled)}
-            aria-pressed={customDrawerEnabled}
-            aria-label={customDrawerEnabled ? 'Disable custom slider drawer' : 'Enable custom slider drawer'}
-            title="Toggle custom slider drawer"
-            style={customDrawerButtonStyle}
-          >
-            {customDrawerEnabled ? (
-              <AudioWaveform size={controlIconSize} strokeWidth={2} />
-            ) : (
-              <Minus size={controlIconSize} strokeWidth={2} />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={handleSwapCustomColors}
-            aria-label="Swap custom slider colors"
-            title="Swap colors"
-            style={iconButtonStyle}
-          >
-            <ArrowLeftRight
-              size={controlIconSize}
-              strokeWidth={2}
-              style={{ transform: customSwapFlipped ? 'scaleX(-1)' : 'scaleX(1)', transition: 'transform 160ms ease' }}
-            />
-          </button>
-          <button
-            type="button"
-            onClick={handleCycleCustomBorder}
-            aria-label="Cycle custom slider border"
-            title={"Border color left/right/none"}
-            style={iconButtonStyle}
-          >
-            {React.createElement(BORDER_ICONS[customBorder], { size: controlIconSize, strokeWidth: 2 })}
-          </button>
-          <CustomColorPopover
-            label="Right color"
-            previewColor={customState.rightColor}
-            accentColor={customState.leftColor}
-            isDarkMode={previewDarkMode}
-            triggerStyle={iconButtonStyle}
-            onSelect={(color) => actions.setSliderColors(customSliderId, customState.leftColor, color)}
-          />
-        </div>
-        <div
-          ref={customSliderWrapperRef}
-          style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
-        >
-          <ConnectedSlider
-            sliderId={customSliderId}
-            fontSize={sliderFontSize}
-            widthOverride={customSliderWidth}
-            isFullWidth
-          />
-        </div>
+        <Tabs.Root value={activeTab} onValueChange={setActiveTab} style={tabsRootStyle}>
+          <Tabs.List style={tabsListStyle} aria-label="UI components">
+            {tabs.map((tab) => (
+              <Tabs.Trigger key={tab.value} value={tab.value} style={getTabTriggerStyle(tab.value)}>
+                {tab.label}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        <Tabs.Content value="lfo-slider" style={tabBodyStyle}>
+          <LfoSliderTab />
+        </Tabs.Content>
+        </Tabs.Root>
       </div>
     </FrameLoopProvider>
   );

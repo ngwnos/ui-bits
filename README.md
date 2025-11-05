@@ -10,8 +10,6 @@ Right now this package only exports the low-frequency oscillator slider from the
 bun add https://github.com/ngwnos/ui-bits.git
 ```
 
-Bring your own `react` and `react-dom` peer dependencies. npm, pnpm, and yarn can install from the same git URL if you prefer those tools.
-
 ## Use it
 
 ```tsx

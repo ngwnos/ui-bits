@@ -7,10 +7,10 @@ Right now this package only exports the low-frequency oscillator slider from the
 ## Install
 
 ```sh
-bun add ui-bits
+bun add ngwnos/ui-bits
 ```
 
-Bring your own `react` and `react-dom` peer dependencies.
+Bring your own `react` and `react-dom` peer dependencies. If you prefer npm or pnpm, point them at the repo git URL.
 
 ## Use it
 
@@ -29,4 +29,4 @@ export function Oscillator() {
 
 `ui-bits/style.css` wires up the utility classes the component expects. Beyond `LFOSlider`, helpers like `FrameLoopProvider`, `useFrame`, `useStoreMirror`, and the math utilities are re-exported from the package entry.
 
-The original Vite demo is still available via `bun run dev` if you want to poke around, but consumable code should come from the published package.
+The original Vite demo is still available via `bun run dev`; cloning the repo lets you explore everything locally.

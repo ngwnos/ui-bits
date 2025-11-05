@@ -7,7 +7,7 @@ Right now this package only exports the low-frequency oscillator slider from the
 ## Install
 
 ```sh
-bun add https://github.com/ngwnos/ui-bits.git
+bun add github:ngwnos/ui-bits
 ```
 
 ## Use it

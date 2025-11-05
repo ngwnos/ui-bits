@@ -24,9 +24,11 @@ import {
   useSliderDefinition,
   useSliderLayout,
   useSliderState,
-  DEFAULT_SELECTION_GRID_ID,
+  useSliderStoreState,
+  type SliderRuntimeState,
   type SliderId,
 } from "./sliderStore";
+import { DEFAULT_SELECTION_GRID_ID } from "./selectionGridIds";
 
 const BORDER_MODES: SliderBorder[] = ['left', 'right', 'none'];
 const BORDER_ICONS: Record<SliderBorder, React.ComponentType<{ size?: number; strokeWidth?: number }>> = {
@@ -34,8 +36,6 @@ const BORDER_ICONS: Record<SliderBorder, React.ComponentType<{ size?: number; st
   right: SquareDashed,
   none: X,
 };
-
-export { clamp, snapToStep, splitFromValue, valueFromSplit } from "./lfo";
 
 // =================== Demo: one slider per Flexoki hue ===================
 
@@ -57,10 +57,17 @@ function ColumnView({
   maxColumnWidth?: number;
 }) {
   const actions = useSliderActions();
-  const sliderStates = column.sliderIds.map((sliderId) => ({
-    sliderId,
-    state: useSliderState(sliderId),
-  }));
+  const sliderStoreState = useSliderStoreState();
+  const sliderStates = React.useMemo(
+    () => column.sliderIds
+      .map((sliderId) => {
+        const state = sliderStoreState.sliders[sliderId];
+        if (!state) return null;
+        return { sliderId, state };
+      })
+      .filter((entry): entry is { sliderId: SliderId; state: SliderRuntimeState } => entry !== null),
+    [column.sliderIds, sliderStoreState.sliders],
+  );
   const allOpen = sliderStates.every(({ state }) => state.drawerOpen);
   const allDrawerFeaturesEnabled = sliderStates.every(({ state }) => state.drawerFeatureEnabled);
   const allLfoEnabled = sliderStates.every(({ state }) => state.lfoEnabled);
@@ -677,8 +684,8 @@ function EditableRectPOC() {
               gridId={DEFAULT_SELECTION_GRID_ID}
               previewDarkMode={previewDarkMode}
               layoutGap={layoutGap}
-              colorA={previewDarkMode ? flexoki.base['200'] : flexoki.base['600']}
-              colorB={previewDarkMode ? flexoki.blue['400'] : flexoki.blue['500']}
+              colorA={flexoki.base['950']}
+              colorB={flexoki.base['50']}
               textColor={previewDarkMode ? flexoki.base['50'] : "#ffffff"}
             />
           </Tabs.Content>

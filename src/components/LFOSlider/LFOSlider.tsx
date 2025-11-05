@@ -10,6 +10,14 @@ import {
 import type { LfoSettings, Waveform } from "../../lfo";
 import { useStoreMirror } from "../../useStoreMirror";
 import type { MirrorFn } from "../../useStoreMirror";
+import {
+  applyReplace,
+  extendStep,
+  hexToRGBA,
+  isAllowedNumericChar,
+  normalizeSelection,
+  precisionFrom,
+} from "./utils";
 import "./lfoslider.css";
 export type SliderBorder = 'left' | 'right' | 'none';
 
@@ -62,127 +70,6 @@ const DRAWER_ICON_DEFS: Array<{
     lineJoin: 'round',
   },
 ];
-
-// ================= Helpers & tiny tests =================
-export function normalizeSelection(a: number, b: number, max: number): [number, number] {
-  const s = Math.max(0, Math.min(a, b));
-  const e = Math.min(max, Math.max(a, b));
-  return [s, e];
-}
-
-export function applyReplace(base: string, start: number, end: number, insert: string) {
-  const before = base.slice(0, start);
-  const after = base.slice(end);
-  const next = before + insert + after;
-  const pos = before.length + insert.length; // collapsed caret after insertion
-  return { next, pos };
-}
-
-// Allow only digits, dot, and minus for numeric entry
-export function isAllowedNumericChar(k: string): boolean {
-  if (k.length === 1) return /^[0-9.\-]$/.test(k);
-  if (/^Numpad[0-9]$/.test(k)) return true;
-  if (k === 'NumpadDecimal') return true;
-  if (k === 'NumpadSubtract') return true;
-  return false;
-}
-
-// Count decimal places of a finite number, handling scientific notation
-export function countDecimals(n: number): number {
-  if (!isFinite(n)) return 0;
-  if (Math.floor(n) === n) return 0;
-  const s = n.toString().toLowerCase();
-  if (s.includes('e-')) {
-    const p = parseInt(s.split('e-')[1], 10);
-    return isNaN(p) ? 0 : p;
-  }
-  const i = s.indexOf('.');
-  return i === -1 ? 0 : (s.length - i - 1);
-}
-
-export function precisionFrom(min: number, max: number, step: number): number {
-  return Math.max(countDecimals(min), countDecimals(max), countDecimals(step));
-}
-
-// Math helpers for value/split linkage
-export function hexToRGBA(hex: string, alpha: number) {
-  const trimmed = hex.trim();
-  const isShort = /^#?[0-9a-fA-F]{3}$/.test(trimmed);
-  const isLong = /^#?[0-9a-fA-F]{6}$/.test(trimmed);
-  if (!isShort && !isLong) return `rgba(0,0,0,${alpha})`;
-  const normalized = trimmed.replace('#', '');
-  const full = normalized.length === 3
-    ? normalized.split('').map((c) => c + c).join('')
-    : normalized;
-  const intVal = parseInt(full, 16);
-  if (Number.isNaN(intVal)) return `rgba(0,0,0,${alpha})`;
-  const r = (intVal >> 16) & 255;
-  const g = (intVal >> 8) & 255;
-  const b = intVal & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-// Selection extension helper for testing
-export function extendStep(anchor: number, selStart: number, selEnd: number, dir: -1 | 1, textLen: number): [number, number] {
-  const clampIndex = (i: number) => Math.max(0, Math.min(textLen, i));
-  const head = selStart === anchor ? selEnd : selStart;
-  const newHead = clampIndex(head + dir);
-  return normalizeSelection(anchor, newHead, textLen);
-}
-
-function runDevTests() {
-  const eq = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
-  console.assert(eq(normalizeSelection(5, 2, 10), [2, 5]), 'normalizeSelection basic');
-  console.assert(eq(normalizeSelection(-3, 100, 6), [0, 6]), 'normalizeSelection clamps');
-  console.assert(eq(normalizeSelection(4, 4, 7), [4, 4]), 'normalizeSelection equal');
-  console.assert(eq(normalizeSelection(0, 0, 0), [0, 0]), 'normalizeSelection empty max');
-
-  let r = applyReplace('abc', 0, 3, 'X');
-  console.assert(eq([r.next, r.pos], ['X', 1]), 'replace all with X');
-  r = applyReplace('abc', 1, 1, 'Z');
-  console.assert(eq([r.next, r.pos], ['aZbc', 2]), 'insert at 1');
-  r = applyReplace('abcdef', 2, 4, '');
-  console.assert(eq([r.next, r.pos], ['abef', 2]), 'delete middle range');
-  r = applyReplace('hello', 5, 5, '!');
-  console.assert(eq([r.next, r.pos], ['hello!', 6]), 'insert at end');
-
-  // Numeric filter tests
-  console.assert(isAllowedNumericChar('0') === true, 'numeric 0');
-  console.assert(isAllowedNumericChar('9') === true, 'numeric 9');
-  console.assert(isAllowedNumericChar('.') === true, 'numeric dot');
-  console.assert(isAllowedNumericChar('-') === true, 'numeric minus');
-  console.assert(isAllowedNumericChar('Numpad4') === true, 'numeric numpad digit');
-  console.assert(isAllowedNumericChar('NumpadDecimal') === true, 'numeric numpad decimal');
-  console.assert(isAllowedNumericChar('NumpadSubtract') === true, 'numeric numpad minus');
-  console.assert(isAllowedNumericChar('a') === false, 'numeric letter');
-  console.assert(isAllowedNumericChar(',') === false, 'numeric comma');
-
-  // Decimal precision helpers
-  console.assert(countDecimals(1) === 0, 'countDecimals int');
-  console.assert(countDecimals(0.001) === 3, 'countDecimals 0.001');
-  console.assert(precisionFrom(0.001, 100, 1) === 3, 'precisionFrom min dominates');
-  console.assert(precisionFrom(0, 1, 0.01) === 2, 'precisionFrom step dominates');
-  console.assert(precisionFrom(0.1, 0.001, 1) === 3, 'precisionFrom mixed cases');
-
-  // Linkage math
-  console.assert(splitFromValue(0, 0, 10) === 0, 'splitFromValue min');
-  console.assert(splitFromValue(10, 0, 10) === 1, 'splitFromValue max');
-  console.assert(valueFromSplit(0, 0, 10, 1) === 0, 'valueFromSplit min');
-  console.assert(valueFromSplit(1, 0, 10, 1) === 10, 'valueFromSplit max');
-
-  // Selection extend tests
-  let rng = extendStep(5, 5, 5, -1 as -1, 10);
-  console.assert(JSON.stringify(rng) === JSON.stringify([4,5]), 'extend left from caret');
-  rng = extendStep(5, rng[0], rng[1], -1 as -1, 10);
-  console.assert(JSON.stringify(rng) === JSON.stringify([3,5]), 'extend left continues');
-  rng = extendStep(3, 3, 5, +1 as 1, 10);
-  console.assert(JSON.stringify(rng) === JSON.stringify([3,6]), 'extend right from left-anchored');
-}
-
-if (typeof window !== 'undefined' && !(window as any).__EditableRectPOC_TestsDone) {
-  try { runDevTests(); } catch {}
-  (window as any).__EditableRectPOC_TestsDone = true;
-}
 
 // =================== LFOSlider component ===================
 
@@ -386,15 +273,15 @@ function LFOSlider({
   // Caret metrics — 70% of bar height
   const [caretH, setCaretH] = useState<number>(0);
   const [caretLeft, setCaretLeft] = useState<number>(0);
-  const recomputeCaretH = () => {
+  const recomputeCaretH = useCallback(() => {
     const host = containerRef.current;
     if (!host) return;
     const r = host.getBoundingClientRect();
     const h = r.height || parseFloat(getComputedStyle(host as Element).height) || 0;
     const caretPx = h ? Math.max(1, Math.round(h * 0.7)) : 0; // 70% of bar height
     if (caretPx && caretPx !== caretH) setCaretH(caretPx);
-  };
-  useLayoutEffect(() => { recomputeCaretH(); }, [text, width]);
+  }, [caretH]);
+  useLayoutEffect(() => { recomputeCaretH(); }, [recomputeCaretH, text, width]);
   useLayoutEffect(() => {
     if (focused && selStart === selEnd) {
       const host = containerRef.current;
@@ -419,7 +306,7 @@ function LFOSlider({
     const onResize = () => recomputeCaretH();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [recomputeCaretH]);
   useLayoutEffect(() => {
     if (!drawerHandleActive) return;
     const updateDrawerHeight = () => {
@@ -976,8 +863,22 @@ function LFOSlider({
         e.preventDefault();
         adjustValueByStep(-1);
         break;
-      case 'ArrowLeft': e.preventDefault(); e.shiftKey ? moveExtend(-1) : moveCollapsed(-1); break;
-      case 'ArrowRight': e.preventDefault(); e.shiftKey ? moveExtend(+1) : moveCollapsed(+1); break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        if (e.shiftKey) {
+          moveExtend(-1);
+        } else {
+          moveCollapsed(-1);
+        }
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        if (e.shiftKey) {
+          moveExtend(+1);
+        } else {
+          moveCollapsed(+1);
+        }
+        break;
       case 'Home': e.preventDefault(); moveToBoundary(true, e.shiftKey); break;
       case 'End': e.preventDefault(); moveToBoundary(false, e.shiftKey); break;
       case 'Enter':

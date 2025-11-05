@@ -2,147 +2,74 @@ import React from "react";
 import LFOSlider from "../LFOSlider";
 import { flexoki } from "../../flexoki";
 import {
-  DEFAULT_SELECTION_GRID_ID,
   useSelectionGridActions,
   useSelectionGridState,
   type SelectionGridId,
 } from "../../sliderStore";
+import { DEFAULT_SELECTION_GRID_ID } from "../../selectionGridIds";
+import {
+  MATPLOTLIB_GRADIENTS,
+  buildPalette,
+  createGradientCss,
+  type GradientDefinition,
+} from "../../gradients/matplotlib";
+import { CRATER_LAKE_HEIGHTMAP_SRC } from "./constants";
 
-type GradientStop = { color: string; stop: number };
+type PaletteInfo = {
+  data: Uint8ClampedArray;
+  css: string[];
+};
 
-const MATPLOTLIB_GRADIENTS: Array<{ name: string; stops: GradientStop[] }> = [
-  {
-    name: "Viridis",
-    stops: [
-      { color: "#440154", stop: 0 },
-      { color: "#3b528b", stop: 25 },
-      { color: "#21918c", stop: 50 },
-      { color: "#5ec962", stop: 75 },
-      { color: "#fde725", stop: 100 },
-    ],
-  },
-  {
-    name: "Plasma",
-    stops: [
-      { color: "#0d0887", stop: 0 },
-      { color: "#7e03a8", stop: 25 },
-      { color: "#cc4778", stop: 50 },
-      { color: "#f89441", stop: 75 },
-      { color: "#f0f921", stop: 100 },
-    ],
-  },
-  {
-    name: "Inferno",
-    stops: [
-      { color: "#000004", stop: 0 },
-      { color: "#420a68", stop: 25 },
-      { color: "#932667", stop: 50 },
-      { color: "#dd513a", stop: 75 },
-      { color: "#fba40a", stop: 100 },
-    ],
-  },
-  {
-    name: "Magma",
-    stops: [
-      { color: "#000004", stop: 0 },
-      { color: "#3b0f70", stop: 20 },
-      { color: "#8c2981", stop: 40 },
-      { color: "#de4968", stop: 65 },
-      { color: "#fe9f6d", stop: 85 },
-      { color: "#fcfdbf", stop: 100 },
-    ],
-  },
-  {
-    name: "Cividis",
-    stops: [
-      { color: "#00204c", stop: 0 },
-      { color: "#2d708e", stop: 35 },
-      { color: "#a2a929", stop: 70 },
-      { color: "#f9f7a5", stop: 100 },
-    ],
-  },
-  {
-    name: "Turbo",
-    stops: [
-      { color: "#30123b", stop: 0 },
-      { color: "#4145ab", stop: 20 },
-      { color: "#4686f4", stop: 40 },
-      { color: "#38bf6b", stop: 60 },
-      { color: "#d7e21c", stop: 80 },
-      { color: "#fca107", stop: 90 },
-      { color: "#d62f27", stop: 100 },
-    ],
-  },
-  {
-    name: "Twilight",
-    stops: [
-      { color: "#e2d9ff", stop: 0 },
-      { color: "#b8a0ff", stop: 15 },
-      { color: "#8469f0", stop: 30 },
-      { color: "#5b3fa8", stop: 45 },
-      { color: "#3b1f65", stop: 60 },
-      { color: "#5a375e", stop: 70 },
-      { color: "#8c675d", stop: 80 },
-      { color: "#c39d6a", stop: 90 },
-      { color: "#f1d9a7", stop: 100 },
-    ],
-  },
-  {
-    name: "Coolwarm",
-    stops: [
-      { color: "#3b4cc0", stop: 0 },
-      { color: "#6f92f3", stop: 25 },
-      { color: "#f7f7f7", stop: 50 },
-      { color: "#f49d7c", stop: 75 },
-      { color: "#b40426", stop: 100 },
-    ],
-  },
-  {
-    name: "Spectral",
-    stops: [
-      { color: "#9e0142", stop: 0 },
-      { color: "#f46d43", stop: 20 },
-      { color: "#fee08b", stop: 40 },
-      { color: "#e6f598", stop: 60 },
-      { color: "#66c2a5", stop: 80 },
-      { color: "#5e4fa2", stop: 100 },
-    ],
-  },
-  {
-    name: "Rainbow",
-    stops: [
-      { color: "#6e40aa", stop: 0 },
-      { color: "#4178d4", stop: 20 },
-      { color: "#1fa187", stop: 40 },
-      { color: "#73d055", stop: 60 },
-      { color: "#fde725", stop: 80 },
-      { color: "#f97306", stop: 100 },
-    ],
-  },
-  {
-    name: "Monochrome",
-    stops: [
-      { color: "#000000", stop: 0 },
-      { color: "#ffffff", stop: 100 },
-    ],
-  },
-  {
-    name: "Flexoki Monochrome",
-    stops: [
-      { color: "#100F0F", stop: 0 },
-      { color: "#FFFCF0", stop: 100 },
-    ],
-  },
-];
+type GradientBase = {
+  name: string;
+  stops: GradientDefinition["stops"];
+  normal: PaletteInfo;
+  inverted: PaletteInfo;
+};
 
-function buildGradient(stops: GradientStop[], invert: boolean): string {
-  const orderedStops = invert
-    ? stops
-        .slice()
-        .reverse()
-        .map(({ color, stop }) => ({ color, stop: 100 - stop }))
-    : stops;
-  return `linear-gradient(90deg, ${orderedStops.map(({ color, stop }) => `${color} ${stop}%`).join(", ")})`;
+type GradientVisual = {
+  name: string;
+  normal: {
+    textureUrl: string | null;
+    paletteCss: string[];
+    cssFallback: string;
+  };
+  inverted: {
+    textureUrl: string | null;
+    paletteCss: string[];
+    cssFallback: string;
+  };
+};
+
+const GRADIENT_BASE_DATA: GradientBase[] = MATPLOTLIB_GRADIENTS.map((definition) => ({
+  name: definition.name,
+  stops: definition.stops,
+  normal: buildPalette(definition.stops, false),
+  inverted: buildPalette(definition.stops, true),
+}));
+
+type HeightmapData = { data: Uint8Array; width: number; height: number };
+
+function createTextureUrl(heightMap: Uint8Array, palette: Uint8ClampedArray, width: number, height: number): string | null {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const imageData = ctx.createImageData(width, height);
+  const dest = imageData.data;
+  for (let index = 0; index < heightMap.length; index += 1) {
+    const value = heightMap[index];
+    const srcOffset = value * 4;
+    const destOffset = index * 4;
+    dest[destOffset] = palette[srcOffset];
+    dest[destOffset + 1] = palette[srcOffset + 1];
+    dest[destOffset + 2] = palette[srcOffset + 2];
+    dest[destOffset + 3] = 255;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
 }
 
 export type SelectionGridProps = {
@@ -164,7 +91,67 @@ export default function SelectionGrid({
   textColor,
   allowEmptySelection = false,
 }: SelectionGridProps) {
-  const gridCellCount = MATPLOTLIB_GRADIENTS.length;
+  const [heightmap, setHeightmap] = React.useState<HeightmapData | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    let cancelled = false;
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.src = CRATER_LAKE_HEIGHTMAP_SRC;
+    image.onload = () => {
+      if (cancelled) return;
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(image, 0, 0, width, height);
+      const src = ctx.getImageData(0, 0, width, height).data;
+      const values = new Uint8Array(width * height);
+      for (let index = 0; index < values.length; index += 1) {
+        const offset = index * 4;
+        const r = src[offset];
+        const g = src[offset + 1];
+        const b = src[offset + 2];
+        const gray = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
+        values[index] = gray;
+      }
+      setHeightmap({ data: values, width, height });
+    };
+    image.onerror = () => {
+      if (!cancelled) setHeightmap(null);
+    };
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const gradientVisuals = React.useMemo<GradientVisual[]>(() => GRADIENT_BASE_DATA.map((base) => {
+    const normalTexture = heightmap
+      ? createTextureUrl(heightmap.data, base.normal.data, heightmap.width, heightmap.height)
+      : null;
+    const invertedTexture = heightmap
+      ? createTextureUrl(heightmap.data, base.inverted.data, heightmap.width, heightmap.height)
+      : null;
+    return {
+      name: base.name,
+      normal: {
+        textureUrl: normalTexture,
+        paletteCss: [...base.normal.css],
+        cssFallback: createGradientCss(base.stops, false),
+      },
+      inverted: {
+        textureUrl: invertedTexture,
+        paletteCss: [...base.inverted.css],
+        cssFallback: createGradientCss(base.stops, true),
+      },
+    };
+  }), [heightmap]);
+
+  const gradientCount = gradientVisuals.length;
   const sliderContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [sliderBox, setSliderBox] = React.useState<{ width: number; height: number }>({ width: 260, height: 48 });
   const selectionGridState = useSelectionGridState(gridId);
@@ -176,6 +163,8 @@ export default function SelectionGrid({
     invertGradients,
     allowEmptySelection: stateAllowEmptySelection,
   } = selectionGridState;
+
+  const paletteSignatureRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     selectionGridActions.registerSelectionGrid(gridId, { allowEmptySelection });
@@ -215,44 +204,61 @@ export default function SelectionGrid({
     };
   }, []);
 
+  const selectedPalette = React.useMemo(() => {
+    if (selectedIndex == null || gradientVisuals[selectedIndex] === undefined) return null;
+    const visual = gradientVisuals[selectedIndex];
+    return invertGradients ? visual.inverted.paletteCss : visual.normal.paletteCss;
+  }, [gradientVisuals, invertGradients, selectedIndex]);
+
+  React.useEffect(() => {
+    if (!selectedPalette) return;
+    const signature = selectedPalette.join("|");
+    if (signature === paletteSignatureRef.current) return;
+    paletteSignatureRef.current = signature;
+    selectionGridActions.setSelectionGridPalette(gridId, selectedPalette);
+  }, [gridId, selectedPalette, selectionGridActions]);
+
   const baseCellSize = Math.max(8, sliderBox.height || 0);
   const cellSizePx = baseCellSize * squareScale;
   const rowCapacity = sliderBox.width ? Math.max(1, Math.floor(sliderBox.width / cellSizePx)) : 1;
-  const lastRowCount = rowCapacity >= gridCellCount ? gridCellCount : gridCellCount % rowCapacity || rowCapacity;
+  const lastRowCount = rowCapacity >= gradientCount ? gradientCount : gradientCount % rowCapacity || rowCapacity;
   const leftoverSlots = rowCapacity > lastRowCount ? rowCapacity - lastRowCount : 0;
-  const lastRowIndex = rowCapacity ? Math.floor((gridCellCount - 1) / rowCapacity) : 0;
-  const alignmentOffsetPx =
-    leftoverSlots > 0
-      ? squareAlignment === "center"
-        ? (leftoverSlots * cellSizePx) / 2
-        : squareAlignment === "right"
-          ? leftoverSlots * cellSizePx
-          : 0
-      : 0;
+  const lastRowIndex = rowCapacity ? Math.floor((gradientCount - 1) / rowCapacity) : 0;
+  const alignmentOffsetPx = leftoverSlots > 0
+    ? squareAlignment === "center"
+      ? (leftoverSlots * cellSizePx) / 2
+      : squareAlignment === "right"
+        ? leftoverSlots * cellSizePx
+        : 0
+    : 0;
   const containerWidthPx = rowCapacity * cellSizePx;
 
-  const cells = MATPLOTLIB_GRADIENTS.map((swatch, index) => {
+  const cells = gradientVisuals.map((visual, index) => {
     const row = rowCapacity ? Math.floor(index / rowCapacity) : 0;
     const col = rowCapacity ? index % rowCapacity : 0;
     const isLastRow = row === lastRowIndex;
     const marginLeft = isLastRow && col === 0 ? alignmentOffsetPx : 0;
     const isSelected = selectedIndex === index;
-    const borderWidth = isSelected ? 2 : 1;
-    const background = buildGradient(swatch.stops, invertGradients);
+    const borderWidth = 1;
+    const appearance = invertGradients ? visual.inverted : visual.normal;
+    const backgroundImage = appearance.textureUrl ? `url(${appearance.textureUrl})` : appearance.cssFallback;
     return (
       <div
-        key={swatch.name}
+        key={visual.name}
         style={{
           width: `${cellSizePx}px`,
           height: `${cellSizePx}px`,
           flex: `0 0 ${cellSizePx}px`,
-          background,
           border: `${borderWidth}px solid ${isSelected ? colorB : colorA}`,
           borderRadius: 3,
           boxSizing: "border-box",
           marginLeft,
           cursor: "pointer",
           outline: "none",
+          backgroundImage,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
         }}
         role="button"
         tabIndex={0}
@@ -316,15 +322,17 @@ export default function SelectionGrid({
     borderColor: colorB,
   };
 
-  const activeGradient = selectedIndex != null ? MATPLOTLIB_GRADIENTS[selectedIndex] : null;
-  const previewGradient = activeGradient ? buildGradient(activeGradient.stops, invertGradients) : "transparent";
-  const previewLabelBase = activeGradient ? activeGradient.name : "None";
-  const previewLabel =
-    activeGradient == null
-      ? previewLabelBase
-      : invertGradients
-        ? `<-${previewLabelBase}-<`
-        : `>-${previewLabelBase}->`;
+  const activeVisual = selectedIndex != null ? gradientVisuals[selectedIndex] : null;
+  const previewGradient = selectedIndex != null
+    ? createGradientCss(GRADIENT_BASE_DATA[selectedIndex].stops, invertGradients)
+    : "none";
+
+  const previewLabelBase = activeVisual ? activeVisual.name : "None";
+  const previewLabel = activeVisual == null
+    ? previewLabelBase
+    : invertGradients
+      ? `<-${previewLabelBase}-<`
+      : `>-${previewLabelBase}->`;
 
   return (
     <div style={wrapperStyle}>
@@ -388,7 +396,6 @@ export default function SelectionGrid({
               borderRadius: 3,
               border: `1px solid ${colorA}`,
               boxSizing: "border-box",
-              background: previewGradient,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
@@ -402,6 +409,10 @@ export default function SelectionGrid({
                 "0 1px 3px rgba(0, 0, 0, 0.85)",
               ].join(", "),
               userSelect: "none",
+              backgroundImage: previewGradient,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
             }}
             aria-label="Selected gradient preview"
             role="button"

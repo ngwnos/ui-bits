@@ -43,6 +43,8 @@ type GradientVisual = {
   };
 };
 
+const CELL_CORNER_RADIUS_PX = 3;
+
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -249,6 +251,14 @@ export default function SelectionGrid({
     const isSelected = selectedIndex === index;
     const borderWidth = 1;
     const appearance = invertGradients ? visual.inverted : visual.normal;
+    const hasTopNeighbor = index - rowCapacity >= 0;
+    const hasBottomNeighbor = index + rowCapacity < gridCellCount;
+    const hasLeftNeighbor = col > 0;
+    const hasRightNeighbor = col < rowCapacity - 1 && index + 1 < gridCellCount && Math.floor((index + 1) / rowCapacity) === row;
+    const topLeftRadius = (hasTopNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
+    const topRightRadius = (hasTopNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
+    const bottomLeftRadius = (hasBottomNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
+    const bottomRightRadius = (hasBottomNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
     const backgroundStyle = appearance.textureUrl
       ? {
         backgroundImage: `url(${appearance.textureUrl})`,
@@ -268,7 +278,7 @@ export default function SelectionGrid({
           height: `${cellSizePx}px`,
           flex: `0 0 ${cellSizePx}px`,
           border: `${borderWidth}px solid ${isSelected ? colorB : colorA}`,
-          borderRadius: 3,
+          borderRadius: `${topLeftRadius}px ${topRightRadius}px ${bottomRightRadius}px ${bottomLeftRadius}px`,
           boxSizing: "border-box",
           marginLeft,
           cursor: "pointer",

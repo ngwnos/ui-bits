@@ -1,10 +1,21 @@
-import React, { createContext, useContext, useMemo, useReducer } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useReducer } from "react";
 import { clamp, valueFromSplit } from "./lfo";
 import type { Waveform } from "./lfo";
 import { flexoki, type FlexokiHue } from "./flexoki";
 import type { SliderBorder } from "./components/LFOSlider";
 
 export type SliderId = string;
+export type SelectionGridId = string;
+
+type SelectionGridAlignment = 'left' | 'center' | 'right';
+
+export interface SelectionGridState {
+  selectedIndex: number | null;
+  squareScale: number;
+  squareAlignment: SelectionGridAlignment;
+  invertGradients: boolean;
+  allowEmptySelection: boolean;
+}
 
 interface SliderDefinition {
   id: SliderId;
@@ -41,6 +52,8 @@ interface SliderStoreState {
   sliders: Record<SliderId, SliderRuntimeState>;
   columns: SliderColumn[];
   customSliderId: SliderId;
+  selectionGrids: Record<SelectionGridId, SelectionGridState>;
+  selectionGridIds: SelectionGridId[];
 }
 
 type SliderStoreAction =
@@ -59,7 +72,20 @@ type SliderStoreAction =
   | { type: 'setLfoEnabledBatch'; ids: SliderId[]; enabled: boolean }
   | { type: 'swapColorsAll' }
   | { type: 'swapColorsColumn'; ids: SliderId[] }
-  | { type: 'setBorderColumn'; ids: SliderId[]; border: SliderBorder };
+  | { type: 'setBorderColumn'; ids: SliderId[]; border: SliderBorder }
+  | { type: 'registerSelectionGrid'; id: SelectionGridId; initialState?: Partial<SelectionGridState> }
+  | { type: 'updateSelectionGrid'; id: SelectionGridId; patch: Partial<SelectionGridState> }
+  | { type: 'toggleSelectionGridInvert'; id: SelectionGridId };
+
+export const DEFAULT_SELECTION_GRID_ID: SelectionGridId = 'selection-grid-demo';
+
+const SELECTION_GRID_BASE_STATE: SelectionGridState = {
+  selectedIndex: 0,
+  squareScale: 1,
+  squareAlignment: 'left',
+  invertGradients: false,
+  allowEmptySelection: false,
+};
 
 interface SliderStoreContextValue {
   state: SliderStoreState;
@@ -227,10 +253,46 @@ const sliderGroups: SliderGroupDefinition[] = [
   },
 ];
 
+function selectionGridStatesEqual(a: SelectionGridState, b: SelectionGridState): boolean {
+  return (
+    a.selectedIndex === b.selectedIndex
+    && a.squareScale === b.squareScale
+    && a.squareAlignment === b.squareAlignment
+    && a.invertGradients === b.invertGradients
+    && a.allowEmptySelection === b.allowEmptySelection
+  );
+}
+
+function normalizeSelectionGridState(base: SelectionGridState): SelectionGridState {
+  const clampScale = (value: number): number => {
+    if (!Number.isFinite(value)) return 1;
+    return Math.min(4, Math.max(1, Math.round(value)));
+  };
+  const normalizeAlignment = (value: SelectionGridAlignment): SelectionGridAlignment => {
+    if (value === 'center' || value === 'right') return value;
+    return 'left';
+  };
+  const normalized: SelectionGridState = {
+    selectedIndex: base.selectedIndex,
+    squareScale: clampScale(base.squareScale),
+    squareAlignment: normalizeAlignment(base.squareAlignment),
+    invertGradients: Boolean(base.invertGradients),
+    allowEmptySelection: Boolean(base.allowEmptySelection),
+  };
+  if (!normalized.allowEmptySelection && normalized.selectedIndex == null) {
+    normalized.selectedIndex = 0;
+  }
+  return normalized;
+}
+
+const NORMALIZED_SELECTION_GRID_BASE = normalizeSelectionGridState({ ...SELECTION_GRID_BASE_STATE });
+
 function buildInitialState(): SliderStoreState {
   const definitions: Record<SliderId, SliderDefinition> = {};
   const sliders: Record<SliderId, SliderRuntimeState> = {};
   const columns: SliderColumn[] = [];
+  const selectionGrids: Record<SelectionGridId, SelectionGridState> = {};
+  const selectionGridIds: SelectionGridId[] = [];
 
   const columnCount = sliderGroups[0]?.variants.length ?? 0;
 
@@ -305,7 +367,19 @@ function buildInitialState(): SliderStoreState {
     phase: randomPhase(),
   };
 
-  return { definitions, sliders, columns, customSliderId };
+  selectionGrids[DEFAULT_SELECTION_GRID_ID] = normalizeSelectionGridState({
+    ...SELECTION_GRID_BASE_STATE,
+  });
+  selectionGridIds.push(DEFAULT_SELECTION_GRID_ID);
+
+  return {
+    definitions,
+    sliders,
+    columns,
+    customSliderId,
+    selectionGrids,
+    selectionGridIds,
+  };
 }
 
 function sliderStoreReducer(state: SliderStoreState, action: SliderStoreAction): SliderStoreState {
@@ -485,6 +559,58 @@ function sliderStoreReducer(state: SliderStoreState, action: SliderStoreAction):
       });
       return { ...state, sliders: nextSliders };
     }
+    case 'registerSelectionGrid': {
+      const current = state.selectionGrids[action.id];
+      if (current) {
+        const next = normalizeSelectionGridState({ ...current, ...(action.initialState ?? {}) });
+        if (selectionGridStatesEqual(next, current)) return state;
+        return {
+          ...state,
+          selectionGrids: {
+            ...state.selectionGrids,
+            [action.id]: next,
+          },
+        };
+      }
+      const next = normalizeSelectionGridState({ ...SELECTION_GRID_BASE_STATE, ...(action.initialState ?? {}) });
+      return {
+        ...state,
+        selectionGridIds: state.selectionGridIds.includes(action.id)
+          ? state.selectionGridIds
+          : [...state.selectionGridIds, action.id],
+        selectionGrids: {
+          ...state.selectionGrids,
+          [action.id]: next,
+        },
+      };
+    }
+    case 'updateSelectionGrid': {
+      const current = state.selectionGrids[action.id];
+      if (!current) return state;
+      const next = normalizeSelectionGridState({ ...current, ...action.patch });
+      if (selectionGridStatesEqual(next, current)) {
+        return state;
+      }
+      return {
+        ...state,
+        selectionGrids: {
+          ...state.selectionGrids,
+          [action.id]: next,
+        },
+      };
+    }
+    case 'toggleSelectionGridInvert': {
+      const current = state.selectionGrids[action.id];
+      if (!current) return state;
+      const next = { ...current, invertGradients: !current.invertGradients };
+      return {
+        ...state,
+        selectionGrids: {
+          ...state.selectionGrids,
+          [action.id]: next,
+        },
+      };
+    }
     default:
       return state;
   }
@@ -521,6 +647,11 @@ export function useSliderLayout(): { columns: SliderColumn[]; customSliderId: Sl
   return { columns: state.columns, customSliderId: state.customSliderId };
 }
 
+export function useSelectionGridIds(): SelectionGridId[] {
+  const { state } = useSliderStore();
+  return state.selectionGridIds;
+}
+
 export function useSliderColumn(columnId: string): SliderColumn {
   const { state } = useSliderStore();
   const column = state.columns.find((c) => c.id === columnId);
@@ -547,5 +678,34 @@ export function useSliderActions() {
     swapAllSliderColors: () => dispatch({ type: 'swapColorsAll' }),
     swapColumnSliderColors: (ids: SliderId[]) => dispatch({ type: 'swapColorsColumn', ids }),
     setColumnBorder: (ids: SliderId[], border: SliderBorder) => dispatch({ type: 'setBorderColumn', ids, border }),
+  }), [dispatch]);
+}
+
+export function useSelectionGridState(id: SelectionGridId): SelectionGridState {
+  const { state, dispatch } = useSliderStore();
+  const grid = state.selectionGrids[id];
+
+  useEffect(() => {
+    if (!grid) {
+      dispatch({ type: 'registerSelectionGrid', id });
+    }
+  }, [grid, id, dispatch]);
+
+  if (!grid) {
+    return NORMALIZED_SELECTION_GRID_BASE;
+  }
+  return grid;
+}
+
+export function useSelectionGridActions() {
+  const { dispatch } = useSliderStore();
+  return useMemo(() => ({
+    registerSelectionGrid: (id: SelectionGridId, initialState?: Partial<SelectionGridState>) => dispatch({ type: 'registerSelectionGrid', id, initialState }),
+    setSelectionGridSelectedIndex: (id: SelectionGridId, selectedIndex: number | null) => dispatch({ type: 'updateSelectionGrid', id, patch: { selectedIndex } }),
+    setSelectionGridSquareScale: (id: SelectionGridId, squareScale: number) => dispatch({ type: 'updateSelectionGrid', id, patch: { squareScale } }),
+    setSelectionGridAlignment: (id: SelectionGridId, squareAlignment: SelectionGridAlignment) => dispatch({ type: 'updateSelectionGrid', id, patch: { squareAlignment } }),
+    setSelectionGridAllowEmpty: (id: SelectionGridId, allowEmptySelection: boolean) => dispatch({ type: 'updateSelectionGrid', id, patch: { allowEmptySelection } }),
+    setSelectionGridInvert: (id: SelectionGridId, invertGradients: boolean) => dispatch({ type: 'updateSelectionGrid', id, patch: { invertGradients } }),
+    toggleSelectionGridInvert: (id: SelectionGridId) => dispatch({ type: 'toggleSelectionGridInvert', id }),
   }), [dispatch]);
 }

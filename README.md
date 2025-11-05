@@ -7,10 +7,10 @@ Right now this package only exports the low-frequency oscillator slider from the
 ## Install
 
 ```sh
-bun add ngwnos/ui-bits
+bun add https://github.com/ngwnos/ui-bits.git
 ```
 
-Bring your own `react` and `react-dom` peer dependencies. If you prefer npm or pnpm, point them at the repo git URL.
+Bring your own `react` and `react-dom` peer dependencies. npm, pnpm, and yarn can install from the same git URL if you prefer those tools.
 
 ## Use it
 

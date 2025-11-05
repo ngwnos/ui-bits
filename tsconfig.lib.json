@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "outDir": "dist/types",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "stripInternal": true
+  },
+  "include": [
+    "src/library.ts",
+    "src/components/LFOSlider/**/*",
+    "src/frameLoop.tsx",
+    "src/useStoreMirror.ts",
+    "src/lfo.ts"
+  ]
+}

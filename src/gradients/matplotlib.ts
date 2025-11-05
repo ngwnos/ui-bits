@@ -151,6 +151,456 @@ export const MATPLOTLIB_GRADIENTS: GradientDefinition[] = [
     ],
   },
   {
+    name: "Blues",
+    stops: [
+      { color: "#f7fbff", stop: 0 },
+      { color: "#c6dbef", stop: 25 },
+      { color: "#6aaed6", stop: 50 },
+      { color: "#2070b4", stop: 75 },
+      { color: "#08306b", stop: 100 },
+    ],
+  },
+  {
+    name: "BuGn",
+    stops: [
+      { color: "#f7fcfd", stop: 0 },
+      { color: "#ccece6", stop: 25 },
+      { color: "#65c2a3", stop: 50 },
+      { color: "#228a44", stop: 75 },
+      { color: "#00441b", stop: 100 },
+    ],
+  },
+  {
+    name: "BuPu",
+    stops: [
+      { color: "#f7fcfd", stop: 0 },
+      { color: "#bfd3e6", stop: 25 },
+      { color: "#8c95c6", stop: 50 },
+      { color: "#88409c", stop: 75 },
+      { color: "#4d004b", stop: 100 },
+    ],
+  },
+  {
+    name: "GnBu",
+    stops: [
+      { color: "#f7fcf0", stop: 0 },
+      { color: "#ccebc5", stop: 25 },
+      { color: "#7accc4", stop: 50 },
+      { color: "#2a8bbe", stop: 75 },
+      { color: "#084081", stop: 100 },
+    ],
+  },
+  {
+    name: "Greens",
+    stops: [
+      { color: "#f7fcf5", stop: 0 },
+      { color: "#c7e9c0", stop: 25 },
+      { color: "#73c476", stop: 50 },
+      { color: "#228a44", stop: 75 },
+      { color: "#00441b", stop: 100 },
+    ],
+  },
+  {
+    name: "Greys",
+    stops: [
+      { color: "#ffffff", stop: 0 },
+      { color: "#d9d9d9", stop: 25 },
+      { color: "#959595", stop: 50 },
+      { color: "#515151", stop: 75 },
+      { color: "#000000", stop: 100 },
+    ],
+  },
+  {
+    name: "Oranges",
+    stops: [
+      { color: "#fff5eb", stop: 0 },
+      { color: "#fdd0a2", stop: 25 },
+      { color: "#fd8c3b", stop: 50 },
+      { color: "#d84801", stop: 75 },
+      { color: "#7f2704", stop: 100 },
+    ],
+  },
+  {
+    name: "OrRd",
+    stops: [
+      { color: "#fff7ec", stop: 0 },
+      { color: "#fdd49e", stop: 25 },
+      { color: "#fc8c59", stop: 50 },
+      { color: "#d62f1e", stop: 75 },
+      { color: "#7f0000", stop: 100 },
+    ],
+  },
+  {
+    name: "PuBu",
+    stops: [
+      { color: "#fff7fb", stop: 0 },
+      { color: "#d0d1e6", stop: 25 },
+      { color: "#73a9cf", stop: 50 },
+      { color: "#056faf", stop: 75 },
+      { color: "#023858", stop: 100 },
+    ],
+  },
+  {
+    name: "PuBuGn",
+    stops: [
+      { color: "#fff7fb", stop: 0 },
+      { color: "#d0d1e6", stop: 25 },
+      { color: "#66a9cf", stop: 50 },
+      { color: "#028189", stop: 75 },
+      { color: "#014636", stop: 100 },
+    ],
+  },
+  {
+    name: "PuRd",
+    stops: [
+      { color: "#f7f4f9", stop: 0 },
+      { color: "#d4b9da", stop: 25 },
+      { color: "#df64af", stop: 50 },
+      { color: "#cd1256", stop: 75 },
+      { color: "#67001f", stop: 100 },
+    ],
+  },
+  {
+    name: "Purples",
+    stops: [
+      { color: "#fcfbfd", stop: 0 },
+      { color: "#dadaeb", stop: 25 },
+      { color: "#9e9ac8", stop: 50 },
+      { color: "#6950a3", stop: 75 },
+      { color: "#3f007d", stop: 100 },
+    ],
+  },
+  {
+    name: "RdPu",
+    stops: [
+      { color: "#fff7f3", stop: 0 },
+      { color: "#fcc5c0", stop: 25 },
+      { color: "#f767a1", stop: 50 },
+      { color: "#ad017e", stop: 75 },
+      { color: "#49006a", stop: 100 },
+    ],
+  },
+  {
+    name: "Reds",
+    stops: [
+      { color: "#fff5f0", stop: 0 },
+      { color: "#fcbba1", stop: 25 },
+      { color: "#fb694a", stop: 50 },
+      { color: "#ca181d", stop: 75 },
+      { color: "#67000d", stop: 100 },
+    ],
+  },
+  {
+    name: "YlGn",
+    stops: [
+      { color: "#ffffe5", stop: 0 },
+      { color: "#d9f0a3", stop: 25 },
+      { color: "#77c679", stop: 50 },
+      { color: "#228343", stop: 75 },
+      { color: "#004529", stop: 100 },
+    ],
+  },
+  {
+    name: "YlGnBu",
+    stops: [
+      { color: "#ffffd9", stop: 0 },
+      { color: "#c6e9b4", stop: 25 },
+      { color: "#40b5c4", stop: 50 },
+      { color: "#225da8", stop: 75 },
+      { color: "#081d58", stop: 100 },
+    ],
+  },
+  {
+    name: "YlOrBr",
+    stops: [
+      { color: "#ffffe5", stop: 0 },
+      { color: "#fee390", stop: 25 },
+      { color: "#fe9829", stop: 50 },
+      { color: "#cb4b02", stop: 75 },
+      { color: "#662506", stop: 100 },
+    ],
+  },
+  {
+    name: "YlOrRd",
+    stops: [
+      { color: "#ffffcc", stop: 0 },
+      { color: "#fed976", stop: 25 },
+      { color: "#fd8c3c", stop: 50 },
+      { color: "#e2191c", stop: 75 },
+      { color: "#800026", stop: 100 },
+    ],
+  },
+  {
+    name: "Binary",
+    stops: [
+      { color: "#ffffff", stop: 0 },
+      { color: "#bfbfbf", stop: 25 },
+      { color: "#7f7f7f", stop: 50 },
+      { color: "#3f3f3f", stop: 75 },
+      { color: "#000000", stop: 100 },
+    ],
+  },
+  {
+    name: "Gist Yarg",
+    stops: [
+      { color: "#ffffff", stop: 0 },
+      { color: "#bfbfbf", stop: 25 },
+      { color: "#7f7f7f", stop: 50 },
+      { color: "#3f3f3f", stop: 75 },
+      { color: "#000000", stop: 100 },
+    ],
+  },
+  {
+    name: "Gist Gray",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#404040", stop: 25 },
+      { color: "#808080", stop: 50 },
+      { color: "#c0c0c0", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Gray",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#404040", stop: 25 },
+      { color: "#808080", stop: 50 },
+      { color: "#c0c0c0", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Bone",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#38384e", stop: 25 },
+      { color: "#707b90", stop: 50 },
+      { color: "#a9c8c8", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Pink",
+    stops: [
+      { color: "#1e0000", stop: 0 },
+      { color: "#a16868", stop: 25 },
+      { color: "#d0ac94", stop: 50 },
+      { color: "#e9e9b6", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Spring",
+    stops: [
+      { color: "#ff00ff", stop: 0 },
+      { color: "#ff40bf", stop: 25 },
+      { color: "#ff807f", stop: 50 },
+      { color: "#ffc03f", stop: 75 },
+      { color: "#ffff00", stop: 100 },
+    ],
+  },
+  {
+    name: "Summer",
+    stops: [
+      { color: "#008066", stop: 0 },
+      { color: "#40a066", stop: 25 },
+      { color: "#80c066", stop: 50 },
+      { color: "#c0e066", stop: 75 },
+      { color: "#ffff66", stop: 100 },
+    ],
+  },
+  {
+    name: "Autumn",
+    stops: [
+      { color: "#ff0000", stop: 0 },
+      { color: "#ff4000", stop: 25 },
+      { color: "#ff8000", stop: 50 },
+      { color: "#ffc000", stop: 75 },
+      { color: "#ffff00", stop: 100 },
+    ],
+  },
+  {
+    name: "Winter",
+    stops: [
+      { color: "#0000ff", stop: 0 },
+      { color: "#0040df", stop: 25 },
+      { color: "#0080bf", stop: 50 },
+      { color: "#00c09f", stop: 75 },
+      { color: "#00ff80", stop: 100 },
+    ],
+  },
+  {
+    name: "Cool",
+    stops: [
+      { color: "#00ffff", stop: 0 },
+      { color: "#40bfff", stop: 25 },
+      { color: "#807fff", stop: 50 },
+      { color: "#c03fff", stop: 75 },
+      { color: "#ff00ff", stop: 100 },
+    ],
+  },
+  {
+    name: "Wistia",
+    stops: [
+      { color: "#e4ff7a", stop: 0 },
+      { color: "#ffe81a", stop: 25 },
+      { color: "#ffbd00", stop: 50 },
+      { color: "#ffa000", stop: 75 },
+      { color: "#fc7f00", stop: 100 },
+    ],
+  },
+  {
+    name: "Hot",
+    stops: [
+      { color: "#0b0000", stop: 0 },
+      { color: "#b30000", stop: 25 },
+      { color: "#ff5c00", stop: 50 },
+      { color: "#ffff07", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Afmhot",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#800000", stop: 25 },
+      { color: "#ff8001", stop: 50 },
+      { color: "#ffff81", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Gist Heat",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#600000", stop: 25 },
+      { color: "#c00100", stop: 50 },
+      { color: "#ff8103", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Copper",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#4f3220", stop: 25 },
+      { color: "#9e6440", stop: 50 },
+      { color: "#ed9660", stop: 75 },
+      { color: "#ffc77f", stop: 100 },
+    ],
+  },
+  {
+    name: "Gist Earth",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#2b737e", stop: 25 },
+      { color: "#5ea04b", stop: 50 },
+      { color: "#bdab62", stop: 75 },
+      { color: "#fdfbfb", stop: 100 },
+    ],
+  },
+  {
+    name: "Terrain",
+    stops: [
+      { color: "#333399", stop: 0 },
+      { color: "#01cc66", stop: 25 },
+      { color: "#fefe98", stop: 50 },
+      { color: "#815e56", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Ocean",
+    stops: [
+      { color: "#008000", stop: 0 },
+      { color: "#002040", stop: 25 },
+      { color: "#004080", stop: 50 },
+      { color: "#42a0c0", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Gist Stern",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#404080", stop: 25 },
+      { color: "#8080fd", stop: 50 },
+      { color: "#c0c011", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Brg",
+    stops: [
+      { color: "#0000ff", stop: 0 },
+      { color: "#80007f", stop: 25 },
+      { color: "#fe0100", stop: 50 },
+      { color: "#7e8100", stop: 75 },
+      { color: "#00ff00", stop: 100 },
+    ],
+  },
+  {
+    name: "CMRmap",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#4d26bf", stop: 25 },
+      { color: "#ff4126", stop: 50 },
+      { color: "#e6c01c", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Cubehelix",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#16534c", stop: 25 },
+      { color: "#a1794a", stop: 50 },
+      { color: "#c6b4ee", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Gnuplot",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#8004ff", stop: 25 },
+      { color: "#b52000", stop: 50 },
+      { color: "#dd6d00", stop: 75 },
+      { color: "#ffff00", stop: 100 },
+    ],
+  },
+  {
+    name: "Gnuplot2",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#0100ff", stop: 25 },
+      { color: "#c92ad5", stop: 50 },
+      { color: "#ffaa55", stop: 75 },
+      { color: "#ffffff", stop: 100 },
+    ],
+  },
+  {
+    name: "Nipy Spectral",
+    stops: [
+      { color: "#000000", stop: 0 },
+      { color: "#0078dd", stop: 25 },
+      { color: "#00bc00", stop: 50 },
+      { color: "#ffc900", stop: 75 },
+      { color: "#cccccc", stop: 100 },
+    ],
+  },
+  {
+    name: "Gist Ncar",
+    stops: [
+      { color: "#000080", stop: 0 },
+      { color: "#00fbb0", stop: 25 },
+      { color: "#dbff20", stop: 50 },
+      { color: "#ff0047", stop: 75 },
+      { color: "#fef8fe", stop: 100 },
+    ],
+  },
+  {
     name: "Twilight",
     stops: [
       { color: "#e2d9ff", stop: 0 },
@@ -206,8 +656,8 @@ export const MATPLOTLIB_GRADIENTS: GradientDefinition[] = [
   {
     name: "Flexoki Monochrome",
     stops: [
-      { color: "#100F0F", stop: 0 },
-      { color: "#FFFCF0", stop: 100 },
+      { color: "#100f0f", stop: 0 },
+      { color: "#fffcf0", stop: 100 },
     ],
   },
 ];

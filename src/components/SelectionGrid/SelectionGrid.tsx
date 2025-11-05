@@ -13,7 +13,7 @@ import {
   createGradientCss,
   type GradientDefinition,
 } from "../../gradients/matplotlib";
-import { CRATER_LAKE_HEIGHTMAP_SRC } from "./constants";
+import { loadTilePixels, colorizeTile } from "../../utils/tileColorize";
 
 type PaletteInfo = {
   data: Uint8ClampedArray;
@@ -29,6 +29,7 @@ type GradientBase = {
 
 type GradientVisual = {
   name: string;
+  tile: string;
   normal: {
     textureUrl: string | null;
     paletteCss: string[];
@@ -41,6 +42,17 @@ type GradientVisual = {
   };
 };
 
+function shuffle<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = temp;
+  }
+  return copy;
+}
+
 const GRADIENT_BASE_DATA: GradientBase[] = MATPLOTLIB_GRADIENTS.map((definition) => ({
   name: definition.name,
   stops: definition.stops,
@@ -48,28 +60,17 @@ const GRADIENT_BASE_DATA: GradientBase[] = MATPLOTLIB_GRADIENTS.map((definition)
   inverted: buildPalette(definition.stops, true),
 }));
 
-type HeightmapData = { data: Uint8Array; width: number; height: number };
-
-function createTextureUrl(heightMap: Uint8Array, palette: Uint8ClampedArray, width: number, height: number): string | null {
-  if (typeof document === "undefined") return null;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  const imageData = ctx.createImageData(width, height);
-  const dest = imageData.data;
-  for (let index = 0; index < heightMap.length; index += 1) {
-    const value = heightMap[index];
-    const srcOffset = value * 4;
-    const destOffset = index * 4;
-    dest[destOffset] = palette[srcOffset];
-    dest[destOffset + 1] = palette[srcOffset + 1];
-    dest[destOffset + 2] = palette[srcOffset + 2];
-    dest[destOffset + 3] = 255;
+async function loadTileList(): Promise<string[]> {
+  try {
+    const response = await fetch("/terrain/tiles.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("Failed to load tile list");
+    const data: unknown = await response.json();
+    if (!Array.isArray(data)) throw new Error("Tile manifest malformed");
+    return data.filter((entry): entry is string => typeof entry === "string" && entry.endsWith(".png")).map((name) => `/terrain/tiles/${name}`);
+  } catch (error) {
+    console.error("Failed to fetch tile list", error);
+    return [];
   }
-  ctx.putImageData(imageData, 0, 0);
-  return canvas.toDataURL("image/png");
 }
 
 export type SelectionGridProps = {
@@ -91,67 +92,70 @@ export default function SelectionGrid({
   textColor,
   allowEmptySelection = false,
 }: SelectionGridProps) {
-  const [heightmap, setHeightmap] = React.useState<HeightmapData | null>(null);
+  const [tileTextures, setTileTextures] = React.useState<Map<string, { normal: string | null; inverted: string | null }>>(new Map());
+  const [tileAssignments, setTileAssignments] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
-    if (typeof window === "undefined") return undefined;
     let cancelled = false;
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.src = CRATER_LAKE_HEIGHTMAP_SRC;
-    image.onload = () => {
-      if (cancelled) return;
-      const width = image.naturalWidth || image.width;
-      const height = image.naturalHeight || image.height;
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(image, 0, 0, width, height);
-      const src = ctx.getImageData(0, 0, width, height).data;
-      const values = new Uint8Array(width * height);
-      for (let index = 0; index < values.length; index += 1) {
-        const offset = index * 4;
-        const r = src[offset];
-        const g = src[offset + 1];
-        const b = src[offset + 2];
-        const gray = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
-        values[index] = gray;
+    const loadAndColorize = async () => {
+      try {
+        const tileUrls = await loadTileList();
+        const shuffled = shuffle(tileUrls);
+        const pool = shuffled.length > 0 ? shuffled : tileUrls;
+        const assignments: Record<string, string> = {};
+        const textures = new Map<string, { normal: string | null; inverted: string | null }>();
+        const tileCache = new Map<string, { data: Uint8Array; width: number; height: number }>();
+        GRADIENT_BASE_DATA.forEach((gradient, index) => {
+          const tileUrl = pool[index % pool.length];
+          assignments[gradient.name] = tileUrl;
+        });
+        for (const gradient of GRADIENT_BASE_DATA) {
+          const tileUrl = assignments[gradient.name];
+          if (!tileUrl) continue;
+          let tilePixels = tileCache.get(tileUrl);
+          if (!tilePixels) {
+            tilePixels = await loadTilePixels(tileUrl);
+            tileCache.set(tileUrl, tilePixels);
+          }
+          const normalTexture = colorizeTile(tilePixels, gradient.normal.data);
+          const invertedTexture = colorizeTile(tilePixels, gradient.inverted.data);
+          textures.set(gradient.name, { normal: normalTexture, inverted: invertedTexture });
+        }
+        if (!cancelled) {
+          setTileAssignments(assignments);
+          setTileTextures(textures);
+        }
+      } catch (error) {
+        console.error("Failed to load selection grid tiles", error);
       }
-      setHeightmap({ data: values, width, height });
     };
-    image.onerror = () => {
-      if (!cancelled) setHeightmap(null);
-    };
+    loadAndColorize();
     return () => {
       cancelled = true;
     };
   }, []);
 
   const gradientVisuals = React.useMemo<GradientVisual[]>(() => GRADIENT_BASE_DATA.map((base) => {
-    const normalTexture = heightmap
-      ? createTextureUrl(heightmap.data, base.normal.data, heightmap.width, heightmap.height)
-      : null;
-    const invertedTexture = heightmap
-      ? createTextureUrl(heightmap.data, base.inverted.data, heightmap.width, heightmap.height)
-      : null;
+    const textures = tileTextures.get(base.name);
+    const tileUrl = tileAssignments[base.name] ?? "";
+    const tileName = tileUrl.split("/").pop() ?? tileUrl;
     return {
       name: base.name,
+      tile: tileName,
       normal: {
-        textureUrl: normalTexture,
+        textureUrl: textures?.normal ?? null,
         paletteCss: [...base.normal.css],
         cssFallback: createGradientCss(base.stops, false),
       },
       inverted: {
-        textureUrl: invertedTexture,
+        textureUrl: textures?.inverted ?? null,
         paletteCss: [...base.inverted.css],
         cssFallback: createGradientCss(base.stops, true),
       },
     };
-  }), [heightmap]);
+  }), [tileAssignments, tileTextures]);
 
-  const gradientCount = gradientVisuals.length;
+  const gridCellCount = gradientVisuals.length;
   const sliderContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [sliderBox, setSliderBox] = React.useState<{ width: number; height: number }>({ width: 260, height: 48 });
   const selectionGridState = useSelectionGridState(gridId);
@@ -221,9 +225,9 @@ export default function SelectionGrid({
   const baseCellSize = Math.max(8, sliderBox.height || 0);
   const cellSizePx = baseCellSize * squareScale;
   const rowCapacity = sliderBox.width ? Math.max(1, Math.floor(sliderBox.width / cellSizePx)) : 1;
-  const lastRowCount = rowCapacity >= gradientCount ? gradientCount : gradientCount % rowCapacity || rowCapacity;
+  const lastRowCount = rowCapacity >= gridCellCount ? gridCellCount : gridCellCount % rowCapacity || rowCapacity;
   const leftoverSlots = rowCapacity > lastRowCount ? rowCapacity - lastRowCount : 0;
-  const lastRowIndex = rowCapacity ? Math.floor((gradientCount - 1) / rowCapacity) : 0;
+  const lastRowIndex = rowCapacity ? Math.floor((gridCellCount - 1) / rowCapacity) : 0;
   const alignmentOffsetPx = leftoverSlots > 0
     ? squareAlignment === "center"
       ? (leftoverSlots * cellSizePx) / 2
@@ -241,10 +245,20 @@ export default function SelectionGrid({
     const isSelected = selectedIndex === index;
     const borderWidth = 1;
     const appearance = invertGradients ? visual.inverted : visual.normal;
-    const backgroundImage = appearance.textureUrl ? `url(${appearance.textureUrl})` : appearance.cssFallback;
+    const backgroundStyle = appearance.textureUrl
+      ? {
+        backgroundImage: `url(${appearance.textureUrl})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+      : {
+        backgroundImage: appearance.cssFallback,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      };
     return (
       <div
-        key={visual.name}
+        key={`${visual.name}-${visual.tile}-${index}`}
         style={{
           width: `${cellSizePx}px`,
           height: `${cellSizePx}px`,
@@ -255,10 +269,8 @@ export default function SelectionGrid({
           marginLeft,
           cursor: "pointer",
           outline: "none",
-          backgroundImage,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
           backgroundRepeat: "no-repeat",
+          ...backgroundStyle,
         }}
         role="button"
         tabIndex={0}
@@ -303,36 +315,44 @@ export default function SelectionGrid({
     { value: "right", label: "Right" },
   ];
 
+  const buttonBackground = previewDarkMode ? flexoki.base["100"] : flexoki.base["700"];
+  const buttonForeground = previewDarkMode ? flexoki.base["700"] : flexoki.base["50"];
+  const buttonActiveBackground = previewDarkMode ? flexoki.base["200"] : flexoki.base["600"];
+  const buttonActiveForeground = previewDarkMode ? flexoki.base["900"] : flexoki.base["50"];
+
   const alignmentButtonStyle: React.CSSProperties = {
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colorA,
-    background: previewDarkMode ? flexoki.base["900"] : flexoki.base["50"],
-    color: previewDarkMode ? flexoki.base["200"] : flexoki.base["600"],
-    padding: "0.25rem 0.75rem",
+    background: buttonBackground,
+    color: buttonForeground,
+    padding: "0.35rem 0.9rem",
     borderRadius: 4,
+    border: "none",
     fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
+    lineHeight: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    transition: "background 120ms ease, color 120ms ease, transform 120ms ease",
+    boxShadow: "0 0 0 1px transparent",
   };
 
   const alignmentButtonActiveStyle: React.CSSProperties = {
-    background: colorB,
-    color: "#ffffff",
-    borderColor: colorB,
+    background: buttonActiveBackground,
+    color: buttonActiveForeground,
+    boxShadow: `0 0 0 1px ${buttonActiveBackground}`,
   };
 
-  const activeVisual = selectedIndex != null ? gradientVisuals[selectedIndex] : null;
-  const previewGradient = selectedIndex != null
-    ? createGradientCss(GRADIENT_BASE_DATA[selectedIndex].stops, invertGradients)
-    : "none";
-
-  const previewLabelBase = activeVisual ? activeVisual.name : "None";
-  const previewLabel = activeVisual == null
-    ? previewLabelBase
-    : invertGradients
-      ? `<-${previewLabelBase}-<`
-      : `>-${previewLabelBase}->`;
+  const activeGradient = selectedIndex != null ? MATPLOTLIB_GRADIENTS[selectedIndex] : null;
+  const previewGradient = activeGradient ? createGradientCss(activeGradient.stops, invertGradients) : "transparent";
+  const previewLabelBase = activeGradient ? activeGradient.name : "None";
+  const previewLabel =
+    activeGradient == null
+      ? previewLabelBase
+      : invertGradients
+        ? `<-${previewLabelBase}-<`
+        : `>-${previewLabelBase}->`;
 
   return (
     <div style={wrapperStyle}>
@@ -348,8 +368,8 @@ export default function SelectionGrid({
           drawerHandle={false}
           mode="external"
           readExternal={() => squareScale}
-          leftColor={previewDarkMode ? flexoki.base["400"] : flexoki.base["200"]}
-          rightColor={previewDarkMode ? flexoki.base["900"] : flexoki.base["50"]}
+          leftColor={buttonBackground}
+          rightColor={buttonForeground}
           onUserChange={(value: number) => {
             selectionGridActions.setSelectionGridSquareScale(gridId, value);
           }}
@@ -396,6 +416,7 @@ export default function SelectionGrid({
               borderRadius: 3,
               border: `1px solid ${colorA}`,
               boxSizing: "border-box",
+              background: previewGradient,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
@@ -409,10 +430,6 @@ export default function SelectionGrid({
                 "0 1px 3px rgba(0, 0, 0, 0.85)",
               ].join(", "),
               userSelect: "none",
-              backgroundImage: previewGradient,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
             }}
             aria-label="Selected gradient preview"
             role="button"

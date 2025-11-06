@@ -19,6 +19,7 @@ import {
   type GradientDefinition,
 } from "../../gradients/matplotlib";
 import { loadHeightTexture, type HeightTextureEntry } from "../../utils/loadHeightTexture";
+import { TERRAIN_TILE_ASSETS } from "../../assets/terrain/tiles";
 import "./selectionGrid.css";
 
 type PaletteInfo = {
@@ -50,6 +51,11 @@ type GradientVisual = {
 };
 
 const CELL_CORNER_RADIUS_PX = 3;
+
+type TileAssignment = {
+  url: string;
+  name: string;
+};
 
 const PREVIEW_MODE_SEQUENCE: SelectionGridPreviewMode[] = ["gradient", "terrainHeight", "terrainHillshade"];
 const PREVIEW_MODE_ICON: Record<SelectionGridPreviewMode, typeof Columns4> = {
@@ -273,21 +279,6 @@ const GRADIENT_BASE_DATA: GradientBase[] = MATPLOTLIB_GRADIENTS.map((definition)
   inverted: buildPalette(definition.stops, true),
 }));
 
-async function loadTileList(): Promise<string[]> {
-  try {
-    const response = await fetch("/terrain/tiles.json", { cache: "no-store" });
-    if (!response.ok) throw new Error("Failed to load tile list");
-    const data: unknown = await response.json();
-    if (!Array.isArray(data)) throw new Error("Tile manifest malformed");
-    return data
-      .filter((entry): entry is string => typeof entry === "string" && entry.endsWith(".png") && !entry.includes("/rejected/"))
-      .map((name) => `/terrain/dem_tiles/${name}`);
-  } catch (error) {
-    console.error("Failed to fetch tile list", error);
-    return [];
-  }
-}
-
 export type SelectionGridProps = {
   gridId?: SelectionGridId;
   previewDarkMode: boolean;
@@ -307,7 +298,7 @@ function SelectionGridContent({
   allowEmptySelection = false,
   maxHeightUnits = 24,
 }: SelectionGridProps) {
-  const [tileAssignments, setTileAssignments] = React.useState<Record<string, string>>({});
+  const [tileAssignments, setTileAssignments] = React.useState<Record<string, TileAssignment>>({});
 
   const selectionGridState = useSelectionGridState(gridId);
   const selectionGridActions = useSelectionGridActions();
@@ -330,36 +321,29 @@ function SelectionGridContent({
   const usesTerrainTiles = renderMode !== "plain";
 
   React.useEffect(() => {
-    let cancelled = false;
-    const loadAssignmentsOnly = async () => {
-      try {
-        const tileUrls = await loadTileList();
-        const shuffled = shuffle(tileUrls);
-        const pool = shuffled.length > 0 ? shuffled : tileUrls;
-        const assignments: Record<string, string> = {};
-        GRADIENT_BASE_DATA.forEach((gradient, index) => {
-          assignments[gradient.name] = pool[index % pool.length];
-        });
-        if (!cancelled) {
-          setTileAssignments(assignments);
-        }
-      } catch (error) {
-        console.error("Failed to load selection grid tiles", error);
-      }
-    };
-    if (usesTerrainTiles) {
-      loadAssignmentsOnly();
-    } else {
+    if (!usesTerrainTiles) {
       setTileAssignments({});
+      return;
     }
-    return () => {
-      cancelled = true;
-    };
+    const tiles = TERRAIN_TILE_ASSETS;
+    if (tiles.length === 0) {
+      setTileAssignments({});
+      return;
+    }
+    const shuffled = shuffle(tiles);
+    const pool = shuffled.length > 0 ? shuffled : tiles;
+    const assignments: Record<string, TileAssignment> = {};
+    GRADIENT_BASE_DATA.forEach((gradient, index) => {
+      const tile = pool[index % pool.length];
+      assignments[gradient.name] = tile;
+    });
+    setTileAssignments(assignments);
   }, [usesTerrainTiles]);
 
   const gradientVisuals = React.useMemo<GradientVisual[]>(() => GRADIENT_BASE_DATA.map((base) => {
-    const tileUrl = usesTerrainTiles ? (tileAssignments[base.name] ?? "") : "";
-    const tileName = tileUrl.split("/").pop() ?? tileUrl;
+    const assignment = usesTerrainTiles ? tileAssignments[base.name] : undefined;
+    const tileUrl = assignment?.url ?? "";
+    const tileName = assignment?.name ?? (tileUrl.split("/").pop() ?? tileUrl);
     return {
       name: base.name,
       tile: tileName,

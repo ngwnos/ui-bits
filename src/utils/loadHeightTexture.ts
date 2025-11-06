@@ -185,65 +185,66 @@ export async function loadHeightTexture(device: GPUDevice, tileUrl: string): Pro
     console.warn(`Skipping rejected tile ${tileUrl}`);
     return null;
   }
-  const tifUrl = tileUrl.replace(/\.png$/, ".tif");
-  const cacheKey = tifUrl !== tileUrl ? tifUrl : tileUrl;
+  const normalizedUrl = tileUrl.toLowerCase();
+  const heightUrl = normalizedUrl.endsWith(".png") ? tileUrl.replace(/\.png$/i, ".tif") : tileUrl;
+  const cacheKey = heightUrl;
   const cached = heightTextureCache.get(cacheKey);
   if (cached) return cached;
 
-  if (tifUrl !== tileUrl) {
-    try {
-      const response = await fetch(tifUrl, { cache: "force-cache" });
-      if (!response.ok) throw new Error("Failed to fetch GeoTIFF");
-      const buffer = await response.arrayBuffer();
-      const parsed = await parseGeoTiff(buffer);
-      const texture = device.createTexture({
-        size: [parsed.width, parsed.height, 1],
-        format: "r32float",
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      });
-      device.queue.writeTexture(
-        { texture },
-        parsed.data,
-        { bytesPerRow: parsed.width * Float32Array.BYTES_PER_ELEMENT },
-        [parsed.width, parsed.height, 1],
-      );
-      const entry: HeightTextureEntry = {
-        texture,
-        width: parsed.width,
-        height: parsed.height,
-        min: parsed.min,
-        max: parsed.max,
-      };
-      heightTextureCache.set(cacheKey, entry);
-      return entry;
-    } catch (error) {
-      console.error("Failed to load GeoTIFF height texture", error);
-    }
-  }
-
   try {
-    const raster = await loadTilePixels(tileUrl);
-    const { width, height, data } = raster;
-    const floatData = new Float32Array(width * height);
-    for (let i = 0; i < data.length; i += 1) {
-      floatData[i] = data[i] / 255;
-    }
+    const response = await fetch(heightUrl, { cache: "force-cache" });
+    if (!response.ok) throw new Error("Failed to fetch GeoTIFF");
+    const buffer = await response.arrayBuffer();
+    const parsed = await parseGeoTiff(buffer);
     const texture = device.createTexture({
-      size: [width, height, 1],
+      size: [parsed.width, parsed.height, 1],
       format: "r32float",
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     device.queue.writeTexture(
       { texture },
-      floatData,
-      { bytesPerRow: width * Float32Array.BYTES_PER_ELEMENT },
-      [width, height, 1],
+      parsed.data,
+      { bytesPerRow: parsed.width * Float32Array.BYTES_PER_ELEMENT },
+      [parsed.width, parsed.height, 1],
     );
-    const entry: HeightTextureEntry = { texture, width, height, min: 0, max: 1 };
+    const entry: HeightTextureEntry = {
+      texture,
+      width: parsed.width,
+      height: parsed.height,
+      min: parsed.min,
+      max: parsed.max,
+    };
     heightTextureCache.set(cacheKey, entry);
     return entry;
   } catch (error) {
-    console.error("Failed to load fallback PNG height texture", error);
+    console.error("Failed to load GeoTIFF height texture", error);
+  }
+
+  if (normalizedUrl.endsWith(".png")) {
+    try {
+      const raster = await loadTilePixels(tileUrl);
+      const { width, height, data } = raster;
+      const floatData = new Float32Array(width * height);
+      for (let i = 0; i < data.length; i += 1) {
+        floatData[i] = data[i] / 255;
+      }
+      const texture = device.createTexture({
+        size: [width, height, 1],
+        format: "r32float",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      device.queue.writeTexture(
+        { texture },
+        floatData,
+        { bytesPerRow: width * Float32Array.BYTES_PER_ELEMENT },
+        [width, height, 1],
+      );
+      const entry: HeightTextureEntry = { texture, width, height, min: 0, max: 1 };
+      heightTextureCache.set(cacheKey, entry);
+      return entry;
+    } catch (error) {
+      console.error("Failed to load fallback PNG height texture", error);
+    }
   }
 
   return null;

@@ -18,6 +18,8 @@ export interface SelectionGridState {
   allowEmptySelection: boolean;
   colorPalette: string[];
   previewMode: SelectionGridPreviewMode;
+  sunAltitudeDeg: number;
+  sunAzimuthDeg: number;
 }
 
 export interface SliderDefinition {
@@ -92,6 +94,8 @@ export const SELECTION_GRID_BASE_STATE: SelectionGridState = {
   allowEmptySelection: false,
   colorPalette: [...DEFAULT_SELECTION_PALETTE],
   previewMode: "terrainHillshade",
+  sunAltitudeDeg: 45,
+  sunAzimuthDeg: 315,
 };
 
 function selectionGridStatesEqual(a: SelectionGridState, b: SelectionGridState): boolean {
@@ -104,6 +108,8 @@ function selectionGridStatesEqual(a: SelectionGridState, b: SelectionGridState):
     && a.colorPalette.length === b.colorPalette.length
     && a.colorPalette.every((color, index) => color === b.colorPalette[index])
     && a.previewMode === b.previewMode
+    && a.sunAltitudeDeg === b.sunAltitudeDeg
+    && a.sunAzimuthDeg === b.sunAzimuthDeg
   );
 }
 
@@ -111,6 +117,17 @@ export function normalizeSelectionGridState(base: SelectionGridState): Selection
   const clampScale = (value: number): number => {
     if (!Number.isFinite(value)) return 1;
     return Math.min(4, Math.max(1, Math.round(value)));
+  };
+
+  const normalizeSunAltitude = (value: number | undefined): number => {
+    if (!Number.isFinite(value ?? Number.NaN)) return SELECTION_GRID_BASE_STATE.sunAltitudeDeg;
+    return Math.min(90, Math.max(0, Number(value)));
+  };
+  const normalizeSunAzimuth = (value: number | undefined): number => {
+    if (!Number.isFinite(value ?? Number.NaN)) return SELECTION_GRID_BASE_STATE.sunAzimuthDeg;
+    const raw = Number(value);
+    const wrapped = ((raw % 360) + 360) % 360;
+    return wrapped;
   };
   const normalizeAlignment = (value: SelectionGridAlignment): SelectionGridAlignment => {
     if (value === "center" || value === "right") return value;
@@ -137,6 +154,8 @@ export function normalizeSelectionGridState(base: SelectionGridState): Selection
       ? [...base.colorPalette]
       : [...DEFAULT_SELECTION_PALETTE],
     previewMode: normalizePreviewMode(rawPreviewMode ?? legacyUseTerrain),
+    sunAltitudeDeg: normalizeSunAltitude((base as { sunAltitudeDeg?: number }).sunAltitudeDeg),
+    sunAzimuthDeg: normalizeSunAzimuth((base as { sunAzimuthDeg?: number }).sunAzimuthDeg),
   };
   if (!normalized.allowEmptySelection && normalized.selectedIndex == null) {
     normalized.selectedIndex = 0;

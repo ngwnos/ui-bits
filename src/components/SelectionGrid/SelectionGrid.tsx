@@ -318,6 +318,8 @@ function SelectionGridContent({
     invertGradients,
     allowEmptySelection: stateAllowEmptySelection,
     previewMode,
+    sunAltitudeDeg,
+    sunAzimuthDeg,
   } = selectionGridState;
 
   const renderMode: "plain" | "height" | "hillshade" = previewMode === "gradient"
@@ -523,6 +525,8 @@ function SelectionGridContent({
             size={cellSizePx}
             borderRadius={borderRadiusValue}
             fallbackBackground={fallbackBackground}
+            sunAltitudeDeg={sunAltitudeDeg}
+            sunAzimuthDeg={sunAzimuthDeg}
           />
         ) : null}
         {isSelected ? (
@@ -650,6 +654,50 @@ function SelectionGridContent({
           }}
           onAnimatedUpdate={(value: number) => {
             selectionGridActions.setSelectionGridSquareScale(gridId, value);
+          }}
+        />
+      </div>
+      <div style={{ width: "100%" }}>
+        <LFOSlider
+          label="Sun Altitude"
+          min={0}
+          max={90}
+          step={1}
+          defaultValue={sunAltitudeDeg}
+          width={sliderBox.width}
+          drawerFeatureEnabled={false}
+          drawerHandle={false}
+          mode="external"
+          readExternal={() => sunAltitudeDeg}
+          leftColor={buttonBackground}
+          rightColor={buttonForeground}
+          onUserChange={(value: number) => {
+            selectionGridActions.setSelectionGridSunAltitude(gridId, value);
+          }}
+          onAnimatedUpdate={(value: number) => {
+            selectionGridActions.setSelectionGridSunAltitude(gridId, value);
+          }}
+        />
+      </div>
+      <div style={{ width: "100%" }}>
+        <LFOSlider
+          label="Sun Azimuth"
+          min={0}
+          max={360}
+          step={1}
+          defaultValue={sunAzimuthDeg}
+          width={sliderBox.width}
+          drawerFeatureEnabled={false}
+          drawerHandle={false}
+          mode="external"
+          readExternal={() => sunAzimuthDeg}
+          leftColor={buttonBackground}
+          rightColor={buttonForeground}
+          onUserChange={(value: number) => {
+            selectionGridActions.setSelectionGridSunAzimuth(gridId, value);
+          }}
+          onAnimatedUpdate={(value: number) => {
+            selectionGridActions.setSelectionGridSunAzimuth(gridId, value);
           }}
         />
       </div>
@@ -794,6 +842,8 @@ function GradientTileCanvas({
   size,
   borderRadius,
   fallbackBackground,
+  sunAltitudeDeg,
+  sunAzimuthDeg,
 }: {
   mode: "plain" | "height" | "hillshade";
   tileUrl?: string;
@@ -802,6 +852,8 @@ function GradientTileCanvas({
   size: number;
   borderRadius: string;
   fallbackBackground: string;
+  sunAltitudeDeg: number;
+  sunAzimuthDeg: number;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const hasRenderedRef = React.useRef(false);
@@ -906,8 +958,8 @@ function GradientTileCanvas({
       const cellSizeMeters = 3;
       const verticalExaggeration = 8;
       const heightScale = verticalExaggeration / (cellSizeMeters * 8);
-      const altitude = 45 * Math.PI / 180;
-      const azimuth = 315 * Math.PI / 180;
+      const altitude = (sunAltitudeDeg * Math.PI) / 180;
+      const azimuth = (sunAzimuthDeg * Math.PI) / 180;
       const lightDir = [
         Math.sin(azimuth) * Math.cos(altitude),
         Math.cos(azimuth) * Math.cos(altitude),
@@ -1003,7 +1055,7 @@ function GradientTileCanvas({
         resourcesRef.current = null;
       }
     };
-  }, [mode, tileUrl, stops, invert, size, isPlainMode]);
+  }, [mode, tileUrl, stops, invert, size, isPlainMode, sunAltitudeDeg, sunAzimuthDeg]);
 
   if (isPlainMode) {
     return null;

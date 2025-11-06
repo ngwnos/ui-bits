@@ -105,5 +105,7 @@ export function useSelectionGridActions() {
     toggleSelectionGridInvert: (id: SelectionGridId) => dispatch({ type: "toggleSelectionGridInvert", id }),
     setSelectionGridPreviewMode: (id: SelectionGridId, previewMode: SelectionGridPreviewMode) => dispatch({ type: "setSelectionGridPreviewMode", id, previewMode }),
     setSelectionGridPalette: (id: SelectionGridId, palette: string[]) => dispatch({ type: "setSelectionGridPalette", id, palette }),
+    setSelectionGridSunAltitude: (id: SelectionGridId, sunAltitudeDeg: number) => dispatch({ type: "updateSelectionGrid", id, patch: { sunAltitudeDeg } }),
+    setSelectionGridSunAzimuth: (id: SelectionGridId, sunAzimuthDeg: number) => dispatch({ type: "updateSelectionGrid", id, patch: { sunAzimuthDeg } }),
   }), [dispatch]);
 }

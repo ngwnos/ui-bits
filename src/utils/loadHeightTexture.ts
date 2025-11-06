@@ -185,6 +185,10 @@ async function parseGeoTiff(buffer: ArrayBuffer): Promise<ParsedTiff> {
 }
 
 export async function loadHeightTexture(device: GPUDevice, tileUrl: string): Promise<HeightTextureEntry | null> {
+  if (tileUrl.includes("/rejected/")) {
+    console.warn(`Skipping rejected tile ${tileUrl}`);
+    return null;
+  }
   const tifUrl = tileUrl.replace(/\.png$/, ".tif");
   const cacheKey = tifUrl !== tileUrl ? tifUrl : tileUrl;
   const cached = heightTextureCache.get(cacheKey);

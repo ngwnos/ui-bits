@@ -17,6 +17,7 @@ import {
   createGradientCss,
   type GradientDefinition,
 } from "../../gradients/matplotlib";
+import { loadHeightTexture, type HeightTextureEntry } from "../../utils/loadHeightTexture";
 import "./selectionGrid.css";
 
 type PaletteInfo = {
@@ -53,15 +54,13 @@ type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
 let sharedRoot: TypeGpuRoot | null = null;
 let sharedRootPromise: Promise<TypeGpuRoot | null> | null = null;
 
-const tileTextureCache = new Map<string, { texture: GPUTexture; width: number; height: number }>();
-let sharedPipelines: {
+let sharedPipeline: {
   renderPipeline: GPURenderPipeline;
-  computePipeline: GPUComputePipeline;
   sampler: GPUSampler;
   format: GPUTextureFormat;
   device: GPUDevice;
 } | null = null;
-let sharedLinearGradientTexture: { texture: GPUTexture; width: number; height: number } | null = null;
+let sharedLinearHeightTexture: HeightTextureEntry | null = null;
 
 async function getSharedRoot(): Promise<TypeGpuRoot | null> {
   if (!navigator.gpu) return null;
@@ -79,17 +78,9 @@ async function getSharedRoot(): Promise<TypeGpuRoot | null> {
   return sharedRootPromise;
 }
 
-function getSharedPipeline(device: GPUDevice, format: GPUTextureFormat): {
-  renderPipeline: GPURenderPipeline;
-  computePipeline: GPUComputePipeline;
-  sampler: GPUSampler;
-} {
-  if (sharedPipelines && sharedPipelines.device === device && sharedPipelines.format === format) {
-    return {
-      renderPipeline: sharedPipelines.renderPipeline,
-      computePipeline: sharedPipelines.computePipeline,
-      sampler: sharedPipelines.sampler,
-    };
+function getSharedPipeline(device: GPUDevice, format: GPUTextureFormat): { renderPipeline: GPURenderPipeline; sampler: GPUSampler } {
+  if (sharedPipeline && sharedPipeline.device === device && sharedPipeline.format === format) {
+    return { renderPipeline: sharedPipeline.renderPipeline, sampler: sharedPipeline.sampler };
   }
   const shaderModule = device.createShaderModule({
     code: `
@@ -123,71 +114,70 @@ fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
 }
 
 struct RenderUniforms {
-  useHillshade : u32,
-  padding : vec3<u32>,
+  params0 : vec4<f32>,
+  params1 : vec4<f32>,
+  params2 : vec4<f32>,
 };
 
-@group(0) @binding(0) var hillshadeTexture : texture_2d<f32>;
+@group(0) @binding(0) var heightTexture : texture_2d<f32>;
 @group(0) @binding(1) var tileSampler : sampler;
 @group(0) @binding(2) var gradientTexture : texture_2d<f32>;
-@group(0) @binding(3) var heightTexture : texture_2d<f32>;
-@group(0) @binding(4) var<uniform> renderUniforms : RenderUniforms;
+@group(0) @binding(3) var<uniform> uniforms : RenderUniforms;
+
+fn quantizeUv(uv : vec2<f32>, texelSize : vec2<f32>) -> vec2<i32> {
+  let width = max(1, i32(round(1.0 / texelSize.x)));
+  let height = max(1, i32(round(1.0 / texelSize.y)));
+  let x = clamp(i32(round(uv.x * f32(width - 1))), 0, width - 1);
+  let y = clamp(i32(round(uv.y * f32(height - 1))), 0, height - 1);
+  return vec2<i32>(x, y);
+}
+
+fn sampleHeight(uv : vec2<f32>, texelSize : vec2<f32>) -> f32 {
+  let coords = quantizeUv(uv, texelSize);
+  return textureLoad(heightTexture, coords, 0).r;
+}
+
+fn safeSample(uv : vec2<f32>) -> vec2<f32> {
+  return clamp(uv, vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 1.0));
+}
 
 @fragment
 fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
-  let hillshade = textureSample(hillshadeTexture, tileSampler, in.uv).r;
-  if (renderUniforms.useHillshade == 1u) {
-    return vec4<f32>(hillshade, hillshade, hillshade, 1.0);
+  let useHillshade = uniforms.params0.x;
+  let texelSize = uniforms.params0.yz;
+  let heightScale = uniforms.params0.w;
+  let lightDir = normalize(uniforms.params1.xyz);
+  let heightMin = uniforms.params1.w;
+  let heightRange = max(uniforms.params2.x, 1e-6);
+  let ambient = uniforms.params2.y;
+  let contrast = uniforms.params2.z;
+  let uv = safeSample(in.uv);
+
+  let offset = vec2<f32>(texelSize.x, texelSize.y);
+
+  let hC = sampleHeight(uv, texelSize);
+  let hN = sampleHeight(safeSample(vec2<f32>(uv.x, uv.y + offset.y)), texelSize);
+  let hS = sampleHeight(safeSample(vec2<f32>(uv.x, uv.y - offset.y)), texelSize);
+  let hE = sampleHeight(safeSample(vec2<f32>(uv.x + offset.x, uv.y)), texelSize);
+  let hW = sampleHeight(safeSample(vec2<f32>(uv.x - offset.x, uv.y)), texelSize);
+  let hNE = sampleHeight(safeSample(vec2<f32>(uv.x + offset.x, uv.y + offset.y)), texelSize);
+  let hNW = sampleHeight(safeSample(vec2<f32>(uv.x - offset.x, uv.y + offset.y)), texelSize);
+  let hSE = sampleHeight(safeSample(vec2<f32>(uv.x + offset.x, uv.y - offset.y)), texelSize);
+  let hSW = sampleHeight(safeSample(vec2<f32>(uv.x - offset.x, uv.y - offset.y)), texelSize);
+
+  let dzdx = ((hNE + 2.0 * hE + hSE) - (hNW + 2.0 * hW + hSW)) * heightScale;
+  let dzdy = ((hSW + 2.0 * hS + hSE) - (hNW + 2.0 * hN + hNE)) * heightScale;
+
+  let normal = normalize(vec3<f32>(-dzdx, -dzdy, 1.0));
+  let shade = clamp(ambient + dot(normal, lightDir) * contrast, 0.0, 1.0);
+
+  if (useHillshade > 0.5) {
+    return vec4<f32>(shade, shade, shade, 1.0);
   }
-  let tileColor = textureSample(heightTexture, tileSampler, in.uv);
-  let luminance = dot(tileColor.rgb, vec3f(0.299, 0.587, 0.114));
-  let remapped = textureSample(gradientTexture, tileSampler, vec2f(luminance, 0.5));
+
+  let normalizedHeight = clamp((hC - heightMin) / heightRange, 0.0, 1.0);
+  let remapped = textureSample(gradientTexture, tileSampler, vec2<f32>(normalizedHeight, 0.5));
   return vec4<f32>(remapped.rgb, 1.0);
-}
-`,
-  });
-
-  const computeModule = device.createShaderModule({
-    code: `
-@group(0) @binding(0) var heightTexture : texture_2d<f32>;
-@group(0) @binding(1) var<storage, write> hillshadeTexture : texture_storage_2d<rgba8unorm, write>;
-
-fn sampleHeight(coord : vec2<i32>, dims : vec2<i32>) -> f32 {
-  let clamped = vec2<i32>(clamp(coord.x, 0, dims.x - 1), clamp(coord.y, 0, dims.y - 1));
-  return textureLoad(heightTexture, clamped, 0).r;
-}
-
-@compute @workgroup_size(16, 16)
-fn cs_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
-  let dimsU = textureDimensions(heightTexture);
-  let dims = vec2<i32>(dimsU);
-  let coord = vec2<i32>(global_id.xy);
-  if (coord.x >= dims.x || coord.y >= dims.y) {
-    return;
-  }
-
-  let left = sampleHeight(coord + vec2<i32>(-1, 0), dims);
-  let right = sampleHeight(coord + vec2<i32>(1, 0), dims);
-  let up = sampleHeight(coord + vec2<i32>(0, -1), dims);
-  let down = sampleHeight(coord + vec2<i32>(0, 1), dims);
-
-  let dzdx = (right - left) * 0.5;
-  let dzdy = (down - up) * 0.5;
-
-  let slope = atan(sqrt(dzdx * dzdx + dzdy * dzdy));
-  let aspect = atan2(dzdy, -dzdx);
-
-  let azimuth = 315.0 * (3.14159265359 / 180.0);
-  let altitude = 45.0 * (3.14159265359 / 180.0);
-
-  let hillshade = clamp(
-    cos(altitude) * cos(slope)
-      + sin(altitude) * sin(slope) * cos(azimuth - aspect),
-    0.0,
-    1.0
-  );
-
-  textureStore(hillshadeTexture, coord, vec4<f32>(hillshade, hillshade, hillshade, 1.0));
 }
 `,
   });
@@ -199,75 +189,45 @@ fn cs_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     primitive: { topology: 'triangle-list' },
   });
 
-  const computePipeline = device.createComputePipeline({
-    layout: 'auto',
-    compute: { module: computeModule, entryPoint: 'cs_main' },
-  });
-
-  const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
-  sharedPipelines = {
+  const sampler = device.createSampler({ magFilter: 'nearest', minFilter: 'nearest' });
+  sharedPipeline = {
     renderPipeline,
-    computePipeline,
     sampler,
     format,
     device,
   };
-  return { renderPipeline, computePipeline, sampler };
+  return { renderPipeline, sampler };
 }
 
-async function getTileTexture(device: GPUDevice, tileUrl: string): Promise<{ texture: GPUTexture; width: number; height: number } | null> {
-  const cached = tileTextureCache.get(tileUrl);
-  if (cached) return cached;
-  try {
-    const response = await fetch(tileUrl, { cache: "force-cache" });
-    if (!response.ok) throw new Error('Failed to fetch tile texture');
-    const blob = await response.blob();
-    const bitmap = await createImageBitmap(blob);
-    const texture = device.createTexture({
-      size: [bitmap.width, bitmap.height, 1],
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING
-        | GPUTextureUsage.COPY_DST
-        | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-    device.queue.copyExternalImageToTexture({ source: bitmap }, { texture }, [bitmap.width, bitmap.height]);
-    bitmap.close();
-    const entry = { texture, width: bitmap.width, height: bitmap.height };
-    tileTextureCache.set(tileUrl, entry);
-    return entry;
-  } catch (error) {
-    console.error('Failed to prepare tile texture', error);
-    return null;
-  }
-}
-
-function getLinearGradientTexture(device: GPUDevice): { texture: GPUTexture; width: number; height: number } {
-  if (sharedLinearGradientTexture) return sharedLinearGradientTexture;
+function getLinearHeightTexture(device: GPUDevice): HeightTextureEntry {
+  if (sharedLinearHeightTexture) return sharedLinearHeightTexture;
   const size = 256;
-  const bytes = new Uint8Array(size * size * 4);
+  const data = new Float32Array(size * size);
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      const value = Math.round((x / (size - 1)) * 255);
-      const offset = (y * size + x) * 4;
-      bytes[offset] = value;
-      bytes[offset + 1] = value;
-      bytes[offset + 2] = value;
-      bytes[offset + 3] = 255;
+      const value = x / (size - 1);
+      data[y * size + x] = value;
     }
   }
   const texture = device.createTexture({
     size: [size, size, 1],
-    format: "rgba8unorm",
+    format: "r32float",
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
   });
   device.queue.writeTexture(
     { texture },
-    bytes,
-    { bytesPerRow: size * 4 },
+    data,
+    { bytesPerRow: size * Float32Array.BYTES_PER_ELEMENT },
     [size, size, 1],
   );
-  sharedLinearGradientTexture = { texture, width: size, height: size };
-  return sharedLinearGradientTexture;
+  sharedLinearHeightTexture = {
+    texture,
+    width: size,
+    height: size,
+    min: 0,
+    max: 1,
+  };
+  return sharedLinearHeightTexture;
 }
 
 function uploadGradientToTexture(device: GPUDevice, texture: GPUTexture, stops: GradientDefinition['stops'], invert: boolean) {
@@ -827,7 +787,6 @@ function GradientTileCanvas({
   const configuredSizeRef = React.useRef<{ width: number; height: number } | null>(null);
   const resourcesRef = React.useRef<{
     gradientTexture: GPUTexture;
-    hillshadeTexture: GPUTexture;
     uniformBuffer: GPUBuffer;
   } | null>(null);
   const [hasRendered, setHasRendered] = React.useState<boolean>(false);
@@ -838,7 +797,6 @@ function GradientTileCanvas({
       const resources = resourcesRef.current;
       if (resources) {
         resources.gradientTexture.destroy();
-        resources.hillshadeTexture.destroy();
         resources.uniformBuffer.destroy();
         resourcesRef.current = null;
       }
@@ -878,16 +836,19 @@ function GradientTileCanvas({
         }
       }
 
-      let heightEntry: { texture: GPUTexture; width: number; height: number } | null = null;
+      let heightEntry: HeightTextureEntry | null = null;
       if (mode === "terrain") {
         if (!tileUrl) return;
-        heightEntry = await getTileTexture(device, tileUrl);
+        heightEntry = await loadHeightTexture(device, tileUrl);
       } else {
-        heightEntry = getLinearGradientTexture(device);
+        heightEntry = getLinearHeightTexture(device);
       }
       if (!heightEntry || disposed) return;
 
-      const { renderPipeline, computePipeline, sampler } = getSharedPipeline(device, format);
+      const { renderPipeline, sampler } = getSharedPipeline(device, format);
+      const targetWidth = Math.max(1, heightEntry.width);
+      const targetHeight = Math.max(1, heightEntry.height);
+
       const gradientTexture = device.createTexture({
         size: [256, 1, 1],
         format: 'rgba8unorm',
@@ -895,47 +856,53 @@ function GradientTileCanvas({
       });
       uploadGradientToTexture(device, gradientTexture, stops, invert);
 
-      const hillshadeTexture = device.createTexture({
-        size: [heightEntry.width, heightEntry.height, 1],
-        format: 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-      });
-
+      const heightMin = heightEntry.min;
+      const heightRange = Math.max(1e-6, heightEntry.max - heightEntry.min);
+      const texelSizeX = 1 / targetWidth;
+      const texelSizeY = 1 / targetHeight;
+      const cellSizeMeters = 3;
+      const verticalExaggeration = 8;
+      const heightScale = verticalExaggeration / (cellSizeMeters * 8);
+      const altitude = 45 * Math.PI / 180;
+      const azimuth = 315 * Math.PI / 180;
+      const lightDir = [
+        Math.sin(azimuth) * Math.cos(altitude),
+        Math.cos(azimuth) * Math.cos(altitude),
+        Math.sin(altitude),
+      ];
+      const ambient = 0.2;
+      const contrast = 0.9;
+      const uniformData = new Float32Array([
+        mode === "terrain" ? 1 : 0,
+        texelSizeX,
+        texelSizeY,
+        heightScale,
+        lightDir[0],
+        lightDir[1],
+        lightDir[2],
+        heightMin,
+        heightRange,
+        ambient,
+        contrast,
+        0,
+      ]);
       const uniformBuffer = device.createBuffer({
-        size: 16,
+        size: uniformData.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
-      const uniformData = new Uint32Array([mode === "terrain" ? 1 : 0, 0, 0, 0]);
       device.queue.writeBuffer(uniformBuffer, 0, uniformData);
-
-      const computeBindGroup = device.createBindGroup({
-        layout: computePipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: heightEntry.texture.createView() },
-          { binding: 1, resource: hillshadeTexture.createView() },
-        ],
-      });
 
       const renderBindGroup = device.createBindGroup({
         layout: renderPipeline.getBindGroupLayout(0),
         entries: [
-          { binding: 0, resource: hillshadeTexture.createView() },
+          { binding: 0, resource: heightEntry.texture.createView() },
           { binding: 1, resource: sampler },
           { binding: 2, resource: gradientTexture.createView() },
-          { binding: 3, resource: heightEntry.texture.createView() },
-          { binding: 4, resource: { buffer: uniformBuffer } },
+          { binding: 3, resource: { buffer: uniformBuffer } },
         ],
       });
 
       const commandEncoder = device.createCommandEncoder();
-      const workgroupsX = Math.ceil(heightEntry.width / 16);
-      const workgroupsY = Math.ceil(heightEntry.height / 16);
-      const computePass = commandEncoder.beginComputePass();
-      computePass.setPipeline(computePipeline);
-      computePass.setBindGroup(0, computeBindGroup);
-      computePass.dispatchWorkgroups(workgroupsX, workgroupsY);
-      computePass.end();
-
       const textureView = context.getCurrentTexture().createView();
       const pass = commandEncoder.beginRenderPass({
         colorAttachments: [{
@@ -951,7 +918,10 @@ function GradientTileCanvas({
       pass.end();
       device.queue.submit([commandEncoder.finish()]);
 
-      resourcesRef.current = { gradientTexture, hillshadeTexture, uniformBuffer };
+      resourcesRef.current = {
+        gradientTexture,
+        uniformBuffer,
+      };
 
       if (!disposed) {
         setHasRendered(true);

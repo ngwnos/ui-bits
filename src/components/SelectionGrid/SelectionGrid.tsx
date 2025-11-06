@@ -1,8 +1,6 @@
 import React from "react";
 import tgpu from "typegpu";
 import { Columns4, Mountain, MountainSnow } from "lucide-react";
-import LFOSlider from "../LFOSlider";
-import { flexoki } from "../../flexoki";
 import { SliderStoreProvider } from "../../sliderStore";
 import { SliderStoreContext } from "../../sliderStore/context";
 import {
@@ -287,7 +285,6 @@ export type SelectionGridProps = {
   textColor: string;
   allowEmptySelection?: boolean;
   maxHeightUnits?: number;
-  showControls?: boolean;
 };
 
 function SelectionGridContent({
@@ -298,7 +295,6 @@ function SelectionGridContent({
   textColor,
   allowEmptySelection = false,
   maxHeightUnits = 24,
-  showControls = true,
 }: SelectionGridProps) {
   const [tileAssignments, setTileAssignments] = React.useState<Record<string, TileAssignment>>({});
 
@@ -365,8 +361,7 @@ function SelectionGridContent({
 
   const gridCellCount = gradientVisuals.length;
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
-  const sliderContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const [sliderBox, setSliderBox] = React.useState<{ width: number; height: number }>({ width: 260, height: 48 });
+  const [containerWidth, setContainerWidth] = React.useState<number>(360);
   const paletteSignatureRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
@@ -380,24 +375,13 @@ function SelectionGridContent({
   }, [allowEmptySelection, gridId, selectionGridActions, stateAllowEmptySelection]);
 
   React.useEffect(() => {
-    const node = showControls ? sliderContainerRef.current : wrapperRef.current;
+    const node = wrapperRef.current;
     if (!node) return;
     const measure = () => {
       const rect = node.getBoundingClientRect();
-      if (rect.width && rect.height) {
-        setSliderBox((prev) => {
-          const nextWidth = Math.round(rect.width);
-          const nextHeight = showControls ? Math.round(rect.height) : prev.height;
-          if (prev.width === nextWidth && prev.height === nextHeight) return prev;
-          return { width: nextWidth, height: nextHeight };
-        });
-      } else if (rect.width && !showControls) {
-        setSliderBox((prev) => {
-          const nextWidth = Math.round(rect.width);
-          if (prev.width === nextWidth) return prev;
-          return { width: nextWidth, height: prev.height };
-        });
-      }
+      if (!rect.width) return;
+      const nextWidth = Math.round(rect.width);
+      setContainerWidth((prev) => (Math.abs(prev - nextWidth) < 0.5 ? prev : nextWidth));
     };
     measure();
     let resizeObserver: ResizeObserver | null = null;
@@ -411,7 +395,7 @@ function SelectionGridContent({
       resizeObserver?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [showControls]);
+  }, []);
 
   const selectedPalette = React.useMemo(() => {
     if (selectedIndex == null || gradientVisuals[selectedIndex] === undefined) return null;
@@ -427,10 +411,9 @@ function SelectionGridContent({
     selectionGridActions.setSelectionGridPalette(gridId, selectedPalette);
   }, [gridId, selectedPalette, selectionGridActions]);
 
-  const effectiveHeight = showControls ? sliderBox.height || 0 : Math.max(sliderBox.height, 48);
-  const baseCellSize = Math.max(8, effectiveHeight || 0);
+  const baseCellSize = 48;
   const cellSizePx = baseCellSize * squareScale;
-  const rowCapacity = sliderBox.width ? Math.max(1, Math.floor(sliderBox.width / cellSizePx)) : 1;
+  const rowCapacity = containerWidth ? Math.max(1, Math.floor(containerWidth / cellSizePx)) : 1;
   const rowCount = rowCapacity ? Math.ceil(gridCellCount / rowCapacity) : gridCellCount;
   const lastRowCount = rowCapacity >= gridCellCount ? gridCellCount : gridCellCount % rowCapacity || rowCapacity;
   const leftoverSlots = rowCapacity > lastRowCount ? rowCapacity - lastRowCount : 0;
@@ -547,55 +530,28 @@ function SelectionGridContent({
     alignItems: "stretch",
   };
 
-  const alignmentOptions: Array<{ value: "left" | "center" | "right"; label: string }> = [
-    { value: "left", label: "Left" },
-    { value: "center", label: "Center" },
-    { value: "right", label: "Right" },
-  ];
   const previewModeIndex = PREVIEW_MODE_SEQUENCE.indexOf(previewMode);
   const nextPreviewMode = PREVIEW_MODE_SEQUENCE[(previewModeIndex + 1) % PREVIEW_MODE_SEQUENCE.length];
   const PreviewModeIcon = PREVIEW_MODE_ICON[previewMode];
   const previewModeTitle = PREVIEW_MODE_TITLE[previewMode];
   const nextModeTitle = PREVIEW_MODE_TITLE[nextPreviewMode];
 
-  const buttonBackground = previewDarkMode ? flexoki.base["100"] : flexoki.base["700"];
-  const buttonForeground = previewDarkMode ? flexoki.base["700"] : flexoki.base["50"];
-  const buttonActiveBackground = previewDarkMode ? flexoki.base["200"] : flexoki.base["600"];
-  const buttonActiveForeground = previewDarkMode ? flexoki.base["900"] : flexoki.base["50"];
   const terrainToggleButtonSize = Math.max(28, baseCellSize - 10);
   const terrainToggleIconSize = Math.max(terrainToggleButtonSize - 12, 12);
   const previewTextShadow = [
     "0 0 4px rgba(0, 0, 0, 0.7)",
     "0 1px 3px rgba(0, 0, 0, 0.85)",
   ].join(", ");
-  const previewIconFilter = [
-    "drop-shadow(0 0 1px rgba(0, 0, 0, 0.6))",
-    "drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7))",
-  ].join(" ");
+  const previewIconFilter = previewDarkMode
+    ? [
+      "drop-shadow(0 0 1px rgba(255, 255, 255, 0.45))",
+      "drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5))",
+    ].join(" ")
+    : [
+      "drop-shadow(0 0 1px rgba(0, 0, 0, 0.6))",
+      "drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7))",
+    ].join(" ");
 
-  const alignmentButtonStyle: React.CSSProperties = {
-    background: buttonBackground,
-    color: buttonForeground,
-    padding: "0.35rem 0.9rem",
-    borderRadius: 4,
-    border: "none",
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: "pointer",
-    lineHeight: 1,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    transition: "background 120ms ease, color 120ms ease, transform 120ms ease",
-    boxShadow: "0 0 0 1px transparent",
-  };
-
-  const alignmentButtonActiveStyle: React.CSSProperties = {
-    background: buttonActiveBackground,
-    color: buttonActiveForeground,
-    boxShadow: `0 0 0 1px ${buttonActiveBackground}`,
-  };
   const terrainToggleButtonStyle: React.CSSProperties = {
     width: terrainToggleButtonSize,
     height: terrainToggleButtonSize,
@@ -629,98 +585,6 @@ function SelectionGridContent({
 
   return (
     <div ref={wrapperRef} style={wrapperStyle}>
-      {showControls ? (
-        <>
-          <div ref={sliderContainerRef} style={{ width: "100%" }}>
-            <LFOSlider
-              label="Square Size"
-              min={1}
-              max={4}
-              step={1}
-              defaultValue={squareScale}
-              width={sliderBox.width}
-              drawerFeatureEnabled={false}
-              drawerHandle={false}
-              mode="external"
-              readExternal={() => squareScale}
-              leftColor={buttonBackground}
-              rightColor={buttonForeground}
-              onUserChange={(value: number) => {
-                selectionGridActions.setSelectionGridSquareScale(gridId, value);
-              }}
-              onAnimatedUpdate={(value: number) => {
-                selectionGridActions.setSelectionGridSquareScale(gridId, value);
-              }}
-            />
-          </div>
-          <div style={{ width: "100%" }}>
-            <LFOSlider
-              label="Sun Altitude"
-              min={0}
-              max={90}
-              step={1}
-              defaultValue={sunAltitudeDeg}
-              width={sliderBox.width}
-              drawerFeatureEnabled={false}
-              drawerHandle={false}
-              mode="external"
-              readExternal={() => sunAltitudeDeg}
-              leftColor={buttonBackground}
-              rightColor={buttonForeground}
-              onUserChange={(value: number) => {
-                selectionGridActions.setSelectionGridSunAltitude(gridId, value);
-              }}
-              onAnimatedUpdate={(value: number) => {
-                selectionGridActions.setSelectionGridSunAltitude(gridId, value);
-              }}
-            />
-          </div>
-          <div style={{ width: "100%" }}>
-            <LFOSlider
-              label="Sun Azimuth"
-              min={0}
-              max={360}
-              step={1}
-              defaultValue={sunAzimuthDeg}
-              width={sliderBox.width}
-              drawerFeatureEnabled={false}
-              drawerHandle={false}
-              mode="external"
-              readExternal={() => sunAzimuthDeg}
-              leftColor={buttonBackground}
-              rightColor={buttonForeground}
-              onUserChange={(value: number) => {
-                selectionGridActions.setSelectionGridSunAzimuth(gridId, value);
-              }}
-              onAnimatedUpdate={(value: number) => {
-                selectionGridActions.setSelectionGridSunAzimuth(gridId, value);
-              }}
-            />
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 8,
-            }}
-          >
-            {alignmentOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => selectionGridActions.setSelectionGridAlignment(gridId, option.value)}
-                aria-pressed={squareAlignment === option.value}
-                style={{
-                  ...alignmentButtonStyle,
-                  ...(squareAlignment === option.value ? alignmentButtonActiveStyle : {}),
-                }}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </>
-      ) : null}
       <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
         <div
           style={{

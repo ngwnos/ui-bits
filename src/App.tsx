@@ -30,6 +30,7 @@ import {
   useSliderStoreState,
   useSelectionGridState,
   useSelectionGridActions,
+  type SelectionGridAlignment,
   type SelectionGridPreviewMode,
   type SliderRuntimeState,
   type SliderId,
@@ -490,6 +491,48 @@ const tabs = [
       color: flexoki.base['50'],
     }
     : iconButtonStyle;
+  const selectionGridControlStackStyle: React.CSSProperties = {
+    width: '100%',
+    maxWidth: 360,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  };
+  const selectionGridAlignmentOptions: Array<{ value: SelectionGridAlignment; label: string }> = [
+    { value: 'left', label: 'Left' },
+    { value: 'center', label: 'Center' },
+    { value: 'right', label: 'Right' },
+  ];
+  const selectionGridSliderLeftColor = previewDarkMode ? flexoki.base['100'] : flexoki.base['700'];
+  const selectionGridSliderRightColor = previewDarkMode ? flexoki.base['700'] : flexoki.base['50'];
+  const selectionGridAlignmentButtonStyle: React.CSSProperties = {
+    background: previewDarkMode ? flexoki.base['200'] : flexoki.base['700'],
+    color: previewDarkMode ? flexoki.base['900'] : flexoki.base['50'],
+    padding: '0.35rem 0.9rem',
+    borderRadius: 4,
+    border: 'none',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    lineHeight: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    transition: 'background 120ms ease, color 120ms ease, transform 120ms ease',
+    boxShadow: '0 0 0 1px transparent',
+  };
+  const selectionGridAlignmentActiveStyle: React.CSSProperties = {
+    background: previewDarkMode ? flexoki.base['300'] : flexoki.base['500'],
+    color: previewDarkMode ? flexoki.base['950'] : flexoki.base['50'],
+    boxShadow: `0 0 0 1px ${previewDarkMode ? flexoki.base['300'] : flexoki.base['500']}`,
+  };
+  const {
+    squareScale: selectionSquareScale,
+    sunAltitudeDeg: selectionSunAltitude,
+    sunAzimuthDeg: selectionSunAzimuth,
+    squareAlignment: selectionSquareAlignment,
+  } = selectionGridState;
   const fontSizeControlStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -718,6 +761,84 @@ const tabs = [
             </p>
           </Tabs.Content>
           <Tabs.Content value="selection-grid" style={tabBodyStyle}>
+            <div style={selectionGridControlStackStyle}>
+              <LFOSlider
+                label="Square Size"
+                min={1}
+                max={4}
+                step={1}
+                defaultValue={selectionSquareScale}
+                width={360}
+                drawerFeatureEnabled={false}
+                drawerHandle={false}
+                mode="external"
+                readExternal={() => selectionSquareScale}
+                leftColor={selectionGridSliderLeftColor}
+                rightColor={selectionGridSliderRightColor}
+                onUserChange={(value: number) => {
+                  selectionGridActions.setSelectionGridSquareScale(DEFAULT_SELECTION_GRID_ID, value);
+                }}
+                onAnimatedUpdate={(value: number) => {
+                  selectionGridActions.setSelectionGridSquareScale(DEFAULT_SELECTION_GRID_ID, value);
+                }}
+              />
+              <LFOSlider
+                label="Sun Altitude"
+                min={0}
+                max={90}
+                step={1}
+                defaultValue={selectionSunAltitude}
+                width={360}
+                drawerFeatureEnabled={false}
+                drawerHandle={false}
+                mode="external"
+                readExternal={() => selectionSunAltitude}
+                leftColor={selectionGridSliderLeftColor}
+                rightColor={selectionGridSliderRightColor}
+                onUserChange={(value: number) => {
+                  selectionGridActions.setSelectionGridSunAltitude(DEFAULT_SELECTION_GRID_ID, value);
+                }}
+                onAnimatedUpdate={(value: number) => {
+                  selectionGridActions.setSelectionGridSunAltitude(DEFAULT_SELECTION_GRID_ID, value);
+                }}
+              />
+              <LFOSlider
+                label="Sun Azimuth"
+                min={0}
+                max={360}
+                step={1}
+                defaultValue={selectionSunAzimuth}
+                width={360}
+                drawerFeatureEnabled={false}
+                drawerHandle={false}
+                mode="external"
+                readExternal={() => selectionSunAzimuth}
+                leftColor={selectionGridSliderLeftColor}
+                rightColor={selectionGridSliderRightColor}
+                onUserChange={(value: number) => {
+                  selectionGridActions.setSelectionGridSunAzimuth(DEFAULT_SELECTION_GRID_ID, value);
+                }}
+                onAnimatedUpdate={(value: number) => {
+                  selectionGridActions.setSelectionGridSunAzimuth(DEFAULT_SELECTION_GRID_ID, value);
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+                {selectionGridAlignmentOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => selectionGridActions.setSelectionGridAlignment(DEFAULT_SELECTION_GRID_ID, option.value)}
+                    aria-pressed={selectionSquareAlignment === option.value}
+                    style={{
+                      ...selectionGridAlignmentButtonStyle,
+                      ...(selectionSquareAlignment === option.value ? selectionGridAlignmentActiveStyle : {}),
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => selectionGridActions.setSelectionGridPreviewMode(

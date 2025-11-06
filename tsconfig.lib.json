@@ -10,8 +10,12 @@
   "include": [
     "src/library.ts",
     "src/components/LFOSlider/**/*",
+    "src/components/SelectionGrid/**/*",
     "src/frameLoop.tsx",
     "src/useStoreMirror.ts",
-    "src/lfo.ts"
+    "src/lfo.ts",
+    "src/utils/loadHeightTexture.ts",
+    "src/utils/tileColorize.ts",
+    "src/assets/terrain/tiles.ts"
   ]
 }

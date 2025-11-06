@@ -361,7 +361,9 @@ function SelectionGridContent({
 
   const gridCellCount = gradientVisuals.length;
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const labelRef = React.useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = React.useState<number>(360);
+  const [labelLineHeight, setLabelLineHeight] = React.useState<number>(36);
   const paletteSignatureRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
@@ -397,6 +399,29 @@ function SelectionGridContent({
     };
   }, []);
 
+  React.useEffect(() => {
+    const node = labelRef.current;
+    if (!node) return;
+    const measure = () => {
+      const rect = node.getBoundingClientRect();
+      if (!rect.height) return;
+      setLabelLineHeight((prev) => (Math.abs(prev - rect.height) < 0.5 ? prev : rect.height));
+    };
+    measure();
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(measure);
+      resizeObserver.observe(node);
+      return () => {
+        resizeObserver?.disconnect();
+      };
+    }
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+    };
+  }, [selectedIndex, invertGradients, previewDarkMode, containerWidth, previewMode]);
+
   const selectedPalette = React.useMemo(() => {
     if (selectedIndex == null || gradientVisuals[selectedIndex] === undefined) return null;
     const visual = gradientVisuals[selectedIndex];
@@ -411,7 +436,8 @@ function SelectionGridContent({
     selectionGridActions.setSelectionGridPalette(gridId, selectedPalette);
   }, [gridId, selectedPalette, selectionGridActions]);
 
-  const baseCellSize = 48;
+  const previewFontSize = Math.max(12, Math.min(16, (containerWidth || 360) * 0.045));
+  const baseCellSize = Math.max(36, Math.round(labelLineHeight + 12));
   const cellSizePx = baseCellSize * squareScale;
   const rowCapacity = containerWidth ? Math.max(1, Math.floor(containerWidth / cellSizePx)) : 1;
   const rowCount = rowCapacity ? Math.ceil(gridCellCount / rowCapacity) : gridCellCount;
@@ -600,7 +626,6 @@ function SelectionGridContent({
           <div
             style={{
               width: "100%",
-              height: `${baseCellSize}px`,
               borderRadius: 3,
               boxSizing: "border-box",
               background: previewGradient,
@@ -608,7 +633,8 @@ function SelectionGridContent({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: "0 8px",
+              padding: "6px 8px",
+              minHeight: `${baseCellSize}px`,
               position: "relative",
             }}
             aria-label="Selected gradient preview"
@@ -656,9 +682,10 @@ function SelectionGridContent({
               />
             </button>
             <div
+              ref={labelRef}
               style={{
                 textAlign: "center",
-                fontSize: Math.max(12, baseCellSize * 0.4),
+                fontSize: previewFontSize,
                 fontWeight: 600,
                 textTransform: "capitalize",
                 color: textColor,

@@ -287,6 +287,7 @@ export type SelectionGridProps = {
   textColor: string;
   allowEmptySelection?: boolean;
   maxHeightUnits?: number;
+  showControls?: boolean;
 };
 
 function SelectionGridContent({
@@ -297,6 +298,7 @@ function SelectionGridContent({
   textColor,
   allowEmptySelection = false,
   maxHeightUnits = 24,
+  showControls = true,
 }: SelectionGridProps) {
   const [tileAssignments, setTileAssignments] = React.useState<Record<string, TileAssignment>>({});
 
@@ -362,6 +364,7 @@ function SelectionGridContent({
   }), [tileAssignments, usesTerrainTiles]);
 
   const gridCellCount = gradientVisuals.length;
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const sliderContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [sliderBox, setSliderBox] = React.useState<{ width: number; height: number }>({ width: 260, height: 48 });
   const paletteSignatureRef = React.useRef<string | null>(null);
@@ -377,16 +380,22 @@ function SelectionGridContent({
   }, [allowEmptySelection, gridId, selectionGridActions, stateAllowEmptySelection]);
 
   React.useEffect(() => {
-    const node = sliderContainerRef.current;
+    const node = showControls ? sliderContainerRef.current : wrapperRef.current;
     if (!node) return;
     const measure = () => {
       const rect = node.getBoundingClientRect();
       if (rect.width && rect.height) {
         setSliderBox((prev) => {
           const nextWidth = Math.round(rect.width);
-          const nextHeight = Math.round(rect.height);
+          const nextHeight = showControls ? Math.round(rect.height) : prev.height;
           if (prev.width === nextWidth && prev.height === nextHeight) return prev;
           return { width: nextWidth, height: nextHeight };
+        });
+      } else if (rect.width && !showControls) {
+        setSliderBox((prev) => {
+          const nextWidth = Math.round(rect.width);
+          if (prev.width === nextWidth) return prev;
+          return { width: nextWidth, height: prev.height };
         });
       }
     };
@@ -402,7 +411,7 @@ function SelectionGridContent({
       resizeObserver?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, []);
+  }, [showControls]);
 
   const selectedPalette = React.useMemo(() => {
     if (selectedIndex == null || gradientVisuals[selectedIndex] === undefined) return null;
@@ -418,7 +427,8 @@ function SelectionGridContent({
     selectionGridActions.setSelectionGridPalette(gridId, selectedPalette);
   }, [gridId, selectedPalette, selectionGridActions]);
 
-  const baseCellSize = Math.max(8, sliderBox.height || 0);
+  const effectiveHeight = showControls ? sliderBox.height || 0 : Math.max(sliderBox.height, 48);
+  const baseCellSize = Math.max(8, effectiveHeight || 0);
   const cellSizePx = baseCellSize * squareScale;
   const rowCapacity = sliderBox.width ? Math.max(1, Math.floor(sliderBox.width / cellSizePx)) : 1;
   const rowCount = rowCapacity ? Math.ceil(gridCellCount / rowCapacity) : gridCellCount;
@@ -618,95 +628,99 @@ function SelectionGridContent({
         : `>-${previewLabelBase}->`;
 
   return (
-    <div style={wrapperStyle}>
-      <div ref={sliderContainerRef} style={{ width: "100%" }}>
-        <LFOSlider
-          label="Square Size"
-          min={1}
-          max={4}
-          step={1}
-          defaultValue={squareScale}
-          width={sliderBox.width}
-          drawerFeatureEnabled={false}
-          drawerHandle={false}
-          mode="external"
-          readExternal={() => squareScale}
-          leftColor={buttonBackground}
-          rightColor={buttonForeground}
-          onUserChange={(value: number) => {
-            selectionGridActions.setSelectionGridSquareScale(gridId, value);
-          }}
-          onAnimatedUpdate={(value: number) => {
-            selectionGridActions.setSelectionGridSquareScale(gridId, value);
-          }}
-        />
-      </div>
-      <div style={{ width: "100%" }}>
-        <LFOSlider
-          label="Sun Altitude"
-          min={0}
-          max={90}
-          step={1}
-          defaultValue={sunAltitudeDeg}
-          width={sliderBox.width}
-          drawerFeatureEnabled={false}
-          drawerHandle={false}
-          mode="external"
-          readExternal={() => sunAltitudeDeg}
-          leftColor={buttonBackground}
-          rightColor={buttonForeground}
-          onUserChange={(value: number) => {
-            selectionGridActions.setSelectionGridSunAltitude(gridId, value);
-          }}
-          onAnimatedUpdate={(value: number) => {
-            selectionGridActions.setSelectionGridSunAltitude(gridId, value);
-          }}
-        />
-      </div>
-      <div style={{ width: "100%" }}>
-        <LFOSlider
-          label="Sun Azimuth"
-          min={0}
-          max={360}
-          step={1}
-          defaultValue={sunAzimuthDeg}
-          width={sliderBox.width}
-          drawerFeatureEnabled={false}
-          drawerHandle={false}
-          mode="external"
-          readExternal={() => sunAzimuthDeg}
-          leftColor={buttonBackground}
-          rightColor={buttonForeground}
-          onUserChange={(value: number) => {
-            selectionGridActions.setSelectionGridSunAzimuth(gridId, value);
-          }}
-          onAnimatedUpdate={(value: number) => {
-            selectionGridActions.setSelectionGridSunAzimuth(gridId, value);
-          }}
-        />
-      </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: 8,
-        }}
-      >
-        {alignmentOptions.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => selectionGridActions.setSelectionGridAlignment(gridId, option.value)}
-            aria-pressed={squareAlignment === option.value}
+    <div ref={wrapperRef} style={wrapperStyle}>
+      {showControls ? (
+        <>
+          <div ref={sliderContainerRef} style={{ width: "100%" }}>
+            <LFOSlider
+              label="Square Size"
+              min={1}
+              max={4}
+              step={1}
+              defaultValue={squareScale}
+              width={sliderBox.width}
+              drawerFeatureEnabled={false}
+              drawerHandle={false}
+              mode="external"
+              readExternal={() => squareScale}
+              leftColor={buttonBackground}
+              rightColor={buttonForeground}
+              onUserChange={(value: number) => {
+                selectionGridActions.setSelectionGridSquareScale(gridId, value);
+              }}
+              onAnimatedUpdate={(value: number) => {
+                selectionGridActions.setSelectionGridSquareScale(gridId, value);
+              }}
+            />
+          </div>
+          <div style={{ width: "100%" }}>
+            <LFOSlider
+              label="Sun Altitude"
+              min={0}
+              max={90}
+              step={1}
+              defaultValue={sunAltitudeDeg}
+              width={sliderBox.width}
+              drawerFeatureEnabled={false}
+              drawerHandle={false}
+              mode="external"
+              readExternal={() => sunAltitudeDeg}
+              leftColor={buttonBackground}
+              rightColor={buttonForeground}
+              onUserChange={(value: number) => {
+                selectionGridActions.setSelectionGridSunAltitude(gridId, value);
+              }}
+              onAnimatedUpdate={(value: number) => {
+                selectionGridActions.setSelectionGridSunAltitude(gridId, value);
+              }}
+            />
+          </div>
+          <div style={{ width: "100%" }}>
+            <LFOSlider
+              label="Sun Azimuth"
+              min={0}
+              max={360}
+              step={1}
+              defaultValue={sunAzimuthDeg}
+              width={sliderBox.width}
+              drawerFeatureEnabled={false}
+              drawerHandle={false}
+              mode="external"
+              readExternal={() => sunAzimuthDeg}
+              leftColor={buttonBackground}
+              rightColor={buttonForeground}
+              onUserChange={(value: number) => {
+                selectionGridActions.setSelectionGridSunAzimuth(gridId, value);
+              }}
+              onAnimatedUpdate={(value: number) => {
+                selectionGridActions.setSelectionGridSunAzimuth(gridId, value);
+              }}
+            />
+          </div>
+          <div
             style={{
-              ...alignmentButtonStyle,
-              ...(squareAlignment === option.value ? alignmentButtonActiveStyle : {}),
+              display: "flex",
+              justifyContent: "center",
+              gap: 8,
             }}
           >
-            {option.label}
-          </button>
-        ))}
-      </div>
+            {alignmentOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => selectionGridActions.setSelectionGridAlignment(gridId, option.value)}
+                aria-pressed={squareAlignment === option.value}
+                style={{
+                  ...alignmentButtonStyle,
+                  ...(squareAlignment === option.value ? alignmentButtonActiveStyle : {}),
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
       <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
         <div
           style={{
@@ -1019,9 +1033,7 @@ function GradientTileCanvas({
         hasRenderedRef.current = true;
         setHasRendered(true);
       }
-      if (!disposed && mode === "terrain") {
-        setTerrainReady(true);
-      } else if (!disposed && mode !== "terrain") {
+      if (!disposed) {
         setTerrainReady(true);
       }
     };

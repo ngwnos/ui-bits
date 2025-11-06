@@ -203,8 +203,11 @@ export async function loadHeightTexture(device: GPUDevice, tileUrl: string): Pro
     });
     device.queue.writeTexture(
       { texture },
-      parsed.data,
-      { bytesPerRow: parsed.width * Float32Array.BYTES_PER_ELEMENT },
+      parsed.data.buffer,
+      {
+        offset: parsed.data.byteOffset,
+        bytesPerRow: parsed.width * Float32Array.BYTES_PER_ELEMENT,
+      },
       [parsed.width, parsed.height, 1],
     );
     const entry: HeightTextureEntry = {
@@ -233,12 +236,15 @@ export async function loadHeightTexture(device: GPUDevice, tileUrl: string): Pro
         format: "r32float",
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
       });
-      device.queue.writeTexture(
-        { texture },
-        floatData,
-        { bytesPerRow: width * Float32Array.BYTES_PER_ELEMENT },
-        [width, height, 1],
-      );
+    device.queue.writeTexture(
+      { texture },
+      floatData.buffer,
+      {
+        offset: floatData.byteOffset,
+        bytesPerRow: width * Float32Array.BYTES_PER_ELEMENT,
+      },
+      [width, height, 1],
+    );
       const entry: HeightTextureEntry = { texture, width, height, min: 0, max: 1 };
       heightTextureCache.set(cacheKey, entry);
       return entry;

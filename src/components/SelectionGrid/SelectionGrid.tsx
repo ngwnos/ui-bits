@@ -436,8 +436,8 @@ function SelectionGridContent({
     selectionGridActions.setSelectionGridPalette(gridId, selectedPalette);
   }, [gridId, selectedPalette, selectionGridActions]);
 
-  const previewFontSize = Math.max(12, Math.min(16, (containerWidth || 360) * 0.045));
-  const baseCellSize = Math.max(36, Math.round(labelLineHeight + 12));
+  const previewFontSize = 12;
+  const baseCellSize = Math.max(32, Math.round(labelLineHeight + 12));
   const cellSizePx = baseCellSize * squareScale;
   const rowCapacity = containerWidth ? Math.max(1, Math.floor(containerWidth / cellSizePx)) : 1;
   const rowCount = rowCapacity ? Math.ceil(gridCellCount / rowCapacity) : gridCellCount;
@@ -686,6 +686,7 @@ function SelectionGridContent({
               style={{
                 textAlign: "center",
                 fontSize: previewFontSize,
+                lineHeight: 1.35,
                 fontWeight: 600,
                 textTransform: "capitalize",
                 color: textColor,

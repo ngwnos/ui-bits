@@ -54,7 +54,13 @@ let sharedRoot: TypeGpuRoot | null = null;
 let sharedRootPromise: Promise<TypeGpuRoot | null> | null = null;
 
 const tileTextureCache = new Map<string, { texture: GPUTexture; width: number; height: number }>();
-let sharedPipeline: { pipeline: GPURenderPipeline; sampler: GPUSampler; format: GPUTextureFormat; device: GPUDevice } | null = null;
+let sharedPipelines: {
+  renderPipeline: GPURenderPipeline;
+  computePipeline: GPUComputePipeline;
+  sampler: GPUSampler;
+  format: GPUTextureFormat;
+  device: GPUDevice;
+} | null = null;
 let sharedLinearGradientTexture: { texture: GPUTexture; width: number; height: number } | null = null;
 
 async function getSharedRoot(): Promise<TypeGpuRoot | null> {
@@ -73,9 +79,17 @@ async function getSharedRoot(): Promise<TypeGpuRoot | null> {
   return sharedRootPromise;
 }
 
-function getSharedPipeline(device: GPUDevice, format: GPUTextureFormat): { pipeline: GPURenderPipeline; sampler: GPUSampler } {
-  if (sharedPipeline && sharedPipeline.device === device && sharedPipeline.format === format) {
-    return { pipeline: sharedPipeline.pipeline, sampler: sharedPipeline.sampler };
+function getSharedPipeline(device: GPUDevice, format: GPUTextureFormat): {
+  renderPipeline: GPURenderPipeline;
+  computePipeline: GPUComputePipeline;
+  sampler: GPUSampler;
+} {
+  if (sharedPipelines && sharedPipelines.device === device && sharedPipelines.format === format) {
+    return {
+      renderPipeline: sharedPipelines.renderPipeline,
+      computePipeline: sharedPipelines.computePipeline,
+      sampler: sharedPipelines.sampler,
+    };
   }
   const shaderModule = device.createShaderModule({
     code: `
@@ -108,13 +122,24 @@ fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
   return out;
 }
 
-@group(0) @binding(0) var tileTexture : texture_2d<f32>;
+struct RenderUniforms {
+  useHillshade : u32,
+  padding : vec3<u32>,
+};
+
+@group(0) @binding(0) var hillshadeTexture : texture_2d<f32>;
 @group(0) @binding(1) var tileSampler : sampler;
 @group(0) @binding(2) var gradientTexture : texture_2d<f32>;
+@group(0) @binding(3) var heightTexture : texture_2d<f32>;
+@group(0) @binding(4) var<uniform> renderUniforms : RenderUniforms;
 
 @fragment
 fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
-  let tileColor = textureSample(tileTexture, tileSampler, in.uv);
+  let hillshade = textureSample(hillshadeTexture, tileSampler, in.uv).r;
+  if (renderUniforms.useHillshade == 1u) {
+    return vec4<f32>(hillshade, hillshade, hillshade, 1.0);
+  }
+  let tileColor = textureSample(heightTexture, tileSampler, in.uv);
   let luminance = dot(tileColor.rgb, vec3f(0.299, 0.587, 0.114));
   let remapped = textureSample(gradientTexture, tileSampler, vec2f(luminance, 0.5));
   return vec4<f32>(remapped.rgb, 1.0);
@@ -122,16 +147,72 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
 `,
   });
 
-  const pipeline = device.createRenderPipeline({
+  const computeModule = device.createShaderModule({
+    code: `
+@group(0) @binding(0) var heightTexture : texture_2d<f32>;
+@group(0) @binding(1) var<storage, write> hillshadeTexture : texture_storage_2d<rgba8unorm, write>;
+
+fn sampleHeight(coord : vec2<i32>, dims : vec2<i32>) -> f32 {
+  let clamped = vec2<i32>(clamp(coord.x, 0, dims.x - 1), clamp(coord.y, 0, dims.y - 1));
+  return textureLoad(heightTexture, clamped, 0).r;
+}
+
+@compute @workgroup_size(16, 16)
+fn cs_main(@builtin(global_invocation_id) global_id : vec3<u32>) {
+  let dimsU = textureDimensions(heightTexture);
+  let dims = vec2<i32>(dimsU);
+  let coord = vec2<i32>(global_id.xy);
+  if (coord.x >= dims.x || coord.y >= dims.y) {
+    return;
+  }
+
+  let left = sampleHeight(coord + vec2<i32>(-1, 0), dims);
+  let right = sampleHeight(coord + vec2<i32>(1, 0), dims);
+  let up = sampleHeight(coord + vec2<i32>(0, -1), dims);
+  let down = sampleHeight(coord + vec2<i32>(0, 1), dims);
+
+  let dzdx = (right - left) * 0.5;
+  let dzdy = (down - up) * 0.5;
+
+  let slope = atan(sqrt(dzdx * dzdx + dzdy * dzdy));
+  let aspect = atan2(dzdy, -dzdx);
+
+  let azimuth = 315.0 * (3.14159265359 / 180.0);
+  let altitude = 45.0 * (3.14159265359 / 180.0);
+
+  let hillshade = clamp(
+    cos(altitude) * cos(slope)
+      + sin(altitude) * sin(slope) * cos(azimuth - aspect),
+    0.0,
+    1.0
+  );
+
+  textureStore(hillshadeTexture, coord, vec4<f32>(hillshade, hillshade, hillshade, 1.0));
+}
+`,
+  });
+
+  const renderPipeline = device.createRenderPipeline({
     layout: 'auto',
     vertex: { module: shaderModule, entryPoint: 'vs_main' },
     fragment: { module: shaderModule, entryPoint: 'fs_main', targets: [{ format }] },
     primitive: { topology: 'triangle-list' },
   });
 
+  const computePipeline = device.createComputePipeline({
+    layout: 'auto',
+    compute: { module: computeModule, entryPoint: 'cs_main' },
+  });
+
   const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
-  sharedPipeline = { pipeline, sampler, format, device };
-  return { pipeline, sampler };
+  sharedPipelines = {
+    renderPipeline,
+    computePipeline,
+    sampler,
+    format,
+    device,
+  };
+  return { renderPipeline, computePipeline, sampler };
 }
 
 async function getTileTexture(device: GPUDevice, tileUrl: string): Promise<{ texture: GPUTexture; width: number; height: number } | null> {
@@ -744,14 +825,28 @@ function GradientTileCanvas({
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const contextRef = React.useRef<GPUCanvasContext | null>(null);
   const configuredSizeRef = React.useRef<{ width: number; height: number } | null>(null);
-  const gradientTextureRef = React.useRef<GPUTexture | null>(null);
-  const bindGroupRef = React.useRef<GPUBindGroup | null>(null);
-  const heightKeyRef = React.useRef<string | null>(null);
+  const resourcesRef = React.useRef<{
+    gradientTexture: GPUTexture;
+    hillshadeTexture: GPUTexture;
+    uniformBuffer: GPUBuffer;
+  } | null>(null);
   const [hasRendered, setHasRendered] = React.useState<boolean>(false);
   React.useEffect(() => {
     let disposed = false;
 
+    const disposeResources = () => {
+      const resources = resourcesRef.current;
+      if (resources) {
+        resources.gradientTexture.destroy();
+        resources.hillshadeTexture.destroy();
+        resources.uniformBuffer.destroy();
+        resourcesRef.current = null;
+      }
+    };
+
     const run = async () => {
+      setHasRendered(false);
+      disposeResources();
       const root = await getSharedRoot();
       if (!root || disposed) return;
       const canvas = canvasRef.current;
@@ -792,37 +887,55 @@ function GradientTileCanvas({
       }
       if (!heightEntry || disposed) return;
 
-      const { pipeline, sampler } = getSharedPipeline(device, format);
-      let gradientTexture = gradientTextureRef.current;
-      if (!gradientTexture) {
-        gradientTexture = device.createTexture({
-          size: [256, 1, 1],
-          format: 'rgba8unorm',
-          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        });
-        gradientTextureRef.current = gradientTexture;
-      }
+      const { renderPipeline, computePipeline, sampler } = getSharedPipeline(device, format);
+      const gradientTexture = device.createTexture({
+        size: [256, 1, 1],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
       uploadGradientToTexture(device, gradientTexture, stops, invert);
 
-      const nextHeightKey = mode === "terrain" ? `terrain:${tileUrl}` : "plain";
-      if (heightKeyRef.current !== nextHeightKey) {
-        bindGroupRef.current = null;
-      }
-      let bindGroup = bindGroupRef.current;
-      if (!bindGroup) {
-        bindGroup = device.createBindGroup({
-          layout: pipeline.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: heightEntry.texture.createView() },
-            { binding: 1, resource: sampler },
-            { binding: 2, resource: gradientTexture.createView() },
-          ],
-        });
-        bindGroupRef.current = bindGroup;
-        heightKeyRef.current = nextHeightKey;
-      }
+      const hillshadeTexture = device.createTexture({
+        size: [heightEntry.width, heightEntry.height, 1],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+      });
+
+      const uniformBuffer = device.createBuffer({
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      const uniformData = new Uint32Array([mode === "terrain" ? 1 : 0, 0, 0, 0]);
+      device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+      const computeBindGroup = device.createBindGroup({
+        layout: computePipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: heightEntry.texture.createView() },
+          { binding: 1, resource: hillshadeTexture.createView() },
+        ],
+      });
+
+      const renderBindGroup = device.createBindGroup({
+        layout: renderPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: hillshadeTexture.createView() },
+          { binding: 1, resource: sampler },
+          { binding: 2, resource: gradientTexture.createView() },
+          { binding: 3, resource: heightEntry.texture.createView() },
+          { binding: 4, resource: { buffer: uniformBuffer } },
+        ],
+      });
 
       const commandEncoder = device.createCommandEncoder();
+      const workgroupsX = Math.ceil(heightEntry.width / 16);
+      const workgroupsY = Math.ceil(heightEntry.height / 16);
+      const computePass = commandEncoder.beginComputePass();
+      computePass.setPipeline(computePipeline);
+      computePass.setBindGroup(0, computeBindGroup);
+      computePass.dispatchWorkgroups(workgroupsX, workgroupsY);
+      computePass.end();
+
       const textureView = context.getCurrentTexture().createView();
       const pass = commandEncoder.beginRenderPass({
         colorAttachments: [{
@@ -832,11 +945,13 @@ function GradientTileCanvas({
           storeOp: 'store',
         }],
       });
-      pass.setPipeline(pipeline);
-      pass.setBindGroup(0, bindGroup);
+      pass.setPipeline(renderPipeline);
+      pass.setBindGroup(0, renderBindGroup);
       pass.draw(6, 1, 0, 0);
       pass.end();
       device.queue.submit([commandEncoder.finish()]);
+
+      resourcesRef.current = { gradientTexture, hillshadeTexture, uniformBuffer };
 
       if (!disposed) {
         setHasRendered(true);
@@ -845,10 +960,12 @@ function GradientTileCanvas({
 
     run().catch((error) => {
       console.error('Failed to render gradient preview', error);
+      disposeResources();
     });
 
     return () => {
       disposed = true;
+      disposeResources();
     };
   }, [mode, tileUrl, stops, invert, size]);
 

@@ -8,6 +8,7 @@ import {
   ListChevronsUpDown,
   Minus,
   Mountain,
+  MountainSnow,
   Moon,
   Pause,
   Play,
@@ -29,6 +30,7 @@ import {
   useSliderStoreState,
   useSelectionGridState,
   useSelectionGridActions,
+  type SelectionGridPreviewMode,
   type SliderRuntimeState,
   type SliderId,
 } from "./sliderStore";
@@ -39,6 +41,17 @@ const BORDER_ICONS: Record<SliderBorder, React.ComponentType<{ size?: number; st
   left: Square,
   right: SquareDashed,
   none: X,
+};
+const SELECTION_PREVIEW_MODE_SEQUENCE: SelectionGridPreviewMode[] = ["gradient", "terrainHeight", "terrainHillshade"];
+const SELECTION_PREVIEW_MODE_ICON: Record<SelectionGridPreviewMode, React.ComponentType<{ size?: number; strokeWidth?: number }>> = {
+  gradient: Columns4,
+  terrainHeight: Mountain,
+  terrainHillshade: MountainSnow,
+};
+const SELECTION_PREVIEW_MODE_TITLE: Record<SelectionGridPreviewMode, string> = {
+  gradient: "Gradient previews",
+  terrainHeight: "Terrain height previews",
+  terrainHillshade: "Terrain hillshade previews",
 };
 
 // =================== Demo: one slider per Flexoki hue ===================
@@ -459,13 +472,24 @@ const tabs = [
     background: buttonBackground,
     color: buttonForeground,
   };
-  const terrainToggleStyle: React.CSSProperties = selectionGridState.useTerrainTiles
-    ? iconButtonStyle
-    : {
+  const selectionPreviewMode = selectionGridState.previewMode;
+  const selectionPreviewModeIndex = SELECTION_PREVIEW_MODE_SEQUENCE.indexOf(selectionPreviewMode);
+  const safeSelectionPreviewModeIndex = selectionPreviewModeIndex >= 0 ? selectionPreviewModeIndex : 0;
+  const nextSelectionPreviewMode = SELECTION_PREVIEW_MODE_SEQUENCE[
+    (safeSelectionPreviewModeIndex + 1) % SELECTION_PREVIEW_MODE_SEQUENCE.length
+  ];
+  const SelectionPreviewModeIcon = SELECTION_PREVIEW_MODE_ICON[selectionPreviewMode];
+  const selectionPreviewModeTitle = SELECTION_PREVIEW_MODE_TITLE[selectionPreviewMode];
+  const nextSelectionPreviewModeTitle = SELECTION_PREVIEW_MODE_TITLE[nextSelectionPreviewMode];
+  const selectionPreviewButtonLabel = `Switch to ${nextSelectionPreviewModeTitle.toLowerCase()}`;
+  const selectionPreviewButtonTitle = `${selectionPreviewModeTitle} (click to switch to ${nextSelectionPreviewModeTitle.toLowerCase()})`;
+  const terrainToggleStyle: React.CSSProperties = selectionPreviewMode === "gradient"
+    ? {
       ...iconButtonStyle,
       background: flexoki.base['500'],
       color: flexoki.base['50'],
-    };
+    }
+    : iconButtonStyle;
   const fontSizeControlStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -696,26 +720,20 @@ const tabs = [
           <Tabs.Content value="selection-grid" style={tabBodyStyle}>
             <button
               type="button"
-              onClick={() => selectionGridActions.setSelectionGridUseTerrainTiles(
+              onClick={() => selectionGridActions.setSelectionGridPreviewMode(
                 DEFAULT_SELECTION_GRID_ID,
-                !selectionGridState.useTerrainTiles,
+                nextSelectionPreviewMode,
               )}
-              aria-pressed={selectionGridState.useTerrainTiles}
-              aria-label={selectionGridState.useTerrainTiles ? "Show gradient previews" : "Show terrain tile previews"}
-              title={selectionGridState.useTerrainTiles ? "Switch to plain gradients" : "Enable terrain textures"}
+              aria-label={selectionPreviewButtonLabel}
+              title={selectionPreviewButtonTitle}
               style={terrainToggleStyle}
             >
-              {selectionGridState.useTerrainTiles ? (
-                <Mountain size={controlIconSize} strokeWidth={2} />
-              ) : (
-                <Columns4 size={controlIconSize} strokeWidth={2} />
-              )}
+              <SelectionPreviewModeIcon size={controlIconSize} strokeWidth={2} />
             </button>
             <SelectionGrid
               gridId={DEFAULT_SELECTION_GRID_ID}
               previewDarkMode={previewDarkMode}
               layoutGap={layoutGap}
-              colorA={flexoki.base['950']}
               colorB={flexoki.base['50']}
               textColor={previewDarkMode ? flexoki.base['50'] : "#ffffff"}
               maxHeightUnits={24}

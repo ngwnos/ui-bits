@@ -6,6 +6,7 @@ import {
   SELECTION_GRID_BASE_STATE,
   type SelectionGridAlignment,
   type SelectionGridId,
+  type SelectionGridPreviewMode,
   type SelectionGridState,
   type SliderDefinition,
   type SliderId,
@@ -102,7 +103,7 @@ export function useSelectionGridActions() {
     setSelectionGridAllowEmpty: (id: SelectionGridId, allowEmptySelection: boolean) => dispatch({ type: "updateSelectionGrid", id, patch: { allowEmptySelection } }),
     setSelectionGridInvert: (id: SelectionGridId, invertGradients: boolean) => dispatch({ type: "updateSelectionGrid", id, patch: { invertGradients } }),
     toggleSelectionGridInvert: (id: SelectionGridId) => dispatch({ type: "toggleSelectionGridInvert", id }),
-    setSelectionGridUseTerrainTiles: (id: SelectionGridId, useTerrainTiles: boolean) => dispatch({ type: "updateSelectionGrid", id, patch: { useTerrainTiles } }),
+    setSelectionGridPreviewMode: (id: SelectionGridId, previewMode: SelectionGridPreviewMode) => dispatch({ type: "setSelectionGridPreviewMode", id, previewMode }),
     setSelectionGridPalette: (id: SelectionGridId, palette: string[]) => dispatch({ type: "setSelectionGridPalette", id, palette }),
   }), [dispatch]);
 }

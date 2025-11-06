@@ -58,10 +58,6 @@ function readValues(
         values.push(view.getFloat64(entryOffset, little));
         break;
       }
-      case 12: {
-        values.push(view.getFloat64(entryOffset, little));
-        break;
-      }
       default:
         values.push(view.getUint8(entryOffset));
     }

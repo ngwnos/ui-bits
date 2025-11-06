@@ -1,6 +1,7 @@
 export type {
   SelectionGridAlignment,
   SelectionGridId,
+  SelectionGridPreviewMode,
   SelectionGridState,
   SliderDefinition,
   SliderId,

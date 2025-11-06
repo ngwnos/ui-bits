@@ -279,7 +279,6 @@ export type SelectionGridProps = {
   gridId?: SelectionGridId;
   previewDarkMode: boolean;
   layoutGap: string;
-  colorA: string;
   colorB: string;
   textColor: string;
   allowEmptySelection?: boolean;
@@ -290,7 +289,6 @@ function SelectionGridContent({
   gridId = DEFAULT_SELECTION_GRID_ID,
   previewDarkMode,
   layoutGap,
-  colorA,
   colorB,
   textColor,
   allowEmptySelection = false,

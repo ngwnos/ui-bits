@@ -8,6 +8,7 @@ import { MATPLOTLIB_GRADIENTS, buildPalette } from "../gradients/matplotlib";
 export type SliderId = string;
 export type SelectionGridId = string;
 export type SelectionGridAlignment = "left" | "center" | "right";
+export type SelectionGridPreviewMode = "gradient" | "terrainHeight" | "terrainHillshade";
 
 export interface SelectionGridState {
   selectedIndex: number | null;
@@ -16,7 +17,7 @@ export interface SelectionGridState {
   invertGradients: boolean;
   allowEmptySelection: boolean;
   colorPalette: string[];
-  useTerrainTiles: boolean;
+  previewMode: SelectionGridPreviewMode;
 }
 
 export interface SliderDefinition {
@@ -78,7 +79,8 @@ export type SliderStoreAction =
   | { type: "registerSelectionGrid"; id: SelectionGridId; initialState?: Partial<SelectionGridState> }
   | { type: "updateSelectionGrid"; id: SelectionGridId; patch: Partial<SelectionGridState> }
   | { type: "toggleSelectionGridInvert"; id: SelectionGridId }
-  | { type: "setSelectionGridPalette"; id: SelectionGridId; palette: string[] };
+  | { type: "setSelectionGridPalette"; id: SelectionGridId; palette: string[] }
+  | { type: "setSelectionGridPreviewMode"; id: SelectionGridId; previewMode: SelectionGridPreviewMode };
 
 const DEFAULT_SELECTION_PALETTE = buildPalette(MATPLOTLIB_GRADIENTS[0].stops, false).css;
 
@@ -89,7 +91,7 @@ export const SELECTION_GRID_BASE_STATE: SelectionGridState = {
   invertGradients: false,
   allowEmptySelection: false,
   colorPalette: [...DEFAULT_SELECTION_PALETTE],
-  useTerrainTiles: true,
+  previewMode: "terrainHillshade",
 };
 
 function selectionGridStatesEqual(a: SelectionGridState, b: SelectionGridState): boolean {
@@ -101,7 +103,7 @@ function selectionGridStatesEqual(a: SelectionGridState, b: SelectionGridState):
     && a.allowEmptySelection === b.allowEmptySelection
     && a.colorPalette.length === b.colorPalette.length
     && a.colorPalette.every((color, index) => color === b.colorPalette[index])
-    && a.useTerrainTiles === b.useTerrainTiles
+    && a.previewMode === b.previewMode
   );
 }
 
@@ -114,6 +116,17 @@ export function normalizeSelectionGridState(base: SelectionGridState): Selection
     if (value === "center" || value === "right") return value;
     return "left";
   };
+  const normalizePreviewMode = (value: SelectionGridPreviewMode | boolean | undefined): SelectionGridPreviewMode => {
+    if (value === "gradient" || value === "terrainHeight" || value === "terrainHillshade") {
+      return value;
+    }
+    if (typeof value === "boolean") {
+      return value ? "terrainHillshade" : "gradient";
+    }
+    return "terrainHillshade";
+  };
+  const rawPreviewMode = (base as SelectionGridState & { previewMode?: SelectionGridPreviewMode }).previewMode;
+  const legacyUseTerrain = (base as { useTerrainTiles?: boolean }).useTerrainTiles;
   const normalized: SelectionGridState = {
     selectedIndex: base.selectedIndex,
     squareScale: clampScale(base.squareScale),
@@ -123,7 +136,7 @@ export function normalizeSelectionGridState(base: SelectionGridState): Selection
     colorPalette: Array.isArray(base.colorPalette) && base.colorPalette.length === 256
       ? [...base.colorPalette]
       : [...DEFAULT_SELECTION_PALETTE],
-    useTerrainTiles: Boolean(base.useTerrainTiles ?? true),
+    previewMode: normalizePreviewMode(rawPreviewMode ?? legacyUseTerrain),
   };
   if (!normalized.allowEmptySelection && normalized.selectedIndex == null) {
     normalized.selectedIndex = 0;
@@ -629,6 +642,24 @@ export function sliderStoreReducer(state: SliderStoreState, action: SliderStoreA
             ...current,
             colorPalette: [...action.palette],
           },
+        },
+      };
+    }
+    case "setSelectionGridPreviewMode": {
+      const current = state.selectionGrids[action.id];
+      if (!current) return state;
+      if (current.previewMode === action.previewMode) {
+        return state;
+      }
+      const next = normalizeSelectionGridState({ ...current, previewMode: action.previewMode });
+      if (selectionGridStatesEqual(next, current)) {
+        return state;
+      }
+      return {
+        ...state,
+        selectionGrids: {
+          ...state.selectionGrids,
+          [action.id]: next,
         },
       };
     }

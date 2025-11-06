@@ -1,4 +1,5 @@
 import React from "react";
+import { Mountain, Columns4 } from "lucide-react";
 import LFOSlider from "../LFOSlider";
 import { flexoki } from "../../flexoki";
 import {
@@ -340,6 +341,16 @@ export default function SelectionGrid({
   const buttonForeground = previewDarkMode ? flexoki.base["700"] : flexoki.base["50"];
   const buttonActiveBackground = previewDarkMode ? flexoki.base["200"] : flexoki.base["600"];
   const buttonActiveForeground = previewDarkMode ? flexoki.base["900"] : flexoki.base["50"];
+  const terrainToggleButtonSize = Math.max(28, baseCellSize - 10);
+  const terrainToggleIconSize = Math.max(terrainToggleButtonSize - 12, 12);
+  const previewTextShadow = [
+    "0 0 4px rgba(0, 0, 0, 0.7)",
+    "0 1px 3px rgba(0, 0, 0, 0.85)",
+  ].join(", ");
+  const previewIconFilter = [
+    "drop-shadow(0 0 1px rgba(0, 0, 0, 0.6))",
+    "drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7))",
+  ].join(" ");
 
   const alignmentButtonStyle: React.CSSProperties = {
     background: buttonBackground,
@@ -363,6 +374,19 @@ export default function SelectionGrid({
     background: buttonActiveBackground,
     color: buttonActiveForeground,
     boxShadow: `0 0 0 1px ${buttonActiveBackground}`,
+  };
+  const terrainToggleButtonStyle: React.CSSProperties = {
+    width: terrainToggleButtonSize,
+    height: terrainToggleButtonSize,
+    borderRadius: 3,
+    border: "none",
+    background: "transparent",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    padding: 0,
+    transition: "color 120ms ease",
   };
 
   const resolvedMaxHeightUnits = typeof maxHeightUnits === "number" && Number.isFinite(maxHeightUnits) && maxHeightUnits > 0
@@ -451,15 +475,8 @@ export default function SelectionGrid({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: textColor,
-              fontSize: Math.max(12, baseCellSize * 0.4),
-              fontWeight: 600,
-              textTransform: "capitalize",
-              textShadow: [
-                "0 0 4px rgba(0, 0, 0, 0.7)",
-                "0 1px 3px rgba(0, 0, 0, 0.85)",
-              ].join(", "),
-              userSelect: "none",
+              padding: "0 8px",
+              position: "relative",
             }}
             aria-label="Selected gradient preview"
             role="button"
@@ -475,7 +492,62 @@ export default function SelectionGrid({
               }
             }}
           >
-            {previewLabel}
+            <button
+              type="button"
+              aria-pressed={useTerrainTiles}
+              aria-label={useTerrainTiles ? "Show plain gradients" : "Show terrain textures"}
+              title={useTerrainTiles ? "Switch to gradient-only previews" : "Enable terrain textures"}
+              style={{
+                ...terrainToggleButtonStyle,
+                position: "absolute",
+                left: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                selectionGridActions.setSelectionGridUseTerrainTiles(gridId, !useTerrainTiles);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.stopPropagation();
+                }
+              }}
+            >
+              {useTerrainTiles ? (
+                <Mountain
+                  size={terrainToggleIconSize}
+                  strokeWidth={2}
+                  style={{
+                    color: textColor,
+                    filter: previewIconFilter,
+                  }}
+                />
+              ) : (
+                <Columns4
+                  size={terrainToggleIconSize}
+                  strokeWidth={2}
+                  style={{
+                    color: textColor,
+                    filter: previewIconFilter,
+                  }}
+                />
+              )}
+            </button>
+            <div
+              style={{
+                textAlign: "center",
+                fontSize: Math.max(12, baseCellSize * 0.4),
+                fontWeight: 600,
+                textTransform: "capitalize",
+                color: textColor,
+                textShadow: previewTextShadow,
+                userSelect: "none",
+                pointerEvents: "none",
+              }}
+            >
+              {previewLabel}
+            </div>
           </div>
           <div
             className="selection-grid__cells"

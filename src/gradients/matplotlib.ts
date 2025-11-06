@@ -201,16 +201,6 @@ export const MATPLOTLIB_GRADIENTS: GradientDefinition[] = [
     ],
   },
   {
-    name: "Greys",
-    stops: [
-      { color: "#ffffff", stop: 0 },
-      { color: "#d9d9d9", stop: 25 },
-      { color: "#959595", stop: 50 },
-      { color: "#515151", stop: 75 },
-      { color: "#000000", stop: 100 },
-    ],
-  },
-  {
     name: "Oranges",
     stops: [
       { color: "#fff5eb", stop: 0 },
@@ -328,46 +318,6 @@ export const MATPLOTLIB_GRADIENTS: GradientDefinition[] = [
       { color: "#fd8c3c", stop: 50 },
       { color: "#e2191c", stop: 75 },
       { color: "#800026", stop: 100 },
-    ],
-  },
-  {
-    name: "Binary",
-    stops: [
-      { color: "#ffffff", stop: 0 },
-      { color: "#bfbfbf", stop: 25 },
-      { color: "#7f7f7f", stop: 50 },
-      { color: "#3f3f3f", stop: 75 },
-      { color: "#000000", stop: 100 },
-    ],
-  },
-  {
-    name: "Gist Yarg",
-    stops: [
-      { color: "#ffffff", stop: 0 },
-      { color: "#bfbfbf", stop: 25 },
-      { color: "#7f7f7f", stop: 50 },
-      { color: "#3f3f3f", stop: 75 },
-      { color: "#000000", stop: 100 },
-    ],
-  },
-  {
-    name: "Gist Gray",
-    stops: [
-      { color: "#000000", stop: 0 },
-      { color: "#404040", stop: 25 },
-      { color: "#808080", stop: 50 },
-      { color: "#c0c0c0", stop: 75 },
-      { color: "#ffffff", stop: 100 },
-    ],
-  },
-  {
-    name: "Gray",
-    stops: [
-      { color: "#000000", stop: 0 },
-      { color: "#404040", stop: 25 },
-      { color: "#808080", stop: 50 },
-      { color: "#c0c0c0", stop: 75 },
-      { color: "#ffffff", stop: 100 },
     ],
   },
   {

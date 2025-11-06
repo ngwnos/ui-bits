@@ -1,6 +1,6 @@
 import React from "react";
 import tgpu from "typegpu";
-import { Columns4, Mountain } from "lucide-react";
+import { Columns4, Mountain, MountainSnow } from "lucide-react";
 import LFOSlider from "../LFOSlider";
 import { flexoki } from "../../flexoki";
 import { SliderStoreProvider } from "../../sliderStore";
@@ -9,6 +9,7 @@ import {
   useSelectionGridActions,
   useSelectionGridState,
   type SelectionGridId,
+  type SelectionGridPreviewMode,
 } from "../../sliderStore";
 import { DEFAULT_SELECTION_GRID_ID } from "../../selectionGridIds";
 import {
@@ -49,6 +50,18 @@ type GradientVisual = {
 };
 
 const CELL_CORNER_RADIUS_PX = 3;
+
+const PREVIEW_MODE_SEQUENCE: SelectionGridPreviewMode[] = ["gradient", "terrainHeight", "terrainHillshade"];
+const PREVIEW_MODE_ICON: Record<SelectionGridPreviewMode, typeof Columns4> = {
+  gradient: Columns4,
+  terrainHeight: Mountain,
+  terrainHillshade: MountainSnow,
+};
+const PREVIEW_MODE_TITLE: Record<SelectionGridPreviewMode, string> = {
+  gradient: "Gradient previews",
+  terrainHeight: "Terrain height previews",
+  terrainHillshade: "Terrain hillshade previews",
+};
 
 type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
 let sharedRoot: TypeGpuRoot | null = null;
@@ -304,8 +317,15 @@ function SelectionGridContent({
     selectedIndex,
     invertGradients,
     allowEmptySelection: stateAllowEmptySelection,
-    useTerrainTiles,
+    previewMode,
   } = selectionGridState;
+
+  const renderMode: "plain" | "height" | "hillshade" = previewMode === "gradient"
+    ? "plain"
+    : previewMode === "terrainHeight"
+      ? "height"
+      : "hillshade";
+  const usesTerrainTiles = renderMode !== "plain";
 
   React.useEffect(() => {
     let cancelled = false;
@@ -325,7 +345,7 @@ function SelectionGridContent({
         console.error("Failed to load selection grid tiles", error);
       }
     };
-    if (useTerrainTiles) {
+    if (usesTerrainTiles) {
       loadAssignmentsOnly();
     } else {
       setTileAssignments({});
@@ -333,10 +353,10 @@ function SelectionGridContent({
     return () => {
       cancelled = true;
     };
-  }, [useTerrainTiles]);
+  }, [usesTerrainTiles]);
 
   const gradientVisuals = React.useMemo<GradientVisual[]>(() => GRADIENT_BASE_DATA.map((base) => {
-    const tileUrl = useTerrainTiles ? (tileAssignments[base.name] ?? "") : "";
+    const tileUrl = usesTerrainTiles ? (tileAssignments[base.name] ?? "") : "";
     const tileName = tileUrl.split("/").pop() ?? tileUrl;
     return {
       name: base.name,
@@ -353,7 +373,7 @@ function SelectionGridContent({
         cssFallback: createGradientCss(base.stops, true),
       },
     };
-  }), [tileAssignments, useTerrainTiles]);
+  }), [tileAssignments, usesTerrainTiles]);
 
   const gridCellCount = gradientVisuals.length;
   const sliderContainerRef = React.useRef<HTMLDivElement | null>(null);
@@ -460,7 +480,7 @@ function SelectionGridContent({
           outline: "none",
           position: "relative",
           overflow: "hidden",
-          ...(useTerrainTiles
+          ...(usesTerrainTiles
             ? {}
             : {
               backgroundImage: fallbackBackground,
@@ -494,15 +514,17 @@ function SelectionGridContent({
           }
         }}
       >
-        <GradientTileCanvas
-          mode={useTerrainTiles ? "terrain" : "plain"}
-          tileUrl={useTerrainTiles ? visual.tileUrl : undefined}
-          stops={gradientStops}
-          invert={invertGradients}
-          size={cellSizePx}
-          borderRadius={borderRadiusValue}
-          fallbackBackground={fallbackBackground}
-        />
+        {renderMode !== "plain" ? (
+          <GradientTileCanvas
+            mode={renderMode}
+            tileUrl={usesTerrainTiles ? visual.tileUrl : undefined}
+            stops={gradientStops}
+            invert={invertGradients}
+            size={cellSizePx}
+            borderRadius={borderRadiusValue}
+            fallbackBackground={fallbackBackground}
+          />
+        ) : null}
         {isSelected ? (
           <div
             style={{
@@ -532,6 +554,11 @@ function SelectionGridContent({
     { value: "center", label: "Center" },
     { value: "right", label: "Right" },
   ];
+  const previewModeIndex = PREVIEW_MODE_SEQUENCE.indexOf(previewMode);
+  const nextPreviewMode = PREVIEW_MODE_SEQUENCE[(previewModeIndex + 1) % PREVIEW_MODE_SEQUENCE.length];
+  const PreviewModeIcon = PREVIEW_MODE_ICON[previewMode];
+  const previewModeTitle = PREVIEW_MODE_TITLE[previewMode];
+  const nextModeTitle = PREVIEW_MODE_TITLE[nextPreviewMode];
 
   const buttonBackground = previewDarkMode ? flexoki.base["100"] : flexoki.base["700"];
   const buttonForeground = previewDarkMode ? flexoki.base["700"] : flexoki.base["50"];
@@ -690,9 +717,8 @@ function SelectionGridContent({
           >
             <button
               type="button"
-              aria-pressed={useTerrainTiles}
-              aria-label={useTerrainTiles ? "Show plain gradients" : "Show terrain textures"}
-              title={useTerrainTiles ? "Switch to gradient-only previews" : "Enable terrain textures"}
+              aria-label={`Switch to ${nextModeTitle.toLowerCase()}`}
+              title={`${previewModeTitle} (click to switch to ${nextModeTitle.toLowerCase()})`}
               style={{
                 ...terrainToggleButtonStyle,
                 position: "absolute",
@@ -702,7 +728,7 @@ function SelectionGridContent({
               }}
               onClick={(event) => {
                 event.stopPropagation();
-                selectionGridActions.setSelectionGridUseTerrainTiles(gridId, !useTerrainTiles);
+                selectionGridActions.setSelectionGridPreviewMode(gridId, nextPreviewMode);
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
@@ -710,25 +736,14 @@ function SelectionGridContent({
                 }
               }}
             >
-              {useTerrainTiles ? (
-                <Mountain
-                  size={terrainToggleIconSize}
-                  strokeWidth={2}
-                  style={{
-                    color: textColor,
-                    filter: previewIconFilter,
-                  }}
-                />
-              ) : (
-                <Columns4
-                  size={terrainToggleIconSize}
-                  strokeWidth={2}
-                  style={{
-                    color: textColor,
-                    filter: previewIconFilter,
-                  }}
-                />
-              )}
+              <PreviewModeIcon
+                size={terrainToggleIconSize}
+                strokeWidth={2}
+                style={{
+                  color: textColor,
+                  filter: previewIconFilter,
+                }}
+              />
             </button>
             <div
               style={{
@@ -780,7 +795,7 @@ function GradientTileCanvas({
   borderRadius,
   fallbackBackground,
 }: {
-  mode: "terrain" | "plain";
+  mode: "plain" | "height" | "hillshade";
   tileUrl?: string;
   stops: GradientDefinition['stops'];
   invert: boolean;
@@ -798,10 +813,11 @@ function GradientTileCanvas({
     uniformSize: number;
   } | null>(null);
   const [hasRendered, setHasRendered] = React.useState<boolean>(false);
-  const [terrainReady, setTerrainReady] = React.useState(mode !== "terrain");
+  const [terrainReady, setTerrainReady] = React.useState(mode === "plain");
+  const isPlainMode = mode === "plain";
 
   React.useEffect(() => {
-    if (!tileUrl) return;
+    if (!tileUrl || isPlainMode) return;
     let cancelled = false;
     (async () => {
       const root = await getSharedRoot();
@@ -811,15 +827,18 @@ function GradientTileCanvas({
     return () => {
       cancelled = true;
     };
-  }, [tileUrl]);
+  }, [tileUrl, isPlainMode]);
   React.useEffect(() => {
-    if (mode !== "terrain") {
+    if (isPlainMode) {
       setTerrainReady(true);
     } else if (!hasRenderedRef.current) {
       setTerrainReady(false);
     }
-  }, [mode, tileUrl]);
+  }, [isPlainMode, mode]);
   React.useEffect(() => {
+    if (isPlainMode) {
+      return;
+    }
     let disposed = false;
 
     const run = async () => {
@@ -861,7 +880,7 @@ function GradientTileCanvas({
       }
 
       let heightEntry: HeightTextureEntry | null = null;
-      if (mode === "terrain") {
+      if (mode === "height" || mode === "hillshade") {
         if (!tileUrl) return;
         heightEntry = await loadHeightTexture(device, tileUrl);
       } else {
@@ -896,20 +915,20 @@ function GradientTileCanvas({
       ];
       const ambient = 0.2;
       const contrast = 0.9;
-      const uniformData = new Float32Array([
-        mode === "terrain" ? 1 : 0,
-        texelSizeX,
-        texelSizeY,
-        heightScale,
-        lightDir[0],
-        lightDir[1],
-        lightDir[2],
-        heightMin,
-        heightRange,
-        ambient,
-        contrast,
-        0,
-      ]);
+      const hillshadeFlag = mode === "hillshade" ? 1 : 0;
+      const uniformArray = new Float32Array(16);
+      uniformArray[0] = hillshadeFlag;
+      uniformArray[1] = texelSizeX;
+      uniformArray[2] = texelSizeY;
+      uniformArray[3] = heightScale;
+      uniformArray[4] = lightDir[0];
+      uniformArray[5] = lightDir[1];
+      uniformArray[6] = lightDir[2];
+      uniformArray[7] = heightMin;
+      uniformArray[8] = heightRange;
+      uniformArray[9] = ambient;
+      uniformArray[10] = contrast;
+      const uniformData = uniformArray;
       let resources = resourcesRef.current;
       if (!resources || resources.uniformSize !== uniformData.byteLength) {
         if (resources) {
@@ -984,7 +1003,11 @@ function GradientTileCanvas({
         resourcesRef.current = null;
       }
     };
-  }, [mode, tileUrl, stops, invert, size]);
+  }, [mode, tileUrl, stops, invert, size, isPlainMode]);
+
+  if (isPlainMode) {
+    return null;
+  }
 
   return (
     <>

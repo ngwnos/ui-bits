@@ -171,13 +171,14 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   let normal = normalize(vec3<f32>(-dzdx, -dzdy, 1.0));
   let shade = clamp(ambient + dot(normal, lightDir) * contrast, 0.0, 1.0);
 
+  let hillshadeColor = textureSample(gradientTexture, tileSampler, vec2<f32>(shade, 0.5));
   if (useHillshade > 0.5) {
-    return vec4<f32>(shade, shade, shade, 1.0);
+    return hillshadeColor;
   }
 
   let normalizedHeight = clamp((hC - heightMin) / heightRange, 0.0, 1.0);
   let remapped = textureSample(gradientTexture, tileSampler, vec2<f32>(normalizedHeight, 0.5));
-  return vec4<f32>(remapped.rgb, 1.0);
+  return remapped;
 }
 `,
   });

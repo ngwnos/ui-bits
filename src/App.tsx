@@ -16,7 +16,7 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import { CustomColorPopover, SelectionGrid } from "./components";
+import { CustomColorPopover, SelectionGrid, TypeGPUTest } from "./components";
 import LFOSlider, { FrameLoopProvider, type SliderBorder } from "./components/LFOSlider";
 import type { Waveform } from "./lfo";
 import { flexoki } from "./flexoki";
@@ -395,10 +395,11 @@ function EditableRectPOC() {
   const toggleIconSize = Math.max(columnButtonSize - 4, 12);
   const controlIconSize = Math.max(columnButtonSize - 6, 12);
   const horizontalPadding = Math.max(columnGap * 2, 16);
-  const tabs = [
+const tabs = [
     { value: 'lfo-slider', label: 'LFO Slider' },
     { value: 'dropdown', label: 'Dropdown' },
     { value: 'selection-grid', label: 'Selection Grid' },
+    { value: 'typegpu-test', label: 'TypeGPU Test' },
   ];
   const tabsRootStyle: React.CSSProperties = {
     display: 'flex',
@@ -719,6 +720,9 @@ function EditableRectPOC() {
               textColor={previewDarkMode ? flexoki.base['50'] : "#ffffff"}
               maxHeightUnits={5}
             />
+          </Tabs.Content>
+          <Tabs.Content value="typegpu-test" style={tabBodyStyle}>
+            <TypeGPUTest />
           </Tabs.Content>
         </Tabs.Root>
       </div>

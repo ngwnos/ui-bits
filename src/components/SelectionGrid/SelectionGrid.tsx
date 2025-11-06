@@ -363,7 +363,7 @@ function SelectionGridContent({
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const labelRef = React.useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = React.useState<number>(360);
-  const [labelLineHeight, setLabelLineHeight] = React.useState<number>(36);
+  const [labelLineHeight, setLabelLineHeight] = React.useState<number>(12);
   const paletteSignatureRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
@@ -437,7 +437,11 @@ function SelectionGridContent({
   }, [gridId, selectedPalette, selectionGridActions]);
 
   const previewFontSize = 12;
-  const baseCellSize = Math.max(32, Math.round(labelLineHeight + 12));
+  const previewLineHeight = 1;
+  const previewPaddingEm = 0.35;
+  const previewPaddingPx = previewFontSize * previewPaddingEm;
+  const baseLabelHeight = labelLineHeight || (previewFontSize * previewLineHeight);
+  const baseCellSize = Math.max(20, Math.round(baseLabelHeight + previewPaddingPx * 2));
   const cellSizePx = baseCellSize * squareScale;
   const rowCapacity = containerWidth ? Math.max(1, Math.floor(containerWidth / cellSizePx)) : 1;
   const rowCount = rowCapacity ? Math.ceil(gridCellCount / rowCapacity) : gridCellCount;
@@ -633,7 +637,7 @@ function SelectionGridContent({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: "6px 8px",
+              padding: `${previewPaddingPx}px 8px`,
               minHeight: `${baseCellSize}px`,
               position: "relative",
             }}
@@ -686,7 +690,7 @@ function SelectionGridContent({
               style={{
                 textAlign: "center",
                 fontSize: previewFontSize,
-                lineHeight: 1.35,
+                lineHeight: previewLineHeight,
                 fontWeight: 600,
                 textTransform: "capitalize",
                 color: textColor,

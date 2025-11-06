@@ -2,7 +2,7 @@ import React from "react";
 import tgpu from "typegpu";
 import { MATPLOTLIB_GRADIENTS, buildPalette } from "../gradients/matplotlib";
 
-const TILE_URL = "/terrain/tiles/tile_r02_c14.png";
+const TILE_URL = "/terrain/dem_tiles/tile_r00_c00.png";
 
 export default function TypeGPUTest() {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);

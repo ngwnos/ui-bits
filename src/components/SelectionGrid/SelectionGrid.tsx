@@ -224,7 +224,9 @@ async function loadTileList(): Promise<string[]> {
     if (!response.ok) throw new Error("Failed to load tile list");
     const data: unknown = await response.json();
     if (!Array.isArray(data)) throw new Error("Tile manifest malformed");
-    return data.filter((entry): entry is string => typeof entry === "string" && entry.endsWith(".png")).map((name) => `/terrain/tiles/${name}`);
+    return data
+      .filter((entry): entry is string => typeof entry === "string" && entry.endsWith(".png"))
+      .map((name) => `/terrain/dem_tiles/${name}`);
   } catch (error) {
     console.error("Failed to fetch tile list", error);
     return [];

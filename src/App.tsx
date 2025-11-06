@@ -718,7 +718,7 @@ const tabs = [
               colorA={flexoki.base['950']}
               colorB={flexoki.base['50']}
               textColor={previewDarkMode ? flexoki.base['50'] : "#ffffff"}
-              maxHeightUnits={5}
+              maxHeightUnits={24}
             />
           </Tabs.Content>
           <Tabs.Content value="typegpu-test" style={tabBodyStyle}>

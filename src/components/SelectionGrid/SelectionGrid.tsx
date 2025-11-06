@@ -1,9 +1,10 @@
 import React from "react";
 import tgpu from "typegpu";
 import { Columns4, Mountain } from "lucide-react";
-import { Mountain, Columns4 } from "lucide-react";
 import LFOSlider from "../LFOSlider";
 import { flexoki } from "../../flexoki";
+import { SliderStoreProvider } from "../../sliderStore";
+import { SliderStoreContext } from "../../sliderStore/context";
 import {
   useSelectionGridActions,
   useSelectionGridState,
@@ -16,7 +17,6 @@ import {
   createGradientCss,
   type GradientDefinition,
 } from "../../gradients/matplotlib";
-import { loadTilePixels, colorizeTile } from "../../utils/tileColorize";
 import "./selectionGrid.css";
 
 type PaletteInfo = {
@@ -55,6 +55,7 @@ let sharedRootPromise: Promise<TypeGpuRoot | null> | null = null;
 
 const tileTextureCache = new Map<string, { texture: GPUTexture; width: number; height: number }>();
 let sharedPipeline: { pipeline: GPURenderPipeline; sampler: GPUSampler; format: GPUTextureFormat; device: GPUDevice } | null = null;
+let sharedLinearGradientTexture: { texture: GPUTexture; width: number; height: number } | null = null;
 
 async function getSharedRoot(): Promise<TypeGpuRoot | null> {
   if (!navigator.gpu) return null;
@@ -137,14 +138,16 @@ async function getTileTexture(device: GPUDevice, tileUrl: string): Promise<{ tex
   const cached = tileTextureCache.get(tileUrl);
   if (cached) return cached;
   try {
-    const response = await fetch(tileUrl, { cache: 'force-cache' });
+    const response = await fetch(tileUrl, { cache: "force-cache" });
     if (!response.ok) throw new Error('Failed to fetch tile texture');
     const blob = await response.blob();
     const bitmap = await createImageBitmap(blob);
     const texture = device.createTexture({
       size: [bitmap.width, bitmap.height, 1],
       format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      usage: GPUTextureUsage.TEXTURE_BINDING
+        | GPUTextureUsage.COPY_DST
+        | GPUTextureUsage.RENDER_ATTACHMENT,
     });
     device.queue.copyExternalImageToTexture({ source: bitmap }, { texture }, [bitmap.width, bitmap.height]);
     bitmap.close();
@@ -155,6 +158,35 @@ async function getTileTexture(device: GPUDevice, tileUrl: string): Promise<{ tex
     console.error('Failed to prepare tile texture', error);
     return null;
   }
+}
+
+function getLinearGradientTexture(device: GPUDevice): { texture: GPUTexture; width: number; height: number } {
+  if (sharedLinearGradientTexture) return sharedLinearGradientTexture;
+  const size = 256;
+  const bytes = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const value = Math.round((x / (size - 1)) * 255);
+      const offset = (y * size + x) * 4;
+      bytes[offset] = value;
+      bytes[offset + 1] = value;
+      bytes[offset + 2] = value;
+      bytes[offset + 3] = 255;
+    }
+  }
+  const texture = device.createTexture({
+    size: [size, size, 1],
+    format: "rgba8unorm",
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  device.queue.writeTexture(
+    { texture },
+    bytes,
+    { bytesPerRow: size * 4 },
+    [size, size, 1],
+  );
+  sharedLinearGradientTexture = { texture, width: size, height: size };
+  return sharedLinearGradientTexture;
 }
 
 function uploadGradientToTexture(device: GPUDevice, texture: GPUTexture, stops: GradientDefinition['stops'], invert: boolean) {
@@ -210,7 +242,7 @@ export type SelectionGridProps = {
   maxHeightUnits?: number;
 };
 
-export default function SelectionGrid({
+function SelectionGridContent({
   gridId = DEFAULT_SELECTION_GRID_ID,
   previewDarkMode,
   layoutGap,
@@ -218,9 +250,8 @@ export default function SelectionGrid({
   colorB,
   textColor,
   allowEmptySelection = false,
-  maxHeightUnits,
+  maxHeightUnits = 24,
 }: SelectionGridProps) {
-  const [tileTextures, setTileTextures] = React.useState<Map<string, { normal: string | null; inverted: string | null }>>(new Map());
   const [tileAssignments, setTileAssignments] = React.useState<Record<string, string>>({});
 
   const selectionGridState = useSelectionGridState(gridId);
@@ -247,39 +278,6 @@ export default function SelectionGrid({
         });
         if (!cancelled) {
           setTileAssignments(assignments);
-          setTileTextures(new Map());
-        }
-      } catch (error) {
-        console.error("Failed to load selection grid tiles", error);
-      }
-    };
-    const loadAndColorize = async () => {
-      try {
-        const tileUrls = await loadTileList();
-        const shuffled = shuffle(tileUrls);
-        const pool = shuffled.length > 0 ? shuffled : tileUrls;
-        const assignments: Record<string, string> = {};
-        const textures = new Map<string, { normal: string | null; inverted: string | null }>();
-        const tileCache = new Map<string, { data: Uint8Array; width: number; height: number }>();
-        GRADIENT_BASE_DATA.forEach((gradient, index) => {
-          const tileUrl = pool[index % pool.length];
-          assignments[gradient.name] = tileUrl;
-        });
-        for (const gradient of GRADIENT_BASE_DATA) {
-          const tileUrl = assignments[gradient.name];
-          if (!tileUrl) continue;
-          let tilePixels = tileCache.get(tileUrl);
-          if (!tilePixels) {
-            tilePixels = await loadTilePixels(tileUrl);
-            tileCache.set(tileUrl, tilePixels);
-          }
-          const normalTexture = colorizeTile(tilePixels, gradient.normal.data);
-          const invertedTexture = colorizeTile(tilePixels, gradient.inverted.data);
-          textures.set(gradient.name, { normal: normalTexture, inverted: invertedTexture });
-        }
-        if (!cancelled) {
-          setTileAssignments(assignments);
-          setTileTextures(textures);
         }
       } catch (error) {
         console.error("Failed to load selection grid tiles", error);
@@ -288,7 +286,7 @@ export default function SelectionGrid({
     if (useTerrainTiles) {
       loadAssignmentsOnly();
     } else {
-      loadAndColorize();
+      setTileAssignments({});
     }
     return () => {
       cancelled = true;
@@ -296,7 +294,6 @@ export default function SelectionGrid({
   }, [useTerrainTiles]);
 
   const gradientVisuals = React.useMemo<GradientVisual[]>(() => GRADIENT_BASE_DATA.map((base) => {
-    const textures = useTerrainTiles ? tileTextures.get(base.name) : undefined;
     const tileUrl = useTerrainTiles ? (tileAssignments[base.name] ?? "") : "";
     const tileName = tileUrl.split("/").pop() ?? tileUrl;
     return {
@@ -304,17 +301,17 @@ export default function SelectionGrid({
       tile: tileName,
       tileUrl,
       normal: {
-        textureUrl: textures?.normal ?? null,
+        textureUrl: null,
         paletteCss: [...base.normal.css],
         cssFallback: createGradientCss(base.stops, false),
       },
       inverted: {
-        textureUrl: textures?.inverted ?? null,
+        textureUrl: null,
         paletteCss: [...base.inverted.css],
         cssFallback: createGradientCss(base.stops, true),
       },
     };
-  }), [tileAssignments, tileTextures, useTerrainTiles]);
+  }), [tileAssignments, useTerrainTiles]);
 
   const gridCellCount = gradientVisuals.length;
   const sliderContainerRef = React.useRef<HTMLDivElement | null>(null);
@@ -404,24 +401,9 @@ export default function SelectionGrid({
     const topRightRadius = (hasTopNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
     const bottomLeftRadius = (hasBottomNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
     const bottomRightRadius = (hasBottomNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
-    const backgroundStyle = useTerrainTiles
-      ? {
-        backgroundImage: appearance.cssFallback,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-      : appearance.textureUrl
-        ? {
-          backgroundImage: `url(${appearance.textureUrl})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }
-        : {
-          backgroundImage: appearance.cssFallback,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        };
     const gradientStops = GRADIENT_BASE_DATA[index].stops;
+    const borderRadiusValue = `${topLeftRadius}px ${topRightRadius}px ${bottomRightRadius}px ${bottomLeftRadius}px`;
+    const fallbackBackground = appearance.cssFallback;
     return (
       <div
         key={`${visual.name}-${visual.tile}-${index}`}
@@ -429,16 +411,17 @@ export default function SelectionGrid({
           width: `${cellSizePx}px`,
           height: `${cellSizePx}px`,
           flex: `0 0 ${cellSizePx}px`,
-          borderRadius: `${topLeftRadius}px ${topRightRadius}px ${bottomRightRadius}px ${bottomLeftRadius}px`,
+          borderRadius: borderRadiusValue,
           boxSizing: "border-box",
           marginLeft,
           cursor: "pointer",
           outline: "none",
-          boxShadow: isSelected ? `inset 0 0 0 2px ${colorB}` : "none",
-          backgroundRepeat: "no-repeat",
           position: "relative",
           overflow: "hidden",
-          ...backgroundStyle,
+          backgroundImage: fallbackBackground,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
         }}
         role="button"
         tabIndex={0}
@@ -465,12 +448,23 @@ export default function SelectionGrid({
           }
         }}
       >
-        {useTerrainTiles && visual.tileUrl ? (
-          <TerrainTileCanvas
-            tileUrl={visual.tileUrl}
-            stops={gradientStops}
-            invert={invertGradients}
-            size={cellSizePx}
+        <GradientTileCanvas
+          mode={useTerrainTiles ? "terrain" : "plain"}
+          tileUrl={useTerrainTiles ? visual.tileUrl : undefined}
+          stops={gradientStops}
+          invert={invertGradients}
+          size={cellSizePx}
+          borderRadius={borderRadiusValue}
+        />
+        {isSelected ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: borderRadiusValue,
+              boxShadow: `inset 0 0 0 2px ${colorB}`,
+              pointerEvents: "none",
+            }}
           />
         ) : null}
       </div>
@@ -730,24 +724,43 @@ export default function SelectionGrid({
   );
 }
 
-function TerrainTileCanvas({ tileUrl, stops, invert, size }: { tileUrl: string; stops: GradientDefinition['stops']; invert: boolean; size: number }) {
+function GradientTileCanvas({
+  mode,
+  tileUrl,
+  stops,
+  invert,
+  size,
+  borderRadius,
+}: {
+  mode: "terrain" | "plain";
+  tileUrl?: string;
+  stops: GradientDefinition['stops'];
+  invert: boolean;
+  size: number;
+  borderRadius: string;
+}) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  const [ready, setReady] = React.useState<boolean>(false);
+  const contextRef = React.useRef<GPUCanvasContext | null>(null);
+  const configuredSizeRef = React.useRef<{ width: number; height: number } | null>(null);
+  const gradientTextureRef = React.useRef<GPUTexture | null>(null);
+  const bindGroupRef = React.useRef<GPUBindGroup | null>(null);
+  const heightKeyRef = React.useRef<string | null>(null);
+  const [hasRendered, setHasRendered] = React.useState<boolean>(false);
   React.useEffect(() => {
     let disposed = false;
-    let gradientTexture: GPUTexture | null = null;
-    let bindGroup: GPUBindGroup | null = null;
 
     const run = async () => {
-      setReady(false);
-      if (!tileUrl) return;
       const root = await getSharedRoot();
       if (!root || disposed) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const device = root.device;
       const format = navigator.gpu.getPreferredCanvasFormat();
-      const context = canvas.getContext('webgpu');
+      let context = contextRef.current;
+      if (!context) {
+        context = canvas.getContext('webgpu');
+        contextRef.current = context;
+      }
       if (!context) return;
 
       const dimension = Math.max(1, Math.floor(size));
@@ -756,72 +769,113 @@ function TerrainTileCanvas({ tileUrl, stops, invert, size }: { tileUrl: string; 
       canvas.style.width = `${dimension}px`;
       canvas.style.height = `${dimension}px`;
 
-      context.configure({ device, format, alphaMode: 'opaque' });
+      const previousSize = configuredSizeRef.current;
+      if (!previousSize || previousSize.width !== dimension || previousSize.height !== dimension) {
+        const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST;
+        try {
+          context.configure({ device, format, alphaMode: 'opaque', usage });
+          configuredSizeRef.current = { width: dimension, height: dimension };
+        } catch (configurationError) {
+          console.error("Failed to configure WebGPU context", configurationError);
+          return;
+        }
+      }
 
-      const tileEntry = await getTileTexture(device, tileUrl);
-      if (!tileEntry || disposed) return;
+      let heightEntry: { texture: GPUTexture; width: number; height: number } | null = null;
+      if (mode === "terrain") {
+        if (!tileUrl) return;
+        heightEntry = await getTileTexture(device, tileUrl);
+      } else {
+        heightEntry = getLinearGradientTexture(device);
+      }
+      if (!heightEntry || disposed) return;
 
       const { pipeline, sampler } = getSharedPipeline(device, format);
-      gradientTexture = device.createTexture({
-        size: [256, 1, 1],
-        format: 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      });
+      let gradientTexture = gradientTextureRef.current;
+      if (!gradientTexture) {
+        gradientTexture = device.createTexture({
+          size: [256, 1, 1],
+          format: 'rgba8unorm',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        gradientTextureRef.current = gradientTexture;
+      }
       uploadGradientToTexture(device, gradientTexture, stops, invert);
 
-      bindGroup = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: tileEntry.texture.createView() },
-          { binding: 1, resource: sampler },
-          { binding: 2, resource: gradientTexture.createView() },
-        ],
-      });
-
-      const render = () => {
-        const commandEncoder = device.createCommandEncoder();
-        const textureView = context.getCurrentTexture().createView();
-        const pass = commandEncoder.beginRenderPass({
-          colorAttachments: [{
-            view: textureView,
-            loadOp: 'clear',
-            clearValue: { r: 0, g: 0, b: 0, a: 1 },
-            storeOp: 'store',
-          }],
+      const nextHeightKey = mode === "terrain" ? `terrain:${tileUrl}` : "plain";
+      if (heightKeyRef.current !== nextHeightKey) {
+        bindGroupRef.current = null;
+      }
+      let bindGroup = bindGroupRef.current;
+      if (!bindGroup) {
+        bindGroup = device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: heightEntry.texture.createView() },
+            { binding: 1, resource: sampler },
+            { binding: 2, resource: gradientTexture.createView() },
+          ],
         });
-        pass.setPipeline(pipeline);
-        pass.setBindGroup(0, bindGroup!);
-        pass.draw(6, 1, 0, 0);
-        pass.end();
-        device.queue.submit([commandEncoder.finish()]);
-      };
+        bindGroupRef.current = bindGroup;
+        heightKeyRef.current = nextHeightKey;
+      }
 
-      render();
-      setReady(true);
+      const commandEncoder = device.createCommandEncoder();
+      const textureView = context.getCurrentTexture().createView();
+      const pass = commandEncoder.beginRenderPass({
+        colorAttachments: [{
+          view: textureView,
+          loadOp: 'clear',
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          storeOp: 'store',
+        }],
+      });
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, bindGroup);
+      pass.draw(6, 1, 0, 0);
+      pass.end();
+      device.queue.submit([commandEncoder.finish()]);
+
+      if (!disposed) {
+        setHasRendered(true);
+      }
     };
 
     run().catch((error) => {
-      console.error('Failed to render terrain tile preview', error);
-      setReady(false);
+      console.error('Failed to render gradient preview', error);
     });
 
     return () => {
       disposed = true;
-      if (gradientTexture) gradientTexture.destroy();
-      bindGroup = null;
     };
-  }, [tileUrl, stops, invert, size]);
+  }, [mode, tileUrl, stops, invert, size]);
 
   return (
     <canvas
       ref={canvasRef}
       style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
         width: '100%',
         height: '100%',
-        display: ready ? 'block' : 'none',
-        borderRadius: 3,
+        opacity: hasRendered ? 1 : 0,
+        borderRadius,
         pointerEvents: 'none',
+        transition: hasRendered ? 'opacity 40ms linear' : 'none',
       }}
     />
   );
+}
+
+export default function SelectionGrid(props: SelectionGridProps) {
+  const context = React.useContext(SliderStoreContext);
+  if (!context) {
+    return (
+      <SliderStoreProvider>
+        <SelectionGridContent {...props} />
+      </SliderStoreProvider>
+    );
+  }
+  return <SelectionGridContent {...props} />;
 }

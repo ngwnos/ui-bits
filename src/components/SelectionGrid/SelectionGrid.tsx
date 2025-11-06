@@ -503,6 +503,7 @@ function SelectionGridContent({
           invert={invertGradients}
           size={cellSizePx}
           borderRadius={borderRadiusValue}
+          fallbackBackground={fallbackBackground}
         />
         {isSelected ? (
           <div
@@ -779,6 +780,7 @@ function GradientTileCanvas({
   invert,
   size,
   borderRadius,
+  fallbackBackground,
 }: {
   mode: "terrain" | "plain";
   tileUrl?: string;
@@ -786,6 +788,7 @@ function GradientTileCanvas({
   invert: boolean;
   size: number;
   borderRadius: string;
+  fallbackBackground: string;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const hasRenderedRef = React.useRef(false);
@@ -797,6 +800,27 @@ function GradientTileCanvas({
     uniformSize: number;
   } | null>(null);
   const [hasRendered, setHasRendered] = React.useState<boolean>(false);
+  const [terrainReady, setTerrainReady] = React.useState(mode !== "terrain");
+
+  React.useEffect(() => {
+    if (!tileUrl) return;
+    let cancelled = false;
+    (async () => {
+      const root = await getSharedRoot();
+      if (!root || cancelled) return;
+      await loadHeightTexture(root.device, tileUrl).catch(() => {});
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tileUrl]);
+  React.useEffect(() => {
+    if (mode !== "terrain") {
+      setTerrainReady(true);
+    } else if (!hasRenderedRef.current) {
+      setTerrainReady(false);
+    }
+  }, [mode, tileUrl]);
   React.useEffect(() => {
     let disposed = false;
 
@@ -928,8 +952,7 @@ function GradientTileCanvas({
       const pass = commandEncoder.beginRenderPass({
         colorAttachments: [{
           view: textureView,
-          loadOp: 'clear',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          loadOp: 'load',
           storeOp: 'store',
         }],
       });
@@ -942,6 +965,11 @@ function GradientTileCanvas({
       if (!disposed && !hasRenderedRef.current) {
         hasRenderedRef.current = true;
         setHasRendered(true);
+      }
+      if (!disposed && mode === "terrain") {
+        setTerrainReady(true);
+      } else if (!disposed && mode !== "terrain") {
+        setTerrainReady(true);
       }
     };
 
@@ -961,20 +989,39 @@ function GradientTileCanvas({
   }, [mode, tileUrl, stops, invert, size]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        opacity: hasRendered ? 1 : 0,
-        borderRadius,
-        pointerEvents: 'none',
-        transition: hasRendered ? 'opacity 40ms linear' : 'none',
-      }}
-    />
+    <>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          borderRadius,
+          pointerEvents: 'none',
+          backgroundImage: fallbackBackground,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: terrainReady ? 0 : 1,
+          transition: 'opacity 80ms ease',
+        }}
+      />
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          opacity: hasRendered ? 1 : 0,
+          borderRadius,
+          pointerEvents: 'none',
+          transition: hasRendered ? 'opacity 40ms linear' : 'none',
+        }}
+      />
+    </>
   );
 }
 

@@ -256,14 +256,13 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
         const render = () => {
           const commandEncoder = device.createCommandEncoder();
           const textureView = context.getCurrentTexture().createView();
-          const pass = commandEncoder.beginRenderPass({
-            colorAttachments: [{
-              view: textureView,
-              loadOp: "clear",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 },
-              storeOp: "store",
-            }],
-          });
+        const pass = commandEncoder.beginRenderPass({
+          colorAttachments: [{
+            view: textureView,
+            loadOp: "load",
+            storeOp: "store",
+          }],
+        });
           pass.setPipeline(renderPipeline);
           pass.setBindGroup(0, renderBindGroup);
           pass.draw(6, 1, 0, 0);

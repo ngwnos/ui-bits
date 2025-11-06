@@ -285,6 +285,7 @@ export type SelectionGridProps = {
   textColor: string;
   allowEmptySelection?: boolean;
   maxHeightUnits?: number;
+  fontSize?: number;
 };
 
 function SelectionGridContent({
@@ -295,6 +296,7 @@ function SelectionGridContent({
   textColor,
   allowEmptySelection = false,
   maxHeightUnits = 24,
+  fontSize,
 }: SelectionGridProps) {
   const [tileAssignments, setTileAssignments] = React.useState<Record<string, TileAssignment>>({});
 
@@ -363,7 +365,7 @@ function SelectionGridContent({
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const labelRef = React.useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = React.useState<number>(360);
-  const [labelLineHeight, setLabelLineHeight] = React.useState<number>(12);
+  const [labelLineHeight, setLabelLineHeight] = React.useState<number>(fontSize ?? 16);
   const paletteSignatureRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
@@ -436,12 +438,15 @@ function SelectionGridContent({
     selectionGridActions.setSelectionGridPalette(gridId, selectedPalette);
   }, [gridId, selectedPalette, selectionGridActions]);
 
-  const previewFontSize = 12;
+  const previewFontSize = fontSize ?? 16;
   const previewLineHeight = 1;
   const previewPaddingEm = 0.35;
   const previewPaddingPx = previewFontSize * previewPaddingEm;
   const baseLabelHeight = labelLineHeight || (previewFontSize * previewLineHeight);
-  const baseCellSize = Math.max(20, Math.round(baseLabelHeight + previewPaddingPx * 2));
+  const baseCellSize = Math.max(
+    Math.round(baseLabelHeight + previewPaddingPx * 2 + 2), // extra room for 1px borders
+    Math.round(previewFontSize + previewPaddingPx * 1.5),
+  );
   const cellSizePx = baseCellSize * squareScale;
   const rowCapacity = containerWidth ? Math.max(1, Math.floor(containerWidth / cellSizePx)) : 1;
   const rowCount = rowCapacity ? Math.ceil(gridCellCount / rowCapacity) : gridCellCount;
@@ -566,8 +571,8 @@ function SelectionGridContent({
   const previewModeTitle = PREVIEW_MODE_TITLE[previewMode];
   const nextModeTitle = PREVIEW_MODE_TITLE[nextPreviewMode];
 
-  const terrainToggleButtonSize = Math.max(28, baseCellSize - 10);
-  const terrainToggleIconSize = Math.max(terrainToggleButtonSize - 12, 12);
+  const terrainToggleButtonSize = Math.max(Math.round(baseCellSize - 4), Math.round(previewFontSize + previewPaddingPx));
+  const terrainToggleIconSize = Math.max(Math.round(terrainToggleButtonSize * 0.6), 12);
   const previewTextShadow = [
     "0 0 4px rgba(0, 0, 0, 0.7)",
     "0 1px 3px rgba(0, 0, 0, 0.85)",

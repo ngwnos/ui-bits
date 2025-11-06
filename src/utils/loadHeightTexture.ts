@@ -16,6 +16,7 @@ const TYPE_SIZES: Record<number, number> = {
   3: 2, // SHORT
   4: 4, // LONG
   5: 8, // RATIONAL
+  12: 8, // DOUBLE
 };
 
 function readUInt16(view: DataView, offset: number, little: boolean): number {
@@ -53,6 +54,14 @@ function readValues(
         values.push(denominator !== 0 ? numerator / denominator : 0);
         break;
       }
+      case 12: {
+        values.push(view.getFloat64(entryOffset, little));
+        break;
+      }
+      case 12: {
+        values.push(view.getFloat64(entryOffset, little));
+        break;
+      }
       default:
         values.push(view.getUint8(entryOffset));
     }
@@ -68,7 +77,18 @@ type ParsedTiff = {
   max: number;
 };
 
-function parseGeoTiff(buffer: ArrayBuffer): ParsedTiff {
+async function decompressDeflate(data: ArrayBuffer): Promise<ArrayBuffer> {
+  const ctor = (globalThis as unknown as { DecompressionStream?: typeof DecompressionStream }).DecompressionStream;
+  if (typeof ctor === "function") {
+    const ds = new ctor("deflate");
+    const stream = new Response(data).body?.pipeThrough(ds);
+    if (!stream) throw new Error("Failed to create deflate stream");
+    return await new Response(stream).arrayBuffer();
+  }
+  throw new Error("Deflate decompression unsupported in this environment");
+}
+
+async function parseGeoTiff(buffer: ArrayBuffer): Promise<ParsedTiff> {
   const view = new DataView(buffer);
   const byteOrder = view.getUint16(0, false);
   const little = byteOrder === 0x4949;
@@ -111,7 +131,7 @@ function parseGeoTiff(buffer: ArrayBuffer): ParsedTiff {
   if (bitsPerSample !== 32 || sampleFormat !== 3) {
     throw new Error(`Unsupported GeoTIFF sample format (bitsPerSample=${bitsPerSample}, sampleFormat=${sampleFormat})`);
   }
-  if (compression !== 1) {
+  if (compression !== 1 && compression !== 8) {
     throw new Error(`Unsupported GeoTIFF compression (${compression})`);
   }
 
@@ -124,10 +144,20 @@ function parseGeoTiff(buffer: ArrayBuffer): ParsedTiff {
     const byteCount = stripByteCounts[i];
     const rows = Math.min(rowsPerStrip, remainingRows);
     const expectedBytes = rows * width * 4;
-    if (byteCount < expectedBytes) {
+    const stripSlice = buffer.slice(stripOffset, stripOffset + byteCount);
+
+    let stripBuffer: ArrayBuffer;
+    if (compression === 8) {
+      stripBuffer = await decompressDeflate(stripSlice);
+    } else {
+      stripBuffer = stripSlice;
+    }
+
+    if (stripBuffer.byteLength < expectedBytes) {
       throw new Error("Strip byte count smaller than expected");
     }
-    const rowView = new DataView(buffer, stripOffset, expectedBytes);
+
+    const rowView = new DataView(stripBuffer);
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < width; col += 1) {
         const sampleOffset = (row * width + col) * 4;
@@ -165,7 +195,7 @@ export async function loadHeightTexture(device: GPUDevice, tileUrl: string): Pro
       const response = await fetch(tifUrl, { cache: "force-cache" });
       if (!response.ok) throw new Error("Failed to fetch GeoTIFF");
       const buffer = await response.arrayBuffer();
-      const parsed = parseGeoTiff(buffer);
+      const parsed = await parseGeoTiff(buffer);
       const texture = device.createTexture({
         size: [parsed.width, parsed.height, 1],
         format: "r32float",

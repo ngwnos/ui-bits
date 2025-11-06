@@ -462,10 +462,14 @@ function SelectionGridContent({
           outline: "none",
           position: "relative",
           overflow: "hidden",
-          backgroundImage: fallbackBackground,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
+          ...(useTerrainTiles
+            ? {}
+            : {
+              backgroundImage: fallbackBackground,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }),
         }}
         role="button"
         tabIndex={0}
@@ -784,28 +788,19 @@ function GradientTileCanvas({
   borderRadius: string;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const hasRenderedRef = React.useRef(false);
   const contextRef = React.useRef<GPUCanvasContext | null>(null);
   const configuredSizeRef = React.useRef<{ width: number; height: number } | null>(null);
   const resourcesRef = React.useRef<{
     gradientTexture: GPUTexture;
     uniformBuffer: GPUBuffer;
+    uniformSize: number;
   } | null>(null);
   const [hasRendered, setHasRendered] = React.useState<boolean>(false);
   React.useEffect(() => {
     let disposed = false;
 
-    const disposeResources = () => {
-      const resources = resourcesRef.current;
-      if (resources) {
-        resources.gradientTexture.destroy();
-        resources.uniformBuffer.destroy();
-        resourcesRef.current = null;
-      }
-    };
-
     const run = async () => {
-      setHasRendered(false);
-      disposeResources();
       const root = await getSharedRoot();
       if (!root || disposed) return;
       const canvas = canvasRef.current;
@@ -820,10 +815,16 @@ function GradientTileCanvas({
       if (!context) return;
 
       const dimension = Math.max(1, Math.floor(size));
-      canvas.width = dimension;
-      canvas.height = dimension;
-      canvas.style.width = `${dimension}px`;
-      canvas.style.height = `${dimension}px`;
+      if (canvas.width !== dimension || canvas.height !== dimension) {
+        canvas.width = dimension;
+        canvas.height = dimension;
+      }
+      if (canvas.style.width !== `${dimension}px`) {
+        canvas.style.width = `${dimension}px`;
+      }
+      if (canvas.style.height !== `${dimension}px`) {
+        canvas.style.height = `${dimension}px`;
+      }
 
       const previousSize = configuredSizeRef.current;
       if (!previousSize || previousSize.width !== dimension || previousSize.height !== dimension) {
@@ -887,19 +888,38 @@ function GradientTileCanvas({
         contrast,
         0,
       ]);
-      const uniformBuffer = device.createBuffer({
-        size: uniformData.byteLength,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
-      device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+      let resources = resourcesRef.current;
+      if (!resources || resources.uniformSize !== uniformData.byteLength) {
+        if (resources) {
+          resources.gradientTexture.destroy();
+          resources.uniformBuffer.destroy();
+        }
+        const gradientTexture = device.createTexture({
+          size: [256, 1, 1],
+          format: 'rgba8unorm',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        const uniformBuffer = device.createBuffer({
+          size: uniformData.byteLength,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        resources = {
+          gradientTexture,
+          uniformBuffer,
+          uniformSize: uniformData.byteLength,
+        };
+        resourcesRef.current = resources;
+      }
+      uploadGradientToTexture(device, resources.gradientTexture, stops, invert);
+      device.queue.writeBuffer(resources.uniformBuffer, 0, uniformData);
 
       const renderBindGroup = device.createBindGroup({
         layout: renderPipeline.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: heightEntry.texture.createView() },
           { binding: 1, resource: sampler },
-          { binding: 2, resource: gradientTexture.createView() },
-          { binding: 3, resource: { buffer: uniformBuffer } },
+          { binding: 2, resource: resources.gradientTexture.createView() },
+          { binding: 3, resource: { buffer: resources.uniformBuffer } },
         ],
       });
 
@@ -919,24 +939,24 @@ function GradientTileCanvas({
       pass.end();
       device.queue.submit([commandEncoder.finish()]);
 
-      resourcesRef.current = {
-        gradientTexture,
-        uniformBuffer,
-      };
-
-      if (!disposed) {
+      if (!disposed && !hasRenderedRef.current) {
+        hasRenderedRef.current = true;
         setHasRendered(true);
       }
     };
 
     run().catch((error) => {
       console.error('Failed to render gradient preview', error);
-      disposeResources();
     });
 
     return () => {
       disposed = true;
-      disposeResources();
+      const resources = resourcesRef.current;
+      if (resources) {
+        resources.gradientTexture.destroy();
+        resources.uniformBuffer.destroy();
+        resourcesRef.current = null;
+      }
     };
   }, [mode, tileUrl, stops, invert, size]);
 

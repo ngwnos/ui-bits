@@ -59,10 +59,16 @@ export default function TypeGPUTest() {
         if (!heightEntry) throw new Error("Failed to load height tile");
         const { texture: heightTexture, width, height, min: heightMin, max: heightMax } = heightEntry;
 
-        canvas.width = width;
-        canvas.height = height;
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        if (canvas.style.width !== `${width}px`) {
+          canvas.style.width = `${width}px`;
+        }
+        if (canvas.style.height !== `${height}px`) {
+          canvas.style.height = `${height}px`;
+        }
 
         context.configure({
           device,

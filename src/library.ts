@@ -17,3 +17,6 @@ export {
   lfoValue,
   phaseCaptureForTriangle,
 } from "./lfo";
+
+export { default as SelectionGrid, type SelectionGridProps } from "./components/SelectionGrid";
+export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";

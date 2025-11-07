@@ -17,7 +17,7 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import { CustomColorPopover, SelectionGrid, TypeGPUTest } from "./components";
+import { CustomColorPopover, SelectionGrid, TypeGPUTest, Dropdown } from "./components";
 import LFOSlider, { FrameLoopProvider, type SliderBorder } from "./components/LFOSlider";
 import type { Waveform } from "./lfo";
 import { flexoki } from "./flexoki";
@@ -54,6 +54,34 @@ const SELECTION_PREVIEW_MODE_TITLE: Record<SelectionGridPreviewMode, string> = {
   terrainHeight: "Terrain height previews",
   terrainHillshade: "Terrain hillshade previews",
 };
+
+const DROPDOWN_OPTIONS = [
+  {
+    value: "sine",
+    label: "Sine Wave",
+    description: "Smooth modulation suited for pads or evolving textures.",
+  },
+  {
+    value: "triangle",
+    label: "Triangle",
+    description: "Linear ramps, great for rhythmic sweeps.",
+  },
+  {
+    value: "saw",
+    label: "Sawtooth",
+    description: "Sharp rise and drop, adds grit to filters.",
+  },
+  {
+    value: "square",
+    label: "Square",
+    description: "Instant toggles for on/off style modulation.",
+  },
+];
+
+const DROPDOWN_SIMPLE_OPTIONS = DROPDOWN_OPTIONS.map((option) => ({
+  value: option.value,
+  label: option.label,
+}));
 
 // =================== Demo: one slider per Flexoki hue ===================
 
@@ -336,6 +364,18 @@ function EditableRectPOC() {
   const customState = useSliderState(customSliderId);
   const [previewDarkMode, setPreviewDarkMode] = React.useState<boolean>(false);
   const [activeTab, setActiveTab] = React.useState<string>('lfo-slider');
+  const [dropdownValue, setDropdownValue] = React.useState<string>(DROPDOWN_OPTIONS[0].value);
+  const [darkDropdownValue, setDarkDropdownValue] = React.useState<string>(DROPDOWN_OPTIONS[1].value);
+  const [dropdownSliderValue, setDropdownSliderValue] = React.useState<number>(42);
+  const [dropdownSliderValueDark, setDropdownSliderValueDark] = React.useState<number>(58);
+  const dropdownSelectionLabel = React.useMemo(
+    () => DROPDOWN_OPTIONS.find((option) => option.value === dropdownValue)?.label ?? dropdownValue,
+    [dropdownValue],
+  );
+  const darkDropdownSelectionLabel = React.useMemo(
+    () => DROPDOWN_OPTIONS.find((option) => option.value === darkDropdownValue)?.label ?? darkDropdownValue,
+    [darkDropdownValue],
+  );
   const handleTogglePalette = () => {
     setPreviewDarkMode((value) => !value);
   };
@@ -756,9 +796,99 @@ const tabs = [
             </div>
           </Tabs.Content>
           <Tabs.Content value="dropdown" style={tabBodyStyle}>
-            <p style={{ fontSize: CONTROL_FONT_SIZE, color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'] }}>
-              Dropdown component coming soon.
-            </p>
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 420,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+                color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'],
+              }}
+            >
+              <p style={{ margin: 0, fontSize: CONTROL_FONT_SIZE }}>
+                A compact dropdown that reuses the same Flexoki accents as the sliders. It supports light/dark palettes,
+                keyboard navigation, disabled options, and subtle helper text.
+              </p>
+              <Dropdown
+                label="Waveform Source"
+                options={DROPDOWN_OPTIONS}
+                value={dropdownValue}
+                onChange={(next) => setDropdownValue(next)}
+                colorA={flexoki.cyan['600']}
+                colorB={flexoki.base['50']}
+                width={360}
+                fontSize={sliderFontSize}
+              />
+              <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.8 }}>
+                Selected: {dropdownSelectionLabel}
+              </span>
+              <Dropdown
+                label="Dark Mode Preview"
+                options={DROPDOWN_OPTIONS}
+                value={darkDropdownValue}
+                onChange={(next) => setDarkDropdownValue(next)}
+                colorA={flexoki.base['50']}
+                colorB={flexoki.cyan['600']}
+                width={360}
+                fontSize={sliderFontSize}
+              />
+              <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.8 }}>
+                Selected (dark): {darkDropdownSelectionLabel}
+              </span>
+              <Dropdown
+                label="Compact List"
+                options={DROPDOWN_SIMPLE_OPTIONS}
+                colorA={flexoki.base['900']}
+                colorB={flexoki.base['50']}
+                width={360}
+                fontSize={sliderFontSize}
+              />
+              <Dropdown
+                label="Read-only Example"
+                options={DROPDOWN_OPTIONS}
+                defaultValue={DROPDOWN_OPTIONS[2].value}
+                colorA={flexoki.orange['500']}
+                colorB={flexoki.paper}
+                width={360}
+                disabled
+                fontSize={sliderFontSize}
+              />
+              <div style={{ width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <LFOSlider
+                  label="Palette Compare Slider"
+                  min={0}
+                  max={100}
+                  step={1}
+                  width={360}
+                  defaultValue={dropdownSliderValue}
+                  drawerHandle={false}
+                  drawerFeatureEnabled={false}
+                  leftColor={flexoki.cyan['600']}
+                  rightColor={flexoki.base['50']}
+                  border="left"
+                  fontSize={sliderFontSize}
+                  onUserChange={(value: number) => setDropdownSliderValue(value)}
+                  onAnimatedUpdate={(value: number) => setDropdownSliderValue(value)}
+                />
+                <LFOSlider
+                  label="Palette Compare Slider (Flipped)"
+                  min={0}
+                  max={100}
+                  step={1}
+                  width={360}
+                  defaultValue={dropdownSliderValueDark}
+                  drawerHandle={false}
+                  drawerFeatureEnabled={false}
+                  leftColor={flexoki.base['50']}
+                  rightColor={flexoki.cyan['600']}
+                  border="right"
+                  fontSize={sliderFontSize}
+                  onUserChange={(value: number) => setDropdownSliderValueDark(value)}
+                  onAnimatedUpdate={(value: number) => setDropdownSliderValueDark(value)}
+                />
+              </div>
+            </div>
           </Tabs.Content>
           <Tabs.Content value="selection-grid" style={tabBodyStyle}>
             <div style={selectionGridControlStackStyle}>

@@ -8,3 +8,4 @@ export { FrameLoopProvider, useFrame, useStoreMirror, type MirrorFn } from "./LF
 export { default as CustomColorPopover, type CustomColorPopoverProps } from "./CustomColorPopover";
 export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";
 export { default as TypeGPUTest } from "./TypeGPUTest";
+export { default as Dropdown, type DropdownProps, type DropdownOption } from "./Dropdown";

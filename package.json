@@ -22,6 +22,16 @@
       "import": "./dist/lfoslider.es.js",
       "require": "./dist/lfoslider.cjs.js"
     },
+    "./components/SelectionGrid": {
+      "types": "./dist/types/components/SelectionGrid/SelectionGrid.d.ts",
+      "import": "./dist/lfoslider.es.js",
+      "require": "./dist/lfoslider.cjs.js"
+    },
+    "./components/Dropdown": {
+      "types": "./dist/types/components/Dropdown/Dropdown.d.ts",
+      "import": "./dist/lfoslider.es.js",
+      "require": "./dist/lfoslider.cjs.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

@@ -74,3 +74,17 @@ export function Oscillator() {
 `ui-bits/style.css` wires up the utility classes the component expects. Beyond `LFOSlider`, helpers like `FrameLoopProvider`, `useFrame`, `useStoreMirror`, and the math utilities are re-exported from the package entry.
 
 The original Vite demo is still available via `bun run dev`; cloning the repo lets you explore everything locally.
+
+## What Actually Ships?
+
+The published package only includes the pieces re-exported from `src/library.ts`:
+
+- `LFOSlider` plus its prop/type helpers.
+- `SelectionGrid` for the gradient/terrain preview control, including its props.
+- `Dropdown` for lightweight themable select menus.
+- `FrameLoopProvider` / `useFrame` and `useStoreMirror` for animation + store mirroring.
+- Numeric helpers from `src/lfo.ts` (clamp, snap, waveform math, etc.).
+
+Everything else you see in this repo (Radix Tabs layout, TypeGPU preview, column toggles, etc.) lives in the playground under `src/App.tsx`. Those demo controls exist purely to poke at otherwise hidden slider props and won’t be bundled into `ui-bits`.
+
+Run `bun run dev` locally if you want to explore that playground; just remember it’s an example surface, not part of the distributed library.

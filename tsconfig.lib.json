@@ -11,6 +11,7 @@
     "src/library.ts",
     "src/components/LFOSlider/**/*",
     "src/components/SelectionGrid/**/*",
+    "src/components/Dropdown/**/*",
     "src/frameLoop.tsx",
     "src/useStoreMirror.ts",
     "src/lfo.ts",

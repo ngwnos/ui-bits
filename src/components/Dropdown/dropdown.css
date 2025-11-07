@@ -85,7 +85,6 @@
   right: -1px;
   background: transparent;
   border: 1px solid var(--dropdown-border);
-  border-top: none;
   border-radius: 0 0 3px 3px;
   box-shadow: none;
   padding: 0;

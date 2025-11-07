@@ -23,6 +23,11 @@
   flex-direction: column;
 }
 
+.dropdown-root[data-open="true"] .dropdown-field {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 .dropdown-trigger {
   font-family: inherit;
   width: 100%;
@@ -48,6 +53,8 @@
 
 .dropdown-trigger[data-open="true"] {
   border-color: var(--dropdown-text);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .dropdown-value {

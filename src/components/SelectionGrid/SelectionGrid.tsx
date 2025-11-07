@@ -286,6 +286,7 @@ export type SelectionGridProps = {
   allowEmptySelection?: boolean;
   maxHeightUnits?: number;
   fontSize?: number;
+  maxWidth?: number | string;
 };
 
 function SelectionGridContent({
@@ -297,6 +298,7 @@ function SelectionGridContent({
   allowEmptySelection = false,
   maxHeightUnits = 24,
   fontSize,
+  maxWidth = 360,
 }: SelectionGridProps) {
   const [tileAssignments, setTileAssignments] = React.useState<Record<string, TileAssignment>>({});
 
@@ -556,9 +558,12 @@ function SelectionGridContent({
     );
   });
 
+  const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
+
   const wrapperStyle: React.CSSProperties = {
-    width: "min(80vw, 360px)",
-    maxWidth: 360,
+    width: "100%",
+    maxWidth: resolvedMaxWidth,
+    margin: "0 auto",
     display: "flex",
     flexDirection: "column",
     gap: layoutGap,

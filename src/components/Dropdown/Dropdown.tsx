@@ -26,7 +26,7 @@ export interface DropdownProps {
   colorA?: string;
   colorB?: string;
   isDarkMode?: boolean;
-  width?: number;
+  width?: number | string;
   fontSize?: number;
   disabled?: boolean;
   className?: string;
@@ -66,7 +66,7 @@ export default function Dropdown({
   colorA,
   colorB,
   isDarkMode = false,
-  width = 260,
+  width,
   fontSize,
   disabled = false,
   className,
@@ -243,6 +243,12 @@ export default function Dropdown({
   const displayLabel = activeOption?.label ?? placeholder;
   const showPlaceholder = !activeOption;
 
+  const resolvedMaxWidth = width == null
+    ? undefined
+    : typeof width === "number"
+      ? `${width}px`
+      : width;
+
   return (
     <div
       ref={rootRef}
@@ -250,7 +256,8 @@ export default function Dropdown({
       data-open={open ? "true" : "false"}
       data-disabled={disabled ? "true" : "false"}
       style={{
-        width,
+        width: "100%",
+        maxWidth: resolvedMaxWidth,
         ...themeVars,
         ...style,
       }}

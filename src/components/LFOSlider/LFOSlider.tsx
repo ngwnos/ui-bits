@@ -81,7 +81,7 @@ export interface LFOSliderProps {
   max?: number;
   step?: number;
   defaultValue?: number;
-  width?: number;
+  width?: number | string;
   drawerLines?: [number, number];
   leftColor?: string;
   rightColor?: string;
@@ -119,7 +119,7 @@ function LFOSlider({
   max = 100,
   step = 1,
   defaultValue,
-  width = 200,
+  width,
   drawerLines,
   leftColor,
   rightColor,
@@ -1070,9 +1070,15 @@ function LFOSlider({
   const stackGap = drawerHandleActive ? '0' : '0.25rem';
 
   const wrapperClassName = ['flex flex-col', className].filter(Boolean).join(' ');
+  const resolvedMaxWidth = width == null
+    ? undefined
+    : typeof width === 'number'
+      ? `${width}px`
+      : width;
+
   const wrapperStyle: React.CSSProperties = {
     width: '100%',
-    maxWidth: typeof width === 'number' ? `${width}px` : width,
+    maxWidth: resolvedMaxWidth,
     fontSize: appliedFontSize,
     gap: stackGap,
     ...(style ?? {}),

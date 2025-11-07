@@ -219,7 +219,7 @@ export default function Dropdown({
   const resolvedColorA = colorA ?? fallbackA;
   const resolvedColorB = colorB ?? fallbackB;
   const surfaceColor = resolvedColorB;
-  const borderColor = colorWithAlpha(resolvedColorA, 0.4, "16,15,15");
+  const borderColor = resolvedColorA;
   const textColor = resolvedColorA;
   const mutedColor = colorWithAlpha(resolvedColorA, 0.7);
   const highlightShadow = colorWithAlpha(resolvedColorA, 0.25);

@@ -32,7 +32,7 @@
   font-size: var(--dropdown-font-size, 16px);
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+  transition: border-color 120ms ease, color 120ms ease;
   line-height: 1;
 }
 
@@ -43,7 +43,6 @@
 
 .dropdown-trigger[data-open="true"] {
   border-color: var(--dropdown-text);
-  box-shadow: 0 0 0 1px var(--dropdown-text);
 }
 
 .dropdown-value {

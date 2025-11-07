@@ -19,6 +19,7 @@
 }
 
 .dropdown-trigger {
+  font-family: inherit;
   width: 100%;
   border-radius: 3px;
   border: 1px solid var(--dropdown-border);
@@ -86,6 +87,7 @@
 }
 
 .dropdown-option {
+  font-family: inherit;
   width: 100%;
   border: none;
   background: var(--dropdown-surface);
@@ -119,11 +121,13 @@
 }
 
 .dropdown-option-label {
+  font-family: inherit;
   font-weight: 600;
   line-height: 1.1;
 }
 
 .dropdown-option-description {
+  font-family: inherit;
   font-size: calc(var(--dropdown-font-size, 16px) * 0.75);
   color: var(--dropdown-muted);
   line-height: 1.1;

@@ -93,7 +93,7 @@ export const SELECTION_GRID_BASE_STATE: SelectionGridState = {
   invertGradients: false,
   allowEmptySelection: false,
   colorPalette: [...DEFAULT_SELECTION_PALETTE],
-  previewMode: "terrainHillshade",
+  previewMode: "terrainHeight",
   sunAltitudeDeg: 45,
   sunAzimuthDeg: 315,
 };

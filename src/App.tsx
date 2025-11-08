@@ -401,6 +401,14 @@ function EditableRectPOC() {
   const [dropdownSliderValueDark, setDropdownSliderValueDark] = React.useState<number>(58);
   const [dateSliderValue, setDateSliderValue] = React.useState<number>(32);
   const [timeSliderValue, setTimeSliderValue] = React.useState<number>(3600);
+  const [dateDrawerLines, setDateDrawerLines] = React.useState<[number, number]>([
+    DATE_SLIDER_MIN,
+    DATE_SLIDER_MAX,
+  ]);
+  const [timeDrawerLines, setTimeDrawerLines] = React.useState<[number, number]>([
+    TIME_SLIDER_MIN,
+    TIME_SLIDER_MAX,
+  ]);
   const dropdownSelectionLabel = React.useMemo(
     () => DROPDOWN_OPTIONS.find((option) => option.value === dropdownValue)?.label ?? dropdownValue,
     [dropdownValue],
@@ -853,6 +861,9 @@ const tabs = [
                 fontSize={sliderFontSize}
                 displayFormatterPreset="dayOfYear"
                 displayFormatterPresetOptions={{ dayOfYear: DATE_SLIDER_PRESET_OPTIONS }}
+                showLfoControls
+                lfoRange={dateDrawerLines}
+                onDrawerLinesChange={setDateDrawerLines}
                 onUserChange={(value: number) => setDateSliderValue(value)}
                 onAnimatedUpdate={(value: number) => setDateSliderValue(value)}
               />
@@ -876,6 +887,9 @@ const tabs = [
                 fontSize={sliderFontSize}
                 displayFormatterPreset="time"
                 displayFormatterPresetOptions={{ time: TIME_SLIDER_PRESET_OPTIONS }}
+                showLfoControls
+                lfoRange={timeDrawerLines}
+                onDrawerLinesChange={setTimeDrawerLines}
                 onUserChange={(value: number) => setTimeSliderValue(value)}
                 onAnimatedUpdate={(value: number) => setTimeSliderValue(value)}
               />
@@ -973,41 +987,47 @@ const tabs = [
                   onAnimatedUpdate={(value: number) => setDropdownSliderValueDark(value)}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <LFOSlider
-                    label="Mission Day"
-                    min={DATE_SLIDER_MIN}
-                    max={DATE_SLIDER_MAX}
-                    step={DATE_SLIDER_STEP}
-                    width={360}
-                    defaultValue={dateSliderValue}
+                <LFOSlider
+                  label="Mission Day"
+                  min={DATE_SLIDER_MIN}
+                  max={DATE_SLIDER_MAX}
+                  step={DATE_SLIDER_STEP}
+                  width={360}
+                  defaultValue={dateSliderValue}
                   leftColor={flexoki.cyan['700']}
                   rightColor={flexoki.base['100']}
                   border="left"
                   fontSize={sliderFontSize}
                   displayFormatterPreset="dayOfYear"
                   displayFormatterPresetOptions={{ dayOfYear: DATE_SLIDER_PRESET_OPTIONS }}
+                  showLfoControls
+                  lfoRange={dateDrawerLines}
+                  onDrawerLinesChange={setDateDrawerLines}
                   onUserChange={(value: number) => setDateSliderValue(value)}
                   onAnimatedUpdate={(value: number) => setDateSliderValue(value)}
                 />
                   <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
                     Selected: {formatDateLabel(dateSliderValue)}
                   </span>
-                  <LFOSlider
-                    label="Mission Runtime"
-                    min={TIME_SLIDER_MIN}
-                    max={TIME_SLIDER_MAX}
-                    step={TIME_SLIDER_STEP}
-                    width={360}
-                    defaultValue={timeSliderValue}
-                    leftColor={flexoki.cyan['800']}
-                    rightColor={flexoki.base['100']}
-                    border="left"
-                    fontSize={sliderFontSize}
-                    displayFormatterPreset="time"
-                    displayFormatterPresetOptions={{ time: TIME_SLIDER_PRESET_OPTIONS }}
-                    onUserChange={(value: number) => setTimeSliderValue(value)}
-                    onAnimatedUpdate={(value: number) => setTimeSliderValue(value)}
-                  />
+                <LFOSlider
+                  label="Mission Runtime"
+                  min={TIME_SLIDER_MIN}
+                  max={TIME_SLIDER_MAX}
+                  step={TIME_SLIDER_STEP}
+                  width={360}
+                  defaultValue={timeSliderValue}
+                  leftColor={flexoki.cyan['800']}
+                  rightColor={flexoki.base['100']}
+                  border="left"
+                  fontSize={sliderFontSize}
+                  displayFormatterPreset="time"
+                  displayFormatterPresetOptions={{ time: TIME_SLIDER_PRESET_OPTIONS }}
+                  showLfoControls
+                  lfoRange={timeDrawerLines}
+                  onDrawerLinesChange={setTimeDrawerLines}
+                  onUserChange={(value: number) => setTimeSliderValue(value)}
+                  onAnimatedUpdate={(value: number) => setTimeSliderValue(value)}
+                />
                   <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
                     Selected runtime: {formatTimeLabel(timeSliderValue)}
                   </span>

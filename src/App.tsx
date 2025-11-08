@@ -18,7 +18,12 @@ import {
   X,
 } from "lucide-react";
 import { CustomColorPopover, SelectionGrid, TypeGPUTest, Dropdown } from "./components";
-import LFOSlider, { FrameLoopProvider, type SliderBorder } from "./components/LFOSlider";
+import LFOSlider, {
+  FrameLoopProvider,
+  type SliderBorder,
+  createDayOfYearFormatter,
+  createTimeFormatter,
+} from "./components/LFOSlider";
 import type { Waveform } from "./lfo";
 import { flexoki } from "./flexoki";
 import {
@@ -82,6 +87,33 @@ const DROPDOWN_SIMPLE_OPTIONS = DROPDOWN_OPTIONS.map((option) => ({
   value: option.value,
   label: option.label,
 }));
+
+const DATE_SLIDER_MIN = 0;
+const DATE_SLIDER_MAX = 365.25;
+const DATE_SLIDER_STEP = 0.01;
+const DATE_SLIDER_BASE_YEAR = 2023;
+const DATE_SLIDER_PRESET_OPTIONS = {
+  baseYear: DATE_SLIDER_BASE_YEAR,
+  zeroOffset: DATE_SLIDER_MIN,
+};
+const dateFormatterHelpers = createDayOfYearFormatter({
+  min: DATE_SLIDER_MIN,
+  max: DATE_SLIDER_MAX,
+  options: DATE_SLIDER_PRESET_OPTIONS,
+});
+const formatDateLabel = (value: number) => dateFormatterHelpers.formatLabel(value);
+const TIME_SLIDER_MIN = 0;
+const TIME_SLIDER_MAX = 24 * 60 * 60;
+const TIME_SLIDER_STEP = 1;
+const TIME_SLIDER_PRESET_OPTIONS = {
+  zeroOffset: TIME_SLIDER_MIN,
+};
+const timeFormatterHelpers = createTimeFormatter({
+  min: TIME_SLIDER_MIN,
+  max: TIME_SLIDER_MAX,
+  options: TIME_SLIDER_PRESET_OPTIONS,
+});
+const formatTimeLabel = (value: number) => timeFormatterHelpers.formatLabel(value);
 
 // =================== Demo: one slider per Flexoki hue ===================
 
@@ -367,6 +399,8 @@ function EditableRectPOC() {
   const [darkDropdownValue, setDarkDropdownValue] = React.useState<string>(DROPDOWN_OPTIONS[1].value);
   const [dropdownSliderValue, setDropdownSliderValue] = React.useState<number>(42);
   const [dropdownSliderValueDark, setDropdownSliderValueDark] = React.useState<number>(58);
+  const [dateSliderValue, setDateSliderValue] = React.useState<number>(32);
+  const [timeSliderValue, setTimeSliderValue] = React.useState<number>(3600);
   const dropdownSelectionLabel = React.useMemo(
     () => DROPDOWN_OPTIONS.find((option) => option.value === dropdownValue)?.label ?? dropdownValue,
     [dropdownValue],
@@ -793,6 +827,62 @@ const tabs = [
                 isFullWidth
               />
             </div>
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 420,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 20,
+                alignItems: 'center',
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'] }}>
+                Calendar-style formatting
+              </h3>
+              <LFOSlider
+                label="Mission Day"
+                min={DATE_SLIDER_MIN}
+                max={DATE_SLIDER_MAX}
+                step={DATE_SLIDER_STEP}
+                width={360}
+                defaultValue={dateSliderValue}
+                leftColor={flexoki.green['700']}
+                rightColor={previewDarkMode ? flexoki.base['100'] : flexoki.base['50']}
+                border="left"
+                fontSize={sliderFontSize}
+                displayFormatterPreset="dayOfYear"
+                displayFormatterPresetOptions={{ dayOfYear: DATE_SLIDER_PRESET_OPTIONS }}
+                onUserChange={(value: number) => setDateSliderValue(value)}
+                onAnimatedUpdate={(value: number) => setDateSliderValue(value)}
+              />
+              <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
+                Selected: {formatDateLabel(dateSliderValue)}
+              </span>
+              <div style={{ width: '100%', height: 1, background: previewDarkMode ? flexoki.base['200'] : flexoki.base['300'], opacity: 0.3 }} />
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'] }}>
+                HH:MM:SS formatting
+              </h3>
+              <LFOSlider
+                label="Runtime"
+                min={TIME_SLIDER_MIN}
+                max={TIME_SLIDER_MAX}
+                step={TIME_SLIDER_STEP}
+                width={360}
+                defaultValue={timeSliderValue}
+                leftColor={previewDarkMode ? flexoki.base['200'] : flexoki.base['900']}
+                rightColor={previewDarkMode ? flexoki.blue['400'] : flexoki.blue['100']}
+                border="right"
+                fontSize={sliderFontSize}
+                displayFormatterPreset="time"
+                displayFormatterPresetOptions={{ time: TIME_SLIDER_PRESET_OPTIONS }}
+                onUserChange={(value: number) => setTimeSliderValue(value)}
+                onAnimatedUpdate={(value: number) => setTimeSliderValue(value)}
+              />
+              <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
+                Selected: {formatTimeLabel(timeSliderValue)}
+              </span>
+            </div>
           </Tabs.Content>
           <Tabs.Content value="dropdown" style={tabBodyStyle}>
             <div
@@ -859,11 +949,11 @@ const tabs = [
                   min={0}
                   max={100}
                   step={1}
-                width={360}
-                defaultValue={dropdownSliderValue}
-                leftColor={flexoki.cyan['600']}
-                rightColor={flexoki.base['50']}
-                border="left"
+                  width={360}
+                  defaultValue={dropdownSliderValue}
+                  leftColor={flexoki.cyan['600']}
+                  rightColor={flexoki.base['50']}
+                  border="left"
                   fontSize={sliderFontSize}
                   onUserChange={(value: number) => setDropdownSliderValue(value)}
                   onAnimatedUpdate={(value: number) => setDropdownSliderValue(value)}
@@ -873,15 +963,55 @@ const tabs = [
                   min={0}
                   max={100}
                   step={1}
-                width={360}
-                defaultValue={dropdownSliderValueDark}
-                leftColor={flexoki.base['50']}
-                rightColor={flexoki.cyan['600']}
-                border="right"
+                  width={360}
+                  defaultValue={dropdownSliderValueDark}
+                  leftColor={flexoki.base['50']}
+                  rightColor={flexoki.cyan['600']}
+                  border="right"
                   fontSize={sliderFontSize}
                   onUserChange={(value: number) => setDropdownSliderValueDark(value)}
                   onAnimatedUpdate={(value: number) => setDropdownSliderValueDark(value)}
                 />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <LFOSlider
+                    label="Mission Day"
+                    min={DATE_SLIDER_MIN}
+                    max={DATE_SLIDER_MAX}
+                    step={DATE_SLIDER_STEP}
+                    width={360}
+                    defaultValue={dateSliderValue}
+                  leftColor={flexoki.cyan['700']}
+                  rightColor={flexoki.base['100']}
+                  border="left"
+                  fontSize={sliderFontSize}
+                  displayFormatterPreset="dayOfYear"
+                  displayFormatterPresetOptions={{ dayOfYear: DATE_SLIDER_PRESET_OPTIONS }}
+                  onUserChange={(value: number) => setDateSliderValue(value)}
+                  onAnimatedUpdate={(value: number) => setDateSliderValue(value)}
+                />
+                  <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
+                    Selected: {formatDateLabel(dateSliderValue)}
+                  </span>
+                  <LFOSlider
+                    label="Mission Runtime"
+                    min={TIME_SLIDER_MIN}
+                    max={TIME_SLIDER_MAX}
+                    step={TIME_SLIDER_STEP}
+                    width={360}
+                    defaultValue={timeSliderValue}
+                    leftColor={flexoki.cyan['800']}
+                    rightColor={flexoki.base['100']}
+                    border="left"
+                    fontSize={sliderFontSize}
+                    displayFormatterPreset="time"
+                    displayFormatterPresetOptions={{ time: TIME_SLIDER_PRESET_OPTIONS }}
+                    onUserChange={(value: number) => setTimeSliderValue(value)}
+                    onAnimatedUpdate={(value: number) => setTimeSliderValue(value)}
+                  />
+                  <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
+                    Selected runtime: {formatTimeLabel(timeSliderValue)}
+                  </span>
+                </div>
               </div>
             </div>
           </Tabs.Content>

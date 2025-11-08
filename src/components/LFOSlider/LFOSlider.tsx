@@ -18,7 +18,17 @@ import {
   normalizeSelection,
   precisionFrom,
 } from "./utils";
+import {
+  createDayOfYearFormatter,
+  createTimeFormatter,
+  type DisplayFormatterPresetOptions,
+  type DisplayValueFormatReason,
+  type DisplayValueFormatterPreset,
+  type FormatDisplayValueFn,
+  type ParseDisplayValueFn,
+} from "./valueFormatters";
 import "./lfoslider.css";
+
 export type SliderBorder = 'left' | 'right' | 'none';
 
 const visuallyHiddenStyle: React.CSSProperties = {
@@ -111,6 +121,10 @@ export interface LFOSliderProps {
   lfoRunning?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  formatDisplayValue?: FormatDisplayValueFn;
+  parseDisplayValue?: ParseDisplayValueFn;
+  displayFormatterPreset?: DisplayValueFormatterPreset;
+  displayFormatterPresetOptions?: DisplayFormatterPresetOptions;
 };
 
 function LFOSlider({
@@ -149,6 +163,10 @@ function LFOSlider({
   lfoRunning,
   className,
   style,
+  formatDisplayValue,
+  parseDisplayValue,
+  displayFormatterPreset,
+  displayFormatterPresetOptions,
 }: LFOSliderProps) {
   const precInit = precisionFrom(min, max, step);
   const [text, setText] = useState<string>(() => (defaultValue !== undefined ? Number(defaultValue).toFixed(precInit) : '0'));
@@ -258,8 +276,49 @@ function LFOSlider({
   useEffect(() => { textRef.current = text; }, [text]);
   useEffect(() => { splitRef.current = split; }, [split]);
   useEffect(() => { selRef.current = { start: selStart, end: selEnd }; }, [selStart, selEnd]);
+  const precision = useMemo(() => precisionFrom(min, max, step), [min, max, step]);
+  const presetFormatter = useMemo(() => {
+    if (displayFormatterPreset === 'dayOfYear') {
+      return createDayOfYearFormatter({
+        min,
+        max,
+        options: displayFormatterPresetOptions?.dayOfYear,
+      });
+    }
+    if (displayFormatterPreset === 'time') {
+      return createTimeFormatter({
+        min,
+        max,
+        options: displayFormatterPresetOptions?.time,
+      });
+    }
+    return null;
+  }, [displayFormatterPreset, displayFormatterPresetOptions, max, min]);
+  const resolvedFormatFn = formatDisplayValue ?? presetFormatter?.format ?? null;
+  const resolvedParseFn = parseDisplayValue ?? presetFormatter?.parse ?? null;
+  const formatValueForDisplay = useCallback((
+    value: number,
+    rawText: string,
+    reason: DisplayValueFormatReason,
+  ) => {
+    if (!resolvedFormatFn) return rawText;
+    const next = resolvedFormatFn(value, { reason, rawValueText: rawText });
+    return typeof next === 'string' ? next : rawText;
+  }, [resolvedFormatFn]);
+  const parseTextToValue = useCallback((input: string): number | null => {
+    if (resolvedParseFn) {
+      const parsed = resolvedParseFn(input);
+      if (parsed !== null && parsed !== undefined && Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    const numeric = Number(input);
+    return Number.isFinite(numeric) ? numeric : null;
+  }, [resolvedParseFn]);
   const liveValueRef = useRef<number>(valueFromSplit(splitRef.current, min, max, step));
-  const displayValueRef = useRef<string>(liveValueRef.current.toFixed(precInit));
+  const displayValueRef = useRef<string>(
+    formatValueForDisplay(liveValueRef.current, liveValueRef.current.toFixed(precInit), 'value'),
+  );
   const activeDrawerValueRef = useRef<number | null>(null);
   const phaseOffsetRef = useRef(0);
   const lastEmitMsRef = useRef(0);
@@ -453,14 +512,14 @@ function LFOSlider({
   const reflectValueToDom = useCallback((numeric: number, formatted: string) => {
     liveValueRef.current = numeric;
     if (activeDrawerValueRef.current !== null) return;
-    displayValueRef.current = formatted;
-  }, []);
+    displayValueRef.current = formatValueForDisplay(numeric, formatted, 'value');
+  }, [formatValueForDisplay]);
   const [activeDrawerValue, setActiveDrawerValue] = useState<number | null>(null);
-  const precision = useMemo(() => precisionFrom(min, max, step), [min, max, step]);
   const formattedDrawerValue = useMemo(() => {
     if (activeDrawerValue === null || !Number.isFinite(activeDrawerValue)) return null;
-    return activeDrawerValue.toFixed(precision);
-  }, [activeDrawerValue, precision]);
+    const raw = activeDrawerValue.toFixed(precision);
+    return formatValueForDisplay(activeDrawerValue, raw, 'drawer');
+  }, [activeDrawerValue, formatValueForDisplay, precision]);
   const displayValue = formattedDrawerValue ?? (focused ? text : displayValueRef.current);
   const setDrawerLineRatio = useCallback((index: number, ratio: number) => {
     setDrawerLineRatios((prev) => {
@@ -553,16 +612,16 @@ function LFOSlider({
     setSelEnd(e);
   };
   const linkSplitToText = (val: string) => {
-    const num = Number(val);
-    if (!isFinite(num)) return;
+    const num = parseTextToValue(val);
+    if (num === null) return;
     const ratio = splitFromValue(num, min, max);
     splitRef.current = ratio;
     writeSplitVars(ratio);
     setSplit(ratio);
   };
   const adjustValueByStep = (dir: -1 | 1) => {
-    const current = Number(textRef.current);
-    const numeric = Number.isFinite(current) ? current : min;
+    const parsedCurrent = parseTextToValue(textRef.current);
+    const numeric = parsedCurrent ?? min;
     const stepValue = step > 0 && Number.isFinite(step) ? step : 1;
     const target = numeric + stepValue * dir;
     const clamped = clamp(target, min, max);
@@ -671,9 +730,13 @@ function LFOSlider({
     if (formattedDrawerValue !== null) {
       displayValueRef.current = formattedDrawerValue;
     } else {
-      displayValueRef.current = liveValueRef.current.toFixed(precision);
+      displayValueRef.current = formatValueForDisplay(
+        liveValueRef.current,
+        liveValueRef.current.toFixed(precision),
+        'value',
+      );
     }
-  }, [activeDrawerValue, formattedDrawerValue, precision]);
+  }, [activeDrawerValue, formatValueForDisplay, formattedDrawerValue, precision]);
   useEffect(() => {
     phaseOffsetRef.current = 0;
   }, [activeWaveform, knobFrequency, phaseDial, lfoSettings.depth, lfoSettings.offset]);
@@ -1028,9 +1091,9 @@ function LFOSlider({
       const restore = preEditTextRef.current || '';
       setText(restore); setSelection(restore.length, restore.length); textRef.current = restore;
     } else if (editingRef.current) {
-      const asNum = Number(textRef.current);
-      if (isFinite(asNum)) {
-        const clamped = clamp(asNum, min, max);
+      const parsed = parseTextToValue(textRef.current);
+      if (parsed !== null) {
+        const clamped = clamp(parsed, min, max);
         const snapped = snapToStep(clamped, min, step);
         const formatted = snapped.toFixed(precision);
         const ratio = splitFromValue(Number(formatted), min, max);

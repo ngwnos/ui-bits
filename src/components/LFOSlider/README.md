@@ -39,14 +39,14 @@ const Example = () => {
 | `label` | `string` | Accessible label and on-screen caption. |
 | `min`, `max`, `step` | `number` | Range and quantisation of the numeric value. Defaults to `0 → 100` with step `1`. |
 | `defaultValue` | `number` | Initial numerical value; the component keeps its own local text buffer. |
-| `drawerLines` | `[number, number]` | Optional min/max markers shown in the drawer track. |
+| `lfoRange` | `[number, number]` | Optional min/max markers shown in the drawer track. Falls back to randomised handles when omitted. |
 | `leftColor`, `rightColor` | `string` | Hex colours for the segmented background. When omitted the slider falls back to neutral grey/white. |
-| `drawerHandle` | `boolean` | Enables the secondary drawer UI (waveform toggle + min/max handles). |
+| `showLfoControls` | `boolean` | Enables the drawer UI (waveform toggles + min/max handles). |
 | `initialWaveform`, `initialFrequency`, `initialPhase` | Numbers describing the starting LFO. |
 | `onUserChange` | `(value: number) => void` | Fired for direct user edits (dragging, typing). |
 | `onAnimatedUpdate` | `(value: number) => void` | Fired for automated updates (frame loop, external source). |
 | `onDrawerOpenChange`, `onDrawerLinesChange` | Callbacks for synchronising drawer state with your store. |
-| `onWaveformChange`, `onFrequencyChange`, `onPhaseChange`, `onLfoEnabledChange` | Hooks for mirroring LFO controls. |
+| `onWaveformChange`, `onFrequencyChange`, `onPhaseChange`, `onLfoEnabledChange` | Hooks for mirroring LFO controls (running state toggles when the active waveform button is clicked again). |
 | `className`, `style` | `string`, `React.CSSProperties` | Optional overrides applied to the root wrapper. |
 
 Refer to `LFOSliderProps` for the full list of optional callbacks and configuration flags.

@@ -83,12 +83,12 @@ export interface LFOSliderProps {
   defaultValue?: number;
   width?: number | string;
   drawerLines?: [number, number];
+  lfoRange?: [number, number];
   leftColor?: string;
   rightColor?: string;
   border?: SliderBorder;
   fontSize?: number;
-  drawerHandle?: boolean;
-  drawerFeatureEnabled?: boolean;
+  showLfoControls?: boolean;
   phase?: number;
   mode?: LFOSliderMode;
   lfo?: LfoSettings;
@@ -107,8 +107,8 @@ export interface LFOSliderProps {
   initialWaveform?: Waveform;
   initialFrequency?: number;
   initialPhase?: number;
-  columnDrawerOpen?: boolean;
-  columnLfoEnabled?: boolean;
+  drawerOpen?: boolean;
+  lfoRunning?: boolean;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -121,12 +121,12 @@ function LFOSlider({
   defaultValue,
   width,
   drawerLines,
+  lfoRange,
   leftColor,
   rightColor,
   border = 'left',
   fontSize,
-  drawerHandle = false,
-  drawerFeatureEnabled = true,
+  showLfoControls = false,
   phase = 0,
   mode = 'auto',
   lfo: lfoProp,
@@ -145,8 +145,8 @@ function LFOSlider({
   initialWaveform,
   initialFrequency,
   initialPhase,
-  columnDrawerOpen,
-  columnLfoEnabled = true,
+  drawerOpen: controlledDrawerOpen,
+  lfoRunning,
   className,
   style,
 }: LFOSliderProps) {
@@ -165,7 +165,7 @@ function LFOSlider({
     return { ...defaults, ...(lfoProp ?? {}) };
   }, [initialFrequency, initialWaveform, lfoProp, phase]);
   const defaultWaveform = initialWaveform ?? lfoSettings.waveform ?? 'sine';
-  const drawerHandleActive = drawerHandle && drawerFeatureEnabled;
+  const drawerHandleActive = showLfoControls;
 
   // Selection model
   const [selStart, setSelStart] = useState<number>(text.length);
@@ -175,10 +175,11 @@ function LFOSlider({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [hoverInside, setHoverInside] = useState<boolean>(false);
   const [overHandle, setOverHandle] = useState<boolean>(false);
-  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(() => controlledDrawerOpen ?? false);
   const [drawerHeight, setDrawerHeight] = useState<number>(0);
   const [activeWaveform, setActiveWaveform] = useState<Waveform>(defaultWaveform);
-  const [lfoEnabled, setLfoEnabled] = useState<boolean>(columnLfoEnabled ?? lfoSettings.enabled ?? true);
+  const initialLfoEnabled = lfoRunning ?? lfoSettings.enabled ?? true;
+  const [lfoEnabled, setLfoEnabled] = useState<boolean>(initialLfoEnabled);
   const [knobFrequency, setKnobFrequency] = useState<number>(initialFrequency ?? lfoSettings.frequency ?? 0.5);
   const [phaseDial, setPhaseDial] = useState<number>(initialPhase ?? lfoSettings.phase ?? 0);
 
@@ -191,8 +192,9 @@ function LFOSlider({
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const draggingDrawerLineRef = useRef<number | null>(null);
   const drawerPointerCaptureRef = useRef<{ id: number; node: Element | null }>({ id: -1, node: null });
+  const controlledRange = lfoRange ?? drawerLines;
   const [drawerLineValues, setDrawerLineValues] = useState<[number, number]>(() => (
-    drawerLines ? [...drawerLines] as [number, number] : [
+    controlledRange ? [...controlledRange] as [number, number] : [
       valueFromSplit(Math.random(), min, max, step),
       valueFromSplit(Math.random(), min, max, step),
     ]
@@ -222,14 +224,14 @@ function LFOSlider({
     });
   }, [min, max, step]);
   useEffect(() => {
-    if (!drawerLines) return;
+    if (!controlledRange) return;
     setDrawerLineValues((prev) => {
-      if (Math.abs(prev[0] - drawerLines[0]) < 1e-6 && Math.abs(prev[1] - drawerLines[1]) < 1e-6) {
+      if (Math.abs(prev[0] - controlledRange[0]) < 1e-6 && Math.abs(prev[1] - controlledRange[1]) < 1e-6) {
         return prev;
       }
-      return [...drawerLines] as [number, number];
+      return [...controlledRange] as [number, number];
     });
-  }, [drawerLines]);
+  }, [controlledRange]);
   useEffect(() => {
     if (draggingDrawerLineRef.current !== null) return;
     const next: [number, number] = [
@@ -620,7 +622,6 @@ function LFOSlider({
   }, [drawerValueMin, drawerValueMax, focused, max, min, onAnimatedUpdate, precision, reflectValueToDom, step, writeSplitVars]);
 
   const frameFn = useCallback((nowSec: number) => {
-    if (!drawerFeatureEnabled) return;
     lastNowSecRef.current = nowSec;
     if (!Number.isFinite(drawerValueMin) || !Number.isFinite(drawerValueMax)) return;
     const activeMode = mode === 'auto'
@@ -645,8 +646,8 @@ function LFOSlider({
     }
     if (nextVal === undefined) return;
     applyWaveValue(nextVal, nowSec);
-  }, [activeWaveform, applyWaveValue, drawerFeatureEnabled, drawerValueMax, drawerValueMin, knobFrequency, phaseDial, lfoEnabled, lfoSettings, mode, readExternal]);
-  useFrame(drawerFeatureEnabled ? frameFn : null);
+  }, [activeWaveform, applyWaveValue, drawerValueMax, drawerValueMin, knobFrequency, phaseDial, lfoEnabled, lfoSettings, mode, readExternal]);
+  useFrame(frameFn);
   const readLiveValue = useCallback(
     () => valueFromSplit(splitRef.current, min, max, step),
     [max, min, step],
@@ -685,21 +686,22 @@ function LFOSlider({
     setPhaseDial(initialPhase ?? lfoSettings.phase ?? 0);
   }, [initialPhase, lfoSettings.phase]);
   useEffect(() => {
-    if (columnLfoEnabled === undefined) return;
-    setLfoEnabled(columnLfoEnabled);
-  }, [columnLfoEnabled]);
+    if (lfoRunning === undefined) return;
+    setLfoEnabled(lfoRunning);
+  }, [lfoRunning]);
   useEffect(() => {
-    if (!drawerFeatureEnabled) {
-      setLfoEnabled(false);
-    }
-  }, [drawerFeatureEnabled]);
-  useEffect(() => {
-    if (columnDrawerOpen === undefined) return;
-    setDrawerOpen(columnDrawerOpen);
-    if (!columnDrawerOpen) {
+    if (controlledDrawerOpen === undefined) return;
+    setDrawerOpen(controlledDrawerOpen);
+    if (!controlledDrawerOpen) {
       setActiveDrawerValue(null);
     }
-  }, [columnDrawerOpen]);
+  }, [controlledDrawerOpen]);
+  useEffect(() => {
+    if (showLfoControls) return;
+    setDrawerOpen(false);
+    setActiveDrawerValue(null);
+    setLfoEnabled(false);
+  }, [showLfoControls]);
   const toggleDrawer = () => {
     if (!drawerHandleActive) return;
     setDrawerOpen((prev) => {

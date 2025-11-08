@@ -23,17 +23,16 @@ const sliderProps: LFOSliderProps = {
   step: 1,
   defaultValue: 440,
   width: 260,
-  drawerLines: [400, 16000],
+  lfoRange: [400, 16000],
   leftColor: '#2f2f2f',
   rightColor: '#f0f0f0',
   border: 'left', // 'left' | 'right' | 'none'
   fontSize: 16,
-  drawerHandle: true,
-  drawerFeatureEnabled: true,
+  showLfoControls: true,
   phase: 0,
   mode: 'auto', // 'auto' | 'manual' | 'lfo' | 'external'
   lfo: {
-    enabled: true,
+    enabled: true, // initial running state
     frequency: 0.5,
     depth: 1,
     offset: 0.5,
@@ -56,8 +55,6 @@ const sliderProps: LFOSliderProps = {
   initialWaveform: 'sine',
   initialFrequency: 0.5,
   initialPhase: 0,
-  columnDrawerOpen: false,
-  columnLfoEnabled: true,
   className: 'my-slider',
   style: { marginTop: 24 },
 };

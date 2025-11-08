@@ -331,15 +331,14 @@ function ConnectedSlider({
       step={definition.step}
       defaultValue={state.value}
       width={resolvedWidth}
-      drawerLines={state.drawerLines}
+      lfoRange={state.drawerLines}
       leftColor={state.leftColor}
       rightColor={state.rightColor}
       border={state.border}
       fontSize={fontSize}
-      drawerHandle={definition.drawerHandle}
-      drawerFeatureEnabled={state.drawerFeatureEnabled}
-      columnDrawerOpen={state.drawerOpen}
-      columnLfoEnabled={state.lfoEnabled}
+      showLfoControls={definition.drawerHandle && state.drawerFeatureEnabled}
+      drawerOpen={state.drawerOpen}
+      lfoRunning={state.lfoEnabled}
       initialWaveform={state.waveform}
       initialFrequency={state.frequency}
       initialPhase={state.phase}
@@ -860,13 +859,11 @@ const tabs = [
                   min={0}
                   max={100}
                   step={1}
-                  width={360}
-                  defaultValue={dropdownSliderValue}
-                  drawerHandle={false}
-                  drawerFeatureEnabled={false}
-                  leftColor={flexoki.cyan['600']}
-                  rightColor={flexoki.base['50']}
-                  border="left"
+                width={360}
+                defaultValue={dropdownSliderValue}
+                leftColor={flexoki.cyan['600']}
+                rightColor={flexoki.base['50']}
+                border="left"
                   fontSize={sliderFontSize}
                   onUserChange={(value: number) => setDropdownSliderValue(value)}
                   onAnimatedUpdate={(value: number) => setDropdownSliderValue(value)}
@@ -876,13 +873,11 @@ const tabs = [
                   min={0}
                   max={100}
                   step={1}
-                  width={360}
-                  defaultValue={dropdownSliderValueDark}
-                  drawerHandle={false}
-                  drawerFeatureEnabled={false}
-                  leftColor={flexoki.base['50']}
-                  rightColor={flexoki.cyan['600']}
-                  border="right"
+                width={360}
+                defaultValue={dropdownSliderValueDark}
+                leftColor={flexoki.base['50']}
+                rightColor={flexoki.cyan['600']}
+                border="right"
                   fontSize={sliderFontSize}
                   onUserChange={(value: number) => setDropdownSliderValueDark(value)}
                   onAnimatedUpdate={(value: number) => setDropdownSliderValueDark(value)}
@@ -899,8 +894,6 @@ const tabs = [
                 step={1}
                 defaultValue={selectionSquareScale}
                 width={360}
-                drawerFeatureEnabled={false}
-                drawerHandle={false}
                 mode="external"
                 readExternal={() => selectionSquareScale}
                 leftColor={selectionGridSliderLeftColor}
@@ -919,8 +912,6 @@ const tabs = [
                 step={1}
                 defaultValue={selectionSunAltitude}
                 width={360}
-                drawerFeatureEnabled={false}
-                drawerHandle={false}
                 mode="external"
                 readExternal={() => selectionSunAltitude}
                 leftColor={selectionGridSliderLeftColor}
@@ -939,8 +930,6 @@ const tabs = [
                 step={1}
                 defaultValue={selectionSunAzimuth}
                 width={360}
-                drawerFeatureEnabled={false}
-                drawerHandle={false}
                 mode="external"
                 readExternal={() => selectionSunAzimuth}
                 leftColor={selectionGridSliderLeftColor}

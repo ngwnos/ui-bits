@@ -625,11 +625,11 @@ function LFOSlider({
     lastNowSecRef.current = nowSec;
     if (!Number.isFinite(drawerValueMin) || !Number.isFinite(drawerValueMax)) return;
     const activeMode = mode === 'auto'
-      ? (lfoSettings.enabled && lfoEnabled ? 'lfo' : (readExternal ? 'external' : 'manual'))
+      ? (lfoEnabled ? 'lfo' : (readExternal ? 'external' : 'manual'))
       : (mode === 'lfo' && !lfoEnabled ? 'manual' : mode);
     if (draggingSplitRef.current || editingRef.current) return;
     let nextVal: number | undefined;
-    if (activeMode === 'lfo' && lfoSettings.enabled && lfoEnabled) {
+    if (activeMode === 'lfo' && lfoEnabled) {
       const phaseBase = phaseDial + phaseOffsetRef.current;
       const withPhase: LfoSettings = {
         ...lfoSettings,

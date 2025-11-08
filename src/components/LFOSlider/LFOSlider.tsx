@@ -178,7 +178,7 @@ function LFOSlider({
   const [drawerOpen, setDrawerOpen] = useState<boolean>(() => controlledDrawerOpen ?? false);
   const [drawerHeight, setDrawerHeight] = useState<number>(0);
   const [activeWaveform, setActiveWaveform] = useState<Waveform>(defaultWaveform);
-  const initialLfoEnabled = lfoRunning ?? lfoSettings.enabled ?? true;
+  const initialLfoEnabled = lfoRunning ?? (showLfoControls ? false : (lfoSettings.enabled ?? true));
   const [lfoEnabled, setLfoEnabled] = useState<boolean>(initialLfoEnabled);
   const [knobFrequency, setKnobFrequency] = useState<number>(initialFrequency ?? lfoSettings.frequency ?? 0.5);
   const [phaseDial, setPhaseDial] = useState<number>(initialPhase ?? lfoSettings.phase ?? 0);

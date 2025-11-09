@@ -86,7 +86,9 @@ export default function SegmentBar({
     : borderMode === "b"
       ? resolvedColorB
       : "transparent";
-  const hoverOverlay = colorWithAlpha(resolvedColorB, 0.16, "255,255,255");
+  const hoverOverlayBase = borderMode === "none" ? resolvedColorA : resolvedColorB;
+  const hoverOverlay = colorWithAlpha(hoverOverlayBase, 0.16, borderMode === "none" ? "0,0,0" : "255,255,255");
+  const containerBackground = resolvedColorB;
   const [internalValue, setInternalValue] = useState<string>(() => (
     resolveInitialValue(options, defaultValue, value)
   ));
@@ -130,7 +132,6 @@ export default function SegmentBar({
     ...(style ?? {}),
   };
   const hasOptions = options.length > 0;
-  const separatorColor = resolvedColorA;
   const inactiveTextColor = resolvedColorA;
   const activeTextColor = resolvedColorB;
 
@@ -213,7 +214,7 @@ export default function SegmentBar({
           borderRadius: 3,
           border: `1px solid ${resolvedBorderColor}`,
           overflow: "hidden",
-          backgroundColor: resolvedColorA,
+          backgroundColor: containerBackground,
           touchAction: "none",
           opacity: disabled ? 0.6 : 1,
         }}
@@ -235,9 +236,10 @@ export default function SegmentBar({
           options.map((option, index) => {
             const isActive = index === effectiveIndex;
             const isHovered = hoverIndex === index && !disabled;
-            const background = isActive
-              ? resolvedColorA
-              : (isHovered ? `linear-gradient(${hoverOverlay}, ${hoverOverlay}), ${resolvedColorB}` : resolvedColorB);
+            const baseBackground = isActive ? resolvedColorA : "transparent";
+            const background = isHovered
+              ? `linear-gradient(${hoverOverlay}, ${hoverOverlay}), ${baseBackground}`
+              : baseBackground;
             return (
               <button
                 key={option.value}
@@ -267,6 +269,7 @@ export default function SegmentBar({
                 }}
                 style={{
                   border: "none",
+                  borderRight: index < options.length - 1 ? `1px solid ${resolvedColorA}` : "none",
                   background,
                   color: isActive ? activeTextColor : inactiveTextColor,
                   fontSize: "inherit",
@@ -292,32 +295,6 @@ export default function SegmentBar({
               </button>
             );
           })
-        )}
-        {hasOptions && options.length > 1 && (
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              inset: 0,
-              pointerEvents: "none",
-              zIndex: 5,
-            }}
-          >
-            {options.slice(1).map((_, index) => (
-              <span
-                key={`segment-separator-${index}`}
-                style={{
-                  position: "absolute",
-                  top: "12%",
-                  bottom: "12%",
-                  width: 1,
-                  background: separatorColor,
-                  left: `${((index + 1) / options.length) * 100}%`,
-                  transform: "translateX(-0.5px)",
-                }}
-              />
-            ))}
-          </div>
         )}
       </div>
     </div>

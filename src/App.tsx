@@ -102,12 +102,37 @@ const SEGMENT_BAR_MODES = [
   { value: "burst", label: "Burst" },
 ];
 
-const SEGMENT_BAR_SYNC_OPTIONS = [
-  { value: "quarter", label: "1/4" },
-  { value: "eighth", label: "1/8" },
-  { value: "triplet", label: "1/8T" },
-  { value: "sixteenth", label: "1/16" },
-  { value: "thirty-second", label: "1/32" },
+const SEGMENT_BAR_DEMO_SETS = [
+  [
+    { value: "a", label: "A" },
+    { value: "b", label: "B" },
+  ],
+  [
+    { value: "a", label: "A" },
+    { value: "b", label: "B" },
+    { value: "c", label: "C" },
+  ],
+  [
+    { value: "a", label: "A" },
+    { value: "b", label: "B" },
+    { value: "c", label: "C" },
+    { value: "d", label: "D" },
+  ],
+  [
+    { value: "a", label: "A" },
+    { value: "b", label: "B" },
+    { value: "c", label: "C" },
+    { value: "d", label: "D" },
+    { value: "e", label: "E" },
+  ],
+  [
+    { value: "a", label: "A" },
+    { value: "b", label: "B" },
+    { value: "c", label: "C" },
+    { value: "d", label: "D" },
+    { value: "e", label: "E" },
+    { value: "f", label: "F" },
+  ],
 ];
 const SEGMENT_BORDER_STYLES: SegmentBarBorderStyle[] = ["a", "b", "none"];
 
@@ -422,7 +447,6 @@ function EditableRectPOC() {
   const [darkDropdownValue, setDarkDropdownValue] = React.useState<string>(DROPDOWN_OPTIONS[1].value);
   const [segmentCompareValue, setSegmentCompareValue] = React.useState<number>(64);
   const [segmentModeValue, setSegmentModeValue] = React.useState<string>(SEGMENT_BAR_MODES[1].value);
-  const [segmentSyncValue, setSegmentSyncValue] = React.useState<string>(SEGMENT_BAR_SYNC_OPTIONS[2].value);
   const [segmentBorderStyle, setSegmentBorderStyle] = React.useState<SegmentBarBorderStyle>("a");
   const [dropdownSliderValue, setDropdownSliderValue] = React.useState<number>(42);
   const [dropdownSliderValueDark, setDropdownSliderValueDark] = React.useState<number>(58);
@@ -447,10 +471,6 @@ function EditableRectPOC() {
   const segmentModeSelection = React.useMemo(
     () => SEGMENT_BAR_MODES.find((option) => option.value === segmentModeValue),
     [segmentModeValue],
-  );
-  const segmentSyncSelection = React.useMemo(
-    () => SEGMENT_BAR_SYNC_OPTIONS.find((option) => option.value === segmentSyncValue),
-    [segmentSyncValue],
   );
   const cycleSegmentBorderStyle = () => {
     setSegmentBorderStyle((prev) => {
@@ -991,8 +1011,8 @@ const tabs = [
                 options={SEGMENT_BAR_MODES}
                 value={segmentModeValue}
                 onChange={(next) => setSegmentModeValue(next)}
-                colorA={flexoki.orange['600']}
-                colorB={flexoki.magenta['300']}
+                colorA={flexoki.blue['600']}
+                colorB={flexoki.blue['100']}
                 borderStyle={segmentBorderStyle}
                 width={420}
                 fontSize={sliderFontSize}
@@ -1000,19 +1020,17 @@ const tabs = [
               <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
                 Selected: {segmentModeSelection?.label ?? segmentModeValue}
               </span>
-              <SegmentBar
-                options={SEGMENT_BAR_SYNC_OPTIONS}
-                value={segmentSyncValue}
-                onChange={(next) => setSegmentSyncValue(next)}
-                colorA={previewDarkMode ? flexoki.base['50'] : flexoki.blue['700']}
-                colorB={previewDarkMode ? flexoki.blue['400'] : flexoki.base['100']}
-                borderStyle="b"
-                width={420}
-                fontSize={sliderFontSize}
-              />
-              <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
-                Selected: {segmentSyncSelection?.label ?? segmentSyncValue}
-              </span>
+              {SEGMENT_BAR_DEMO_SETS.map((optionSet, index) => (
+                <SegmentBar
+                  key={`segment-demo-${index}`}
+                  options={optionSet}
+                  colorA={flexoki.blue['600']}
+                  colorB={flexoki.blue['100']}
+                  borderStyle={segmentBorderStyle}
+                  width={420}
+                  fontSize={sliderFontSize}
+                />
+              ))}
             </div>
           </Tabs.Content>
           <Tabs.Content value="dropdown" style={tabBodyStyle}>

@@ -130,9 +130,7 @@ export default function SegmentBar({
     ...(style ?? {}),
   };
   const hasOptions = options.length > 0;
-  const separatorColor = borderMode === "a"
-    ? resolvedColorA
-    : resolvedColorB;
+  const separatorColor = resolvedColorA;
   const inactiveTextColor = resolvedColorA;
   const activeTextColor = resolvedColorB;
 

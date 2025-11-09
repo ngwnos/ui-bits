@@ -1145,6 +1145,8 @@ function LFOSlider({
     width: '100%',
     maxWidth: resolvedMaxWidth,
     fontSize: appliedFontSize,
+    fontFamily: "'IBM Plex Mono', monospace",
+    fontWeight: 600,
     gap: stackGap,
     ...(style ?? {}),
   };

@@ -29,6 +29,28 @@ export interface SegmentBarProps {
 const FALLBACK_COLOR_A = "#2f2f2f";
 const FALLBACK_COLOR_B = "#f0f0f0";
 
+function normalizeHex(hex: string): string | null {
+  if (!hex) return null;
+  const cleaned = hex.trim().replace("#", "");
+  if (/^[0-9a-fA-F]{3}$/.test(cleaned)) {
+    return cleaned.split("").map((c) => c + c).join("");
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(cleaned)) {
+    return cleaned;
+  }
+  return null;
+}
+
+function colorWithAlpha(color: string, alpha: number, fallback = "0,0,0"): string {
+  const normalized = normalizeHex(color);
+  if (!normalized) return `rgba(${fallback},${alpha})`;
+  const intVal = parseInt(normalized, 16);
+  const r = (intVal >> 16) & 255;
+  const g = (intVal >> 8) & 255;
+  const b = intVal & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function resolveInitialValue(
   options: SegmentBarOption[],
   defaultValue?: string,
@@ -54,6 +76,7 @@ export default function SegmentBar({
 }: SegmentBarProps) {
   const resolvedColorA = colorA ?? FALLBACK_COLOR_A;
   const resolvedColorB = colorB ?? FALLBACK_COLOR_B;
+  const hoverOverlay = colorWithAlpha(resolvedColorB, 0.16, "255,255,255");
   const [internalValue, setInternalValue] = useState<string>(() => (
     resolveInitialValue(options, defaultValue, value)
   ));
@@ -92,12 +115,14 @@ export default function SegmentBar({
     flexDirection: "column",
     gap: "0.25rem",
     fontSize: appliedFontSize,
+    fontFamily: "'IBM Plex Mono', monospace",
+    fontWeight: 600,
     ...(style ?? {}),
   };
   const hasOptions = options.length > 0;
   const separatorColor = resolvedColorB;
-  const inactiveTextColor = resolvedColorB;
-  const activeTextColor = resolvedColorA;
+  const inactiveTextColor = resolvedColorA;
+  const activeTextColor = resolvedColorB;
 
   const draggingRef = useRef(false);
 
@@ -201,6 +226,9 @@ export default function SegmentBar({
             const isActive = index === effectiveIndex;
             const isHovered = hoverIndex === index && !disabled;
             const borderLeft = index === 0 ? "none" : `1px solid ${separatorColor}`;
+            const background = isActive
+              ? resolvedColorA
+              : (isHovered ? `linear-gradient(${hoverOverlay}, ${hoverOverlay}), ${resolvedColorB}` : resolvedColorB);
             return (
               <button
                 key={option.value}
@@ -231,7 +259,7 @@ export default function SegmentBar({
                 style={{
                   border: "none",
                   borderLeft,
-                  background: isActive ? resolvedColorB : resolvedColorA,
+                  background,
                   color: isActive ? activeTextColor : inactiveTextColor,
                   fontSize: "inherit",
                   fontFamily: "inherit",
@@ -245,8 +273,7 @@ export default function SegmentBar({
                   cursor: disabled ? "not-allowed" : "pointer",
                   position: "relative",
                   userSelect: "none",
-                  transition: "background 120ms ease, color 120ms ease, box-shadow 120ms ease",
-                  boxShadow: !disabled && !isActive && isHovered ? `inset 0 0 0 1px ${resolvedColorB}` : "none",
+                  transition: "background 120ms ease, color 120ms ease",
                   outlineColor: resolvedColorB,
                   outlineOffset: -1,
                   height: "100%",

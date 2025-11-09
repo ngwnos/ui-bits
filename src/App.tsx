@@ -17,7 +17,14 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import { CustomColorPopover, SelectionGrid, TypeGPUTest, Dropdown, SegmentBar } from "./components";
+import {
+  CustomColorPopover,
+  SelectionGrid,
+  TypeGPUTest,
+  Dropdown,
+  SegmentBar,
+} from "./components";
+import type { SegmentBarBorderStyle } from "./components";
 import LFOSlider, {
   FrameLoopProvider,
   type SliderBorder,
@@ -102,6 +109,7 @@ const SEGMENT_BAR_SYNC_OPTIONS = [
   { value: "sixteenth", label: "1/16" },
   { value: "thirty-second", label: "1/32" },
 ];
+const SEGMENT_BORDER_STYLES: SegmentBarBorderStyle[] = ["a", "b", "none"];
 
 const DATE_SLIDER_MIN = 0;
 const DATE_SLIDER_MAX = 365.25;
@@ -415,6 +423,7 @@ function EditableRectPOC() {
   const [segmentCompareValue, setSegmentCompareValue] = React.useState<number>(64);
   const [segmentModeValue, setSegmentModeValue] = React.useState<string>(SEGMENT_BAR_MODES[1].value);
   const [segmentSyncValue, setSegmentSyncValue] = React.useState<string>(SEGMENT_BAR_SYNC_OPTIONS[2].value);
+  const [segmentBorderStyle, setSegmentBorderStyle] = React.useState<SegmentBarBorderStyle>("a");
   const [dropdownSliderValue, setDropdownSliderValue] = React.useState<number>(42);
   const [dropdownSliderValueDark, setDropdownSliderValueDark] = React.useState<number>(58);
   const [dateSliderValue, setDateSliderValue] = React.useState<number>(32);
@@ -443,6 +452,13 @@ function EditableRectPOC() {
     () => SEGMENT_BAR_SYNC_OPTIONS.find((option) => option.value === segmentSyncValue),
     [segmentSyncValue],
   );
+  const cycleSegmentBorderStyle = () => {
+    setSegmentBorderStyle((prev) => {
+      const index = SEGMENT_BORDER_STYLES.indexOf(prev);
+      const next = SEGMENT_BORDER_STYLES[(index + 1) % SEGMENT_BORDER_STYLES.length];
+      return next;
+    });
+  };
   const handleTogglePalette = () => {
     setPreviewDarkMode((value) => !value);
   };
@@ -940,6 +956,23 @@ const tabs = [
                 Segment Bar slots options along the same mono-weight bar layout as the sliders. It behaves like a single-select
                 radio group and sticks to the exact two-color palette you pass in.
               </p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={cycleSegmentBorderStyle}
+                  style={{
+                    ...iconButtonStyle,
+                    width: 110,
+                    height: columnButtonSize,
+                    fontSize: CONTROL_FONT_SIZE,
+                  }}
+                >
+                  Border: {segmentBorderStyle.toUpperCase()}
+                </button>
+                <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.8 }}>
+                  (cycles A → B → none)
+                </span>
+              </div>
               <LFOSlider
                 label="Segment Compare"
                 min={0}
@@ -960,6 +993,7 @@ const tabs = [
                 onChange={(next) => setSegmentModeValue(next)}
                 colorA={flexoki.orange['600']}
                 colorB={flexoki.magenta['300']}
+                borderStyle={segmentBorderStyle}
                 width={420}
                 fontSize={sliderFontSize}
               />
@@ -972,6 +1006,7 @@ const tabs = [
                 onChange={(next) => setSegmentSyncValue(next)}
                 colorA={previewDarkMode ? flexoki.base['50'] : flexoki.blue['700']}
                 colorB={previewDarkMode ? flexoki.blue['400'] : flexoki.base['100']}
+                borderStyle="b"
                 width={420}
                 fontSize={sliderFontSize}
               />

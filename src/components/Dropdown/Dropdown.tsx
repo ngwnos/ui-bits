@@ -25,6 +25,7 @@ export interface DropdownProps {
   onChange?: (value: string, option: DropdownOption) => void;
   colorA?: string;
   colorB?: string;
+  borderStyle?: "a" | "b" | "none";
   isDarkMode?: boolean;
   width?: number | string;
   fontSize?: number;
@@ -65,6 +66,7 @@ export default function Dropdown({
   onChange,
   colorA,
   colorB,
+  borderStyle = "a",
   isDarkMode = false,
   width,
   fontSize,
@@ -218,13 +220,19 @@ export default function Dropdown({
   const fallbackB = isDarkMode ? flexoki.base["900"] : flexoki.base["50"];
   const resolvedColorA = colorA ?? fallbackA;
   const resolvedColorB = colorB ?? fallbackB;
-  const surfaceColor = resolvedColorB;
-  const borderColor = resolvedColorA;
-  const textColor = resolvedColorA;
-  const mutedColor = colorWithAlpha(resolvedColorA, 0.7);
-  const highlightShadow = colorWithAlpha(resolvedColorA, 0.25);
-  const placeholderColor = colorWithAlpha(resolvedColorA, 0.5);
-  const focusOverlay = colorWithAlpha(resolvedColorA, 0.2, "16,15,15");
+  const borderColor = borderStyle === "none"
+    ? "transparent"
+    : borderStyle === "a"
+      ? resolvedColorA
+      : resolvedColorB;
+  const surfaceColor = borderStyle === "b" ? resolvedColorA : resolvedColorB;
+  const textColor = borderStyle === "b" ? resolvedColorB : resolvedColorA;
+  const mutedColor = colorWithAlpha(textColor, 0.7);
+  const highlightShadow = colorWithAlpha(textColor, 0.25);
+  const placeholderColor = colorWithAlpha(textColor, 0.5);
+  const inverseSurface = borderStyle === "b" ? resolvedColorB : resolvedColorA;
+  const inverseText = borderStyle === "b" ? resolvedColorA : resolvedColorB;
+  const focusOverlay = colorWithAlpha(textColor, 0.2, "16,15,15");
 
   const themeVars: React.CSSProperties = {
     "--dropdown-surface": surfaceColor,
@@ -233,8 +241,8 @@ export default function Dropdown({
     "--dropdown-muted": mutedColor,
     "--dropdown-placeholder": placeholderColor,
     "--dropdown-shadow": highlightShadow,
-    "--dropdown-inverse-surface": resolvedColorA,
-    "--dropdown-inverse-text": resolvedColorB,
+    "--dropdown-inverse-surface": inverseSurface,
+    "--dropdown-inverse-text": inverseText,
     "--dropdown-focus-overlay": focusOverlay,
     "--dropdown-font-size": `${appliedFontSize}px`,
   } as React.CSSProperties;

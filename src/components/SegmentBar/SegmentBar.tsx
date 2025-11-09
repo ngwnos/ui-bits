@@ -12,6 +12,8 @@ export interface SegmentBarOption {
   label: string;
 }
 
+export type SegmentBarBorderStyle = "a" | "b" | "none";
+
 export interface SegmentBarProps {
   options: SegmentBarOption[];
   value?: string;
@@ -19,6 +21,7 @@ export interface SegmentBarProps {
   onChange?: (value: string, option: SegmentBarOption, index: number) => void;
   colorA?: string;
   colorB?: string;
+  borderStyle?: SegmentBarBorderStyle;
   width?: number | string;
   fontSize?: number;
   disabled?: boolean;
@@ -68,6 +71,7 @@ export default function SegmentBar({
   onChange,
   colorA,
   colorB,
+  borderStyle = "a",
   width,
   fontSize,
   disabled = false,
@@ -76,6 +80,12 @@ export default function SegmentBar({
 }: SegmentBarProps) {
   const resolvedColorA = colorA ?? FALLBACK_COLOR_A;
   const resolvedColorB = colorB ?? FALLBACK_COLOR_B;
+  const borderMode = borderStyle;
+  const resolvedBorderColor = borderMode === "none"
+    ? "transparent"
+    : borderMode === "a"
+      ? resolvedColorA
+      : resolvedColorB;
   const hoverOverlay = colorWithAlpha(resolvedColorB, 0.16, "255,255,255");
   const [internalValue, setInternalValue] = useState<string>(() => (
     resolveInitialValue(options, defaultValue, value)
@@ -120,7 +130,7 @@ export default function SegmentBar({
     ...(style ?? {}),
   };
   const hasOptions = options.length > 0;
-  const separatorColor = resolvedColorB;
+  const separatorColor = resolvedBorderColor === "transparent" ? resolvedColorB : resolvedBorderColor;
   const inactiveTextColor = resolvedColorA;
   const activeTextColor = resolvedColorB;
 
@@ -201,7 +211,7 @@ export default function SegmentBar({
           display: "grid",
           gridTemplateColumns: `repeat(${Math.max(options.length, 1)}, minmax(0, 1fr))`,
           borderRadius: 3,
-          border: `1px solid ${resolvedColorA}`,
+          border: `1px solid ${resolvedBorderColor}`,
           overflow: "hidden",
           backgroundColor: resolvedColorA,
           touchAction: "none",

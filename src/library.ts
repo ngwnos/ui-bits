@@ -20,4 +20,9 @@ export {
 
 export { default as SelectionGrid, type SelectionGridProps } from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";
-export { default as SegmentBar, type SegmentBarProps, type SegmentBarOption } from "./components/SegmentBar";
+export {
+  default as SegmentBar,
+  type SegmentBarProps,
+  type SegmentBarOption,
+  type SegmentBarBorderStyle,
+} from "./components/SegmentBar";

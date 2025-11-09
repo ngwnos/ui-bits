@@ -9,4 +9,9 @@ export { default as CustomColorPopover, type CustomColorPopoverProps } from "./C
 export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";
 export { default as TypeGPUTest } from "./TypeGPUTest";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./Dropdown";
-export { default as SegmentBar, type SegmentBarProps, type SegmentBarOption } from "./SegmentBar";
+export {
+  default as SegmentBar,
+  type SegmentBarProps,
+  type SegmentBarOption,
+  type SegmentBarBorderStyle,
+} from "./SegmentBar";

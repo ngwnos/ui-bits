@@ -274,8 +274,7 @@ export default function SegmentBar({
                   position: "relative",
                   userSelect: "none",
                   transition: "background 120ms ease, color 120ms ease",
-                  outlineColor: resolvedColorB,
-                  outlineOffset: -1,
+                  outline: "none",
                   height: "100%",
                 }}
               >

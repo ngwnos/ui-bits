@@ -211,7 +211,7 @@ export default function SegmentBar({
           display: "grid",
           gridTemplateColumns: `repeat(${Math.max(options.length, 1)}, minmax(0, 1fr))`,
           borderRadius: 3,
-          border: borderMode === "none" ? "none" : `1px solid ${resolvedBorderColor}`,
+          border: `1px solid ${resolvedBorderColor}`,
           overflow: "hidden",
           backgroundColor: resolvedColorA,
           touchAction: "none",

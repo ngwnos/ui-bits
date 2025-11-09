@@ -17,7 +17,7 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import { CustomColorPopover, SelectionGrid, TypeGPUTest, Dropdown } from "./components";
+import { CustomColorPopover, SelectionGrid, TypeGPUTest, Dropdown, SegmentBar } from "./components";
 import LFOSlider, {
   FrameLoopProvider,
   type SliderBorder,
@@ -87,6 +87,21 @@ const DROPDOWN_SIMPLE_OPTIONS = DROPDOWN_OPTIONS.map((option) => ({
   value: option.value,
   label: option.label,
 }));
+
+const SEGMENT_BAR_MODES = [
+  { value: "slow", label: "Slow Drift" },
+  { value: "medium", label: "Medium" },
+  { value: "fast", label: "Fast Rise" },
+  { value: "burst", label: "Burst" },
+];
+
+const SEGMENT_BAR_SYNC_OPTIONS = [
+  { value: "quarter", label: "1/4" },
+  { value: "eighth", label: "1/8" },
+  { value: "triplet", label: "1/8T" },
+  { value: "sixteenth", label: "1/16" },
+  { value: "thirty-second", label: "1/32" },
+];
 
 const DATE_SLIDER_MIN = 0;
 const DATE_SLIDER_MAX = 365.25;
@@ -397,6 +412,9 @@ function EditableRectPOC() {
   const [activeTab, setActiveTab] = React.useState<string>('lfo-slider');
   const [dropdownValue, setDropdownValue] = React.useState<string>(DROPDOWN_OPTIONS[0].value);
   const [darkDropdownValue, setDarkDropdownValue] = React.useState<string>(DROPDOWN_OPTIONS[1].value);
+  const [segmentCompareValue, setSegmentCompareValue] = React.useState<number>(64);
+  const [segmentModeValue, setSegmentModeValue] = React.useState<string>(SEGMENT_BAR_MODES[1].value);
+  const [segmentSyncValue, setSegmentSyncValue] = React.useState<string>(SEGMENT_BAR_SYNC_OPTIONS[2].value);
   const [dropdownSliderValue, setDropdownSliderValue] = React.useState<number>(42);
   const [dropdownSliderValueDark, setDropdownSliderValueDark] = React.useState<number>(58);
   const [dateSliderValue, setDateSliderValue] = React.useState<number>(32);
@@ -416,6 +434,14 @@ function EditableRectPOC() {
   const darkDropdownSelectionLabel = React.useMemo(
     () => DROPDOWN_OPTIONS.find((option) => option.value === darkDropdownValue)?.label ?? darkDropdownValue,
     [darkDropdownValue],
+  );
+  const segmentModeSelection = React.useMemo(
+    () => SEGMENT_BAR_MODES.find((option) => option.value === segmentModeValue),
+    [segmentModeValue],
+  );
+  const segmentSyncSelection = React.useMemo(
+    () => SEGMENT_BAR_SYNC_OPTIONS.find((option) => option.value === segmentSyncValue),
+    [segmentSyncValue],
   );
   const handleTogglePalette = () => {
     setPreviewDarkMode((value) => !value);
@@ -492,6 +518,7 @@ function EditableRectPOC() {
   const horizontalPadding = Math.max(columnGap * 2, 16);
 const tabs = [
     { value: 'lfo-slider', label: 'LFO Slider' },
+    { value: 'segment-bar', label: 'Segment Bar' },
     { value: 'dropdown', label: 'Dropdown' },
     { value: 'selection-grid', label: 'Selection Grid' },
     { value: 'typegpu-test', label: 'TypeGPU Test' },
@@ -895,6 +922,61 @@ const tabs = [
               />
               <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
                 Selected: {formatTimeLabel(timeSliderValue)}
+              </span>
+            </div>
+          </Tabs.Content>
+          <Tabs.Content value="segment-bar" style={tabBodyStyle}>
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 480,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+                color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'],
+              }}
+            >
+              <p style={{ margin: 0, fontSize: CONTROL_FONT_SIZE }}>
+                Segment Bar slots options along the same mono-weight bar layout as the sliders. It behaves like a single-select
+                radio group and sticks to the exact two-color palette you pass in.
+              </p>
+              <LFOSlider
+                label="Segment Compare"
+                min={0}
+                max={100}
+                step={1}
+                width={420}
+                defaultValue={segmentCompareValue}
+                leftColor={flexoki.orange['600']}
+                rightColor={flexoki.magenta['300']}
+                border="left"
+                fontSize={sliderFontSize}
+                onUserChange={(value: number) => setSegmentCompareValue(value)}
+                onAnimatedUpdate={(value: number) => setSegmentCompareValue(value)}
+              />
+              <SegmentBar
+                options={SEGMENT_BAR_MODES}
+                value={segmentModeValue}
+                onChange={(next) => setSegmentModeValue(next)}
+                colorA={flexoki.orange['600']}
+                colorB={flexoki.magenta['300']}
+                width={420}
+                fontSize={sliderFontSize}
+              />
+              <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
+                Selected: {segmentModeSelection?.label ?? segmentModeValue}
+              </span>
+              <SegmentBar
+                options={SEGMENT_BAR_SYNC_OPTIONS}
+                value={segmentSyncValue}
+                onChange={(next) => setSegmentSyncValue(next)}
+                colorA={previewDarkMode ? flexoki.base['50'] : flexoki.blue['700']}
+                colorB={previewDarkMode ? flexoki.blue['400'] : flexoki.base['100']}
+                width={420}
+                fontSize={sliderFontSize}
+              />
+              <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
+                Selected: {segmentSyncSelection?.label ?? segmentSyncValue}
               </span>
             </div>
           </Tabs.Content>

@@ -14,6 +14,7 @@ export interface AudioFFTWindowProps {
   onScrubEnd?: (ratio: number) => void;
   activeColor?: string;
   inactiveColor?: string;
+  peakDecay?: number;
 }
 
 type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
@@ -78,6 +79,7 @@ export default function AudioFFTWindow({
   onScrubEnd,
   activeColor,
   inactiveColor,
+  peakDecay = 0.05,
 }: AudioFFTWindowProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
@@ -93,6 +95,11 @@ export default function AudioFFTWindow({
   const binDataRef = React.useRef<Float32Array>(new Float32Array(binTextureWidth));
   const binCountRef = React.useRef<number>(0);
   const needsUploadRef = React.useRef<boolean>(false);
+  const peakDataRef = React.useRef<Float32Array>(new Float32Array(binTextureWidth));
+  const peakHoldTimersRef = React.useRef<Float32Array>(new Float32Array(binTextureWidth));
+  const peakFallTimersRef = React.useRef<Float32Array>(new Float32Array(binTextureWidth));
+  const lastPeakUpdateRef = React.useRef<number>(typeof performance !== "undefined" ? performance.now() : Date.now());
+  const needsPeakUploadRef = React.useRef<boolean>(false);
   const playbackRatioRef = React.useRef<number>(Math.max(0, Math.min(1, playbackRatio)));
   const pointerStateRef = React.useRef<{ active: boolean; pointerId: number | null }>({ active: false, pointerId: null });
   const activeColorVec = React.useMemo(
@@ -109,6 +116,10 @@ export default function AudioFFTWindow({
   React.useEffect(() => {
     binDataRef.current = new Float32Array(binTextureWidth);
     needsUploadRef.current = true;
+    peakDataRef.current = new Float32Array(binTextureWidth);
+    peakHoldTimersRef.current = new Float32Array(binTextureWidth);
+    peakFallTimersRef.current = new Float32Array(binTextureWidth);
+    needsPeakUploadRef.current = true;
   }, [binTextureWidth]);
 
   React.useEffect(() => {
@@ -134,17 +145,52 @@ export default function AudioFFTWindow({
   React.useEffect(() => {
     if (!bins) return;
     const dest = binDataRef.current;
+    const peaks = peakDataRef.current;
+    const holdTimers = peakHoldTimersRef.current;
+    const fallTimers = peakFallTimersRef.current;
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const deltaSeconds = Math.max(0.001, (now - lastPeakUpdateRef.current) / 1000);
+    lastPeakUpdateRef.current = now;
     const usable = Math.min(maxBinCount, bins.length);
+    const baseDecayPerSecond = Math.max(0.0005, Math.min(peakDecay, 0.1));
+    const gravity = 4.0;
+    const holdSeconds = 0.2;
     for (let i = 0; i < usable; i += 1) {
-      const value = bins[i];
-      dest[i] = Number.isFinite(value) ? Math.max(0, value) : 0;
+      const value = Number.isFinite(bins[i]) ? Math.max(0, bins[i]) : 0;
+      dest[i] = value;
+      const prev = peaks[i] ?? 0;
+      if (value >= prev) {
+        peaks[i] = value;
+        holdTimers[i] = holdSeconds;
+      } else if (holdTimers[i] > 0) {
+        holdTimers[i] = Math.max(0, holdTimers[i] - deltaSeconds);
+        fallTimers[i] = 0;
+      } else {
+        const elapsed = fallTimers[i] + deltaSeconds;
+        fallTimers[i] = elapsed;
+        const accel = 1 + gravity * elapsed;
+        const drop = baseDecayPerSecond * accel * deltaSeconds;
+        peaks[i] = Math.max(0, prev - drop);
+      }
     }
     for (let i = usable; i < dest.length; i += 1) {
       dest[i] = 0;
+      const prev = peaks[i] ?? 0;
+      if (holdTimers[i] > 0) {
+        holdTimers[i] = Math.max(0, holdTimers[i] - deltaSeconds);
+        fallTimers[i] = 0;
+      } else {
+        const elapsed = fallTimers[i] + deltaSeconds;
+        fallTimers[i] = elapsed;
+        const accel = 1 + gravity * elapsed;
+        const drop = baseDecayPerSecond * accel * deltaSeconds;
+        peaks[i] = Math.max(0, prev - drop);
+      }
     }
     binCountRef.current = usable;
     needsUploadRef.current = true;
-  }, [bins, maxBinCount]);
+    needsPeakUploadRef.current = true;
+  }, [bins, maxBinCount, peakDecay]);
 
   const computeRatioFromClientX = React.useCallback((clientX: number): number | null => {
     const wrapper = wrapperRef.current;
@@ -307,6 +353,7 @@ struct Uniforms {
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 @group(0) @binding(1) var fftTexture : texture_2d<f32>;
+@group(0) @binding(2) var peakTexture : texture_2d<f32>;
 
 @fragment
 fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
@@ -316,6 +363,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   let indexF = clamp(floor(in.uv.x * bins), 0.0, bins - 1.0);
   let clampedIndex = clamp(indexF, 0.0, texWidth - 1.0);
   let amplitude = textureLoad(fftTexture, vec2<i32>(i32(clampedIndex), 0), 0).r;
+  let peakValue = textureLoad(peakTexture, vec2<i32>(i32(clampedIndex), 0), 0).r;
   let normalized = clamp(amplitude, 0.0, 1.0);
   let y = 1.0 - in.uv.y;
   let edgeMask = smoothstep(normalized - 0.01, normalized, y);
@@ -328,6 +376,11 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   let lineMask = 1.0 - lineFeather;
   let invertedColor = mix(uniforms.colorActive, uniforms.colorInactive, activeMask);
   color = mix(color, invertedColor, lineMask);
+  if (peakValue > 0.01) {
+    let peakY = clamp(peakValue, 0.0, 1.0);
+    let peakLine = 1.0 - smoothstep(0.0, 0.01, abs(y - peakY));
+    color = mix(color, uniforms.colorActive, peakLine);
+  }
   return vec4<f32>(color, 1.0);
 }
 `,
@@ -353,11 +406,17 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
         format: "r32float",
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
       });
+      const peakTexture = device.createTexture({
+        size: [binTextureWidth, 1, 1],
+        format: "r32float",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
       const bindGroup = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: { buffer: uniformBuffer } },
           { binding: 1, resource: fftTexture.createView() },
+          { binding: 2, resource: peakTexture.createView() },
         ],
       });
 
@@ -389,6 +448,16 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
           device.queue.writeTexture(
             { texture: fftTexture },
             data,
+            { bytesPerRow: binTextureWidth * 4 },
+            [binTextureWidth, 1, 1],
+          );
+        }
+        if (needsPeakUploadRef.current) {
+          needsPeakUploadRef.current = false;
+          const peakData = peakDataRef.current;
+          device.queue.writeTexture(
+            { texture: peakTexture },
+            peakData,
             { bytesPerRow: binTextureWidth * 4 },
             [binTextureWidth, 1, 1],
           );

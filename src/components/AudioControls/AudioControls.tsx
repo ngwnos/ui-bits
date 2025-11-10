@@ -80,6 +80,7 @@ export default function AudioControls({
   const playPauseLabel = isPlaying ? "Pause audio analysis" : "Play audio analysis";
   const attackWeight = clamp01(attackValue);
   const releaseWeight = clamp01(releaseValue);
+  const peakDecayRate = Math.max(0.001, releaseWeight * 0.25);
 
   const issueSeek = React.useCallback((ratio: number) => {
     const clamped = clamp01(ratio);
@@ -121,6 +122,23 @@ export default function AudioControls({
 
   return (
     <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          width: '100%',
+          minHeight: sliderUnitPx,
+          borderTop: `1px solid ${sideBorderColor}`,
+          borderLeft: `1px solid ${sideBorderColor}`,
+          borderRight: `1px solid ${sideBorderColor}`,
+          borderBottom: `1px solid ${safeA}`,
+          borderTopLeftRadius: 3,
+          borderTopRightRadius: 3,
+          background: safeB,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 0.75rem',
+        }}
+      />
       <AudioPlaybackEngine
         src={audioSrc}
         playing={isPlaying}
@@ -137,7 +155,7 @@ export default function AudioControls({
           borderTop: `1px solid ${sideBorderColor}`,
           borderLeft: `1px solid ${sideBorderColor}`,
           borderRight: `1px solid ${sideBorderColor}`,
-          borderRadius: '3px 3px 0 0',
+          borderRadius: 0,
           borderBottom: 'none',
           overflow: 'hidden',
         }}
@@ -148,6 +166,7 @@ export default function AudioControls({
           maxWidth="100%"
           maxBins={binSliderValue}
           bins={audioBins}
+          peakDecay={peakDecayRate}
           playbackRatio={playheadRatio}
           onScrubStart={handleScrubStart}
           onScrub={handleScrubMove}

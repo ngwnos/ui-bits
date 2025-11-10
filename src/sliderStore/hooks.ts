@@ -68,12 +68,17 @@ export function useSliderActions() {
     setSliderWaveform: (id: SliderId, waveform: Waveform) => dispatch({ type: "setWaveform", id, waveform }),
     setSliderFrequency: (id: SliderId, frequency: number) => dispatch({ type: "setFrequency", id, frequency }),
     setSliderPhase: (id: SliderId, phase: number) => dispatch({ type: "setPhase", id, phase }),
+    setSliderAudioResponse: (id: SliderId, audioResponse: number) => dispatch({ type: "setAudioResponse", id, audioResponse }),
+    setSliderAudioSamplePosition: (id: SliderId, audioSamplePosition: number) => dispatch({ type: "setAudioSamplePosition", id, audioSamplePosition }),
     setColumnDrawerOpen: (ids: SliderId[], open: boolean) => dispatch({ type: "setDrawerOpenBatch", ids, open }),
     setColumnDrawerFeatureEnabled: (ids: SliderId[], enabled: boolean) => dispatch({ type: "setDrawerFeatureEnabledBatch", ids, enabled }),
     setColumnLfoEnabled: (ids: SliderId[], enabled: boolean) => dispatch({ type: "setLfoEnabledBatch", ids, enabled }),
     swapAllSliderColors: () => dispatch({ type: "swapColorsAll" }),
     swapColumnSliderColors: (ids: SliderId[]) => dispatch({ type: "swapColorsColumn", ids }),
     setColumnBorder: (ids: SliderId[], border: SliderBorder) => dispatch({ type: "setBorderColumn", ids, border }),
+    setAudioBins: (bins: number[]) => dispatch({ type: "setAudioBins", bins }),
+    setAudioBinCount: (count: number) => dispatch({ type: "setAudioBinCount", count }),
+    setAudioMaxMagnitude: (magnitude: number) => dispatch({ type: "setAudioMaxMagnitude", magnitude }),
   }), [dispatch]);
 }
 

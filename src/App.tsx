@@ -1300,37 +1300,41 @@ const tabs = [
                 alignItems: 'center',
               }}
             >
-              <AudioControls
-                fontSize={sliderFontSize}
-                colorA={flexoki.red['600']}
-                colorB={flexoki.red['100']}
-                borderStyle={audioBorderStyle}
-              />
-              <button
-                type="button"
-                onClick={cycleAudioBorderStyle}
-                style={{
-                  ...iconButtonStyle,
-                  width: 140,
-                  fontSize: CONTROL_FONT_SIZE,
-                }}
-              >
-                Audio border: {audioBorderStyle.toUpperCase()}
-              </button>
-              <LFOSlider
-                label="Audio Preview"
-                min={0}
-                max={100}
-                step={1}
-                width={720}
-                defaultValue={audioPreviewValue}
-                leftColor={flexoki.base['600']}
-                rightColor={flexoki.base['50']}
-                border="left"
-                fontSize={12}
-                onUserChange={setAudioPreviewValue}
-                onAnimatedUpdate={setAudioPreviewValue}
-              />
+              <div style={{ width: '100%', maxWidth: 'min(720px, 50vw)' }}>
+                <AudioControls
+                  fontSize={sliderFontSize}
+                  colorA={flexoki.red['600']}
+                  colorB={flexoki.red['100']}
+                  borderStyle={audioBorderStyle}
+                />
+              </div>
+              <div style={{ width: '100%', maxWidth: 'min(720px, 50vw)', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={cycleAudioBorderStyle}
+                  style={{
+                    ...iconButtonStyle,
+                    width: 140,
+                    fontSize: CONTROL_FONT_SIZE,
+                  }}
+                >
+                  Audio border: {audioBorderStyle.toUpperCase()}
+                </button>
+                <LFOSlider
+                  label="Audio Preview"
+                  min={0}
+                  max={100}
+                  step={1}
+                  width="100%"
+                  defaultValue={audioPreviewValue}
+                  leftColor={flexoki.base['600']}
+                  rightColor={flexoki.base['50']}
+                  border="left"
+                  fontSize={12}
+                  onUserChange={setAudioPreviewValue}
+                  onAnimatedUpdate={setAudioPreviewValue}
+                />
+              </div>
             </div>
           </Tabs.Content>
         </Tabs.Root>

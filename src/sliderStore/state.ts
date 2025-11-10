@@ -5,6 +5,12 @@ import type { SliderBorder } from "../components/LFOSlider";
 import { DEFAULT_SELECTION_GRID_ID } from "../selectionGridIds";
 import { MATPLOTLIB_GRADIENTS, buildPalette } from "../gradients/matplotlib";
 
+const AUDIO_BIN_CAPACITY = 1024;
+const DEFAULT_AUDIO_BIN_COUNT = AUDIO_BIN_CAPACITY;
+const DEFAULT_AUDIO_MAX_MAGNITUDE = 1;
+const AUDIO_RESPONSE_MIN = -1;
+const AUDIO_RESPONSE_MAX = 1;
+
 export type SliderId = string;
 export type SelectionGridId = string;
 export type SelectionGridAlignment = "left" | "center" | "right";
@@ -45,6 +51,8 @@ export interface SliderRuntimeState {
   waveform: Waveform;
   frequency: number;
   phase: number;
+  audioResponse: number;
+  audioSamplePosition: number;
 }
 
 export interface SliderColumn {
@@ -59,6 +67,9 @@ export interface SliderStoreState {
   customSliderId: SliderId;
   selectionGrids: Record<SelectionGridId, SelectionGridState>;
   selectionGridIds: SelectionGridId[];
+  audioBins: number[];
+  audioBinCount: number;
+  audioMaxMagnitude: number;
 }
 
 export type SliderStoreAction =
@@ -82,7 +93,12 @@ export type SliderStoreAction =
   | { type: "updateSelectionGrid"; id: SelectionGridId; patch: Partial<SelectionGridState> }
   | { type: "toggleSelectionGridInvert"; id: SelectionGridId }
   | { type: "setSelectionGridPalette"; id: SelectionGridId; palette: string[] }
-  | { type: "setSelectionGridPreviewMode"; id: SelectionGridId; previewMode: SelectionGridPreviewMode };
+  | { type: "setSelectionGridPreviewMode"; id: SelectionGridId; previewMode: SelectionGridPreviewMode }
+  | { type: "setAudioBins"; bins: number[] }
+  | { type: "setAudioBinCount"; count: number }
+  | { type: "setAudioMaxMagnitude"; magnitude: number }
+  | { type: "setAudioResponse"; id: SliderId; audioResponse: number }
+  | { type: "setAudioSamplePosition"; id: SliderId; audioSamplePosition: number };
 
 const DEFAULT_SELECTION_PALETTE = buildPalette(MATPLOTLIB_GRADIENTS[0].stops, false).css;
 
@@ -195,7 +211,7 @@ function randomPhase(): number {
   return Math.random() * Math.PI * 2;
 }
 
-const waveformOptions: Waveform[] = ["sine", "triangle", "saw", "square"];
+const waveformOptions: Waveform[] = ["sine", "triangle", "saw", "square", "audio"];
 
 type SliderGroupDefinition = {
   hue: FlexokiHue;
@@ -328,6 +344,7 @@ export function buildInitialState(): SliderStoreState {
   const columns: SliderColumn[] = [];
   const selectionGrids: Record<SelectionGridId, SelectionGridState> = {};
   const selectionGridIds: SelectionGridId[] = [];
+  const audioBins = Array.from({ length: AUDIO_BIN_CAPACITY }, () => 0);
 
   const columnCount = sliderGroups[0]?.variants.length ?? 0;
 
@@ -364,6 +381,8 @@ export function buildInitialState(): SliderStoreState {
         waveform: waveformOptions[Math.floor(Math.random() * waveformOptions.length)],
         frequency: randomFrequency(),
         phase: randomPhase(),
+        audioResponse: 0,
+        audioSamplePosition: 0.5,
       };
       columnSliderIds.push(id);
     });
@@ -400,6 +419,8 @@ export function buildInitialState(): SliderStoreState {
     waveform: waveformOptions[Math.floor(Math.random() * waveformOptions.length)],
     frequency: randomFrequency(),
     phase: randomPhase(),
+    audioResponse: 0,
+    audioSamplePosition: 0.5,
   };
 
   selectionGrids[DEFAULT_SELECTION_GRID_ID] = normalizeSelectionGridState({
@@ -414,6 +435,9 @@ export function buildInitialState(): SliderStoreState {
     customSliderId,
     selectionGrids,
     selectionGridIds,
+    audioBins,
+    audioBinCount: DEFAULT_AUDIO_BIN_COUNT,
+    audioMaxMagnitude: DEFAULT_AUDIO_MAX_MAGNITUDE,
   };
 }
 
@@ -534,6 +558,28 @@ export function sliderStoreReducer(state: SliderStoreState, action: SliderStoreA
           [action.id]: {
             ...state.sliders[action.id],
             phase: action.phase,
+          },
+        },
+      };
+    case "setAudioResponse":
+      return {
+        ...state,
+        sliders: {
+          ...state.sliders,
+          [action.id]: {
+            ...state.sliders[action.id],
+            audioResponse: clamp(action.audioResponse, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX),
+          },
+        },
+      };
+    case "setAudioSamplePosition":
+      return {
+        ...state,
+        sliders: {
+          ...state.sliders,
+          [action.id]: {
+            ...state.sliders[action.id],
+            audioSamplePosition: clamp(action.audioSamplePosition, 0, 1),
           },
         },
       };
@@ -680,6 +726,31 @@ export function sliderStoreReducer(state: SliderStoreState, action: SliderStoreA
           ...state.selectionGrids,
           [action.id]: next,
         },
+      };
+    }
+    case "setAudioBins": {
+      const nextBins = Array.from({ length: AUDIO_BIN_CAPACITY }, (_, index) => action.bins[index] ?? 0);
+      return {
+        ...state,
+        audioBins: nextBins,
+      };
+    }
+    case "setAudioBinCount": {
+      const normalized = Math.max(0, Math.min(AUDIO_BIN_CAPACITY, Math.floor(action.count)));
+      if (state.audioBinCount === normalized) return state;
+      return {
+        ...state,
+        audioBinCount: normalized,
+      };
+    }
+    case "setAudioMaxMagnitude": {
+      const normalized = Number.isFinite(action.magnitude) && action.magnitude > 0
+        ? action.magnitude
+        : DEFAULT_AUDIO_MAX_MAGNITUDE;
+      if (state.audioMaxMagnitude === normalized) return state;
+      return {
+        ...state,
+        audioMaxMagnitude: normalized,
       };
     }
     default:

@@ -1,4 +1,4 @@
-export type Waveform = "sine" | "triangle" | "saw" | "square";
+export type Waveform = "sine" | "triangle" | "saw" | "square" | "audio";
 
 export interface LfoSettings {
   enabled: boolean;
@@ -44,6 +44,8 @@ function evalWaveform(w: Waveform, phase: number): number {
     }
     case "triangle":
       return (2 / Math.PI) * Math.asin(Math.sin(p));
+    case "audio":
+      return Math.sin(p);
     default:
       return Math.sin(p);
   }

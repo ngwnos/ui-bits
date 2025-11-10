@@ -30,34 +30,8 @@ function resolveColors(colorA?: string, colorB?: string) {
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const clampBetween = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
-function applyGaussianBlur(values: Float32Array, sigma: number): Float32Array {
-  if (sigma <= 0) return values;
-  const radius = Math.max(1, Math.floor(sigma * 3));
-  const kernelSize = radius * 2 + 1;
-  const kernel = new Float32Array(kernelSize);
-  const denom = Math.max(Number.EPSILON, 2 * sigma * sigma);
-  let weightSum = 0;
-  for (let i = 0; i < kernelSize; i += 1) {
-    const offset = i - radius;
-    const weight = Math.exp(-(offset * offset) / denom);
-    kernel[i] = weight;
-    weightSum += weight;
-  }
-  for (let i = 0; i < kernelSize; i += 1) {
-    kernel[i] /= weightSum || 1;
-  }
-  const result = new Float32Array(values.length);
-  for (let i = 0; i < values.length; i += 1) {
-    let sample = 0;
-    for (let k = -radius; k <= radius; k += 1) {
-      const idx = clampBetween(i + k, 0, values.length - 1);
-      sample += values[idx] * kernel[k + radius];
-    }
-    result[i] = sample;
-  }
-  return result;
-}
+const roundUnit = (value: number) => Math.round(clamp01(value) * 10) / 10;
+const roundSigma = (value: number) => Math.round(clampBetween(value, 0, 3) * 10) / 10;
 
 export default function AudioControls({
   fontSize,
@@ -70,15 +44,17 @@ export default function AudioControls({
   fftBlurSigma = 0,
   analyserSmoothing = 0.8,
 }: AudioControlsProps) {
+  const analyserSmoothingDefault = clamp01(analyserSmoothing ?? 0.8);
   const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
   const [playheadRatio, setPlayheadRatio] = React.useState<number>(0);
   const [isScrubbing, setIsScrubbing] = React.useState<boolean>(false);
   const [seekCommand, setSeekCommand] = React.useState<{ ratio: number; token: number } | null>(null);
   const seekTokenRef = React.useRef<number>(0);
   const [binSliderValue, setBinSliderValue] = React.useState<number>(256);
-  const [attackValue, setAttackValue] = React.useState<number>(fftAttack);
-  const [releaseValue, setReleaseValue] = React.useState<number>(fftRelease);
-  const smoothedBinsRef = React.useRef<Float32Array | null>(null);
+  const [smoothingValue, setSmoothingValue] = React.useState<number>(() => roundUnit(analyserSmoothingDefault));
+  const [attackValue, setAttackValue] = React.useState<number>(() => roundUnit(fftAttack));
+  const [releaseValue, setReleaseValue] = React.useState<number>(() => roundUnit(fftRelease));
+  const [blurValue, setBlurValue] = React.useState<number>(() => roundSigma(fftBlurSigma ?? 0));
   const clampBins = React.useCallback((value: number) => clampBetween(Math.round(value || 0), 1, 1024), []);
   const { audioBins } = useSliderStoreState();
   const sliderUnitPx = React.useMemo(() => {
@@ -104,8 +80,6 @@ export default function AudioControls({
   const playPauseLabel = isPlaying ? "Pause audio analysis" : "Play audio analysis";
   const attackWeight = clamp01(attackValue);
   const releaseWeight = clamp01(releaseValue);
-  const blurSigma = Math.max(0, fftBlurSigma || 0);
-  const analyserSmoothingValue = clamp01(analyserSmoothing ?? 0.8);
 
   const issueSeek = React.useCallback((ratio: number) => {
     const clamped = clamp01(ratio);
@@ -138,62 +112,12 @@ export default function AudioControls({
   }, [issueSeek]);
 
   React.useEffect(() => {
-    smoothedBinsRef.current = null;
-  }, [attackWeight, releaseWeight]);
+    setSmoothingValue(roundUnit(analyserSmoothingDefault));
+  }, [analyserSmoothingDefault]);
 
   React.useEffect(() => {
-    if (!audioBins || audioBins.length === 0) {
-      smoothedBinsRef.current = null;
-    }
-  }, [audioBins]);
-
-  const smoothedBins = React.useMemo(() => {
-    if (!audioBins || audioBins.length === 0) {
-      smoothedBinsRef.current = null;
-      return undefined;
-    }
-    const previous = smoothedBinsRef.current;
-    const next = new Float32Array(audioBins.length);
-    for (let i = 0; i < audioBins.length; i += 1) {
-      const value = audioBins[i] ?? 0;
-      const prevValue = previous ? previous[i] ?? value : value;
-      const weight = value >= prevValue ? attackWeight : releaseWeight;
-      next[i] = prevValue + (value - prevValue) * weight;
-    }
-    smoothedBinsRef.current = next;
-    return next;
-  }, [audioBins, attackWeight, releaseWeight]);
-
-  const processedBins = React.useMemo(() => {
-    const base = smoothedBins ?? (audioBins ? Float32Array.from(audioBins) : undefined);
-    if (!base) return undefined;
-    if (blurSigma > 0.001) {
-      return applyGaussianBlur(base, blurSigma);
-    }
-    return base;
-  }, [audioBins, smoothedBins, blurSigma]);
-
-  const resizedBins = React.useMemo(() => {
-    const source = processedBins ?? audioBins;
-    if (!source || source.length === 0) return undefined;
-    const targetBins = clampBins(binSliderValue);
-    const sourceLength = source.length;
-    if (targetBins === sourceLength) return source;
-    if (targetBins <= 1) {
-      return [source[0] ?? 0];
-    }
-    const result = new Array<number>(targetBins);
-    for (let i = 0; i < targetBins; i += 1) {
-      const position = (i / (targetBins - 1)) * (sourceLength - 1);
-      const lower = Math.floor(position);
-      const upper = Math.min(sourceLength - 1, lower + 1);
-      const t = position - lower;
-      const lowerValue = source[lower] ?? 0;
-      const upperValue = source[upper] ?? 0;
-      result[i] = lowerValue + (upperValue - lowerValue) * t;
-    }
-    return result;
-  }, [processedBins, audioBins, binSliderValue, clampBins]);
+    setBlurValue(roundSigma(fftBlurSigma ?? 0));
+  }, [fftBlurSigma]);
 
   return (
     <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
@@ -202,7 +126,11 @@ export default function AudioControls({
         playing={isPlaying}
         onProgress={handleProgress}
         seekTarget={seekCommand}
-        analyserSmoothing={analyserSmoothingValue}
+        analyserSmoothing={smoothingValue}
+        attackWeight={attackWeight}
+        releaseWeight={releaseWeight}
+        blurSigma={blurValue}
+        targetBins={clampBins(binSliderValue)}
       />
       <div
         style={{
@@ -219,7 +147,7 @@ export default function AudioControls({
           unitSizePx={sliderUnitPx}
           maxWidth="100%"
           maxBins={binSliderValue}
-          bins={resizedBins ?? processedBins ?? audioBins}
+          bins={audioBins}
           playbackRatio={playheadRatio}
           onScrubStart={handleScrubStart}
           onScrub={handleScrubMove}
@@ -287,7 +215,7 @@ export default function AudioControls({
             flex: 1,
             minWidth: 0,
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
             gap: 8,
             padding: '0 0.5rem 0 0',
           }}
@@ -320,10 +248,10 @@ export default function AudioControls({
             style={{ gap: 0 }}
           />
           <LFOSlider
-            label="Attack"
+            label="Atk"
             min={0}
             max={1}
-            step={0.01}
+            step={0.1}
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
@@ -332,15 +260,16 @@ export default function AudioControls({
             fontSize={fontSize}
             mode="external"
             readExternal={() => attackValue}
-            onUserChange={(value: number) => setAttackValue(clamp01(value))}
-            onAnimatedUpdate={(value: number) => setAttackValue(clamp01(value))}
+            onUserChange={(value: number) => setAttackValue(roundUnit(value))}
+            onAnimatedUpdate={(value: number) => setAttackValue(roundUnit(value))}
+            formatDisplayValue={(value) => value.toFixed(1)}
             style={{ gap: 0 }}
           />
           <LFOSlider
-            label="Release"
+            label="Rel"
             min={0}
             max={1}
-            step={0.01}
+            step={0.1}
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
@@ -349,8 +278,45 @@ export default function AudioControls({
             fontSize={fontSize}
             mode="external"
             readExternal={() => releaseValue}
-            onUserChange={(value: number) => setReleaseValue(clamp01(value))}
-            onAnimatedUpdate={(value: number) => setReleaseValue(clamp01(value))}
+            onUserChange={(value: number) => setReleaseValue(roundUnit(value))}
+            onAnimatedUpdate={(value: number) => setReleaseValue(roundUnit(value))}
+            formatDisplayValue={(value) => value.toFixed(1)}
+            style={{ gap: 0 }}
+          />
+          <LFOSlider
+            label="Smooth"
+            min={0}
+            max={1}
+            step={0.1}
+            width="100%"
+            border="left"
+            borderMask={{ top: false, bottom: false, right: true, left: true }}
+            leftColor={safeA}
+            rightColor={safeB}
+            fontSize={fontSize}
+            mode="external"
+            readExternal={() => smoothingValue}
+            onUserChange={(value: number) => setSmoothingValue(roundUnit(value))}
+            onAnimatedUpdate={(value: number) => setSmoothingValue(roundUnit(value))}
+            formatDisplayValue={(value) => value.toFixed(1)}
+            style={{ gap: 0 }}
+          />
+          <LFOSlider
+            label="σ"
+            min={0}
+            max={3}
+            step={0.1}
+            width="100%"
+            border="left"
+            borderMask={{ top: false, bottom: false, right: true, left: true }}
+            leftColor={safeA}
+            rightColor={safeB}
+            fontSize={fontSize}
+            mode="external"
+            readExternal={() => blurValue}
+            onUserChange={(value: number) => setBlurValue(roundSigma(value))}
+            onAnimatedUpdate={(value: number) => setBlurValue(roundSigma(value))}
+            formatDisplayValue={(value) => value.toFixed(1)}
             style={{ gap: 0 }}
           />
         </div>
@@ -365,6 +331,10 @@ interface AudioPlaybackEngineProps {
   seekTarget?: { ratio: number; token: number } | null;
   onProgress?: (ratio: number) => void;
   analyserSmoothing?: number;
+  attackWeight?: number;
+  releaseWeight?: number;
+  blurSigma?: number;
+  targetBins?: number;
 }
 
 function AudioPlaybackEngine({
@@ -373,6 +343,10 @@ function AudioPlaybackEngine({
   seekTarget,
   onProgress,
   analyserSmoothing = 0.8,
+  attackWeight = 0.6,
+  releaseWeight = 0.2,
+  blurSigma = 0,
+  targetBins = 1024,
 }: AudioPlaybackEngineProps) {
   const {
     setAudioBins,
@@ -388,10 +362,20 @@ function AudioPlaybackEngine({
   const playbackOffsetRef = React.useRef<number>(0);
   const playbackStartedAtRef = React.useRef<number | null>(null);
   const onProgressRef = React.useRef<typeof onProgress>(onProgress);
+  const analyserSmoothingRef = React.useRef<number>(clamp01(analyserSmoothing ?? 0.8));
+  const smoothingBufferRef = React.useRef<Float32Array | null>(null);
 
   React.useEffect(() => {
     onProgressRef.current = onProgress;
   }, [onProgress]);
+
+  React.useEffect(() => {
+    const clamped = clamp01(analyserSmoothing ?? 0.8);
+    analyserSmoothingRef.current = clamped;
+    if (analyserRef.current) {
+      analyserRef.current.smoothingTimeConstant = clamped;
+    }
+  }, [analyserSmoothing]);
 
   const getDuration = React.useCallback(() => audioBufferRef.current?.duration ?? 0, []);
 
@@ -450,7 +434,7 @@ function AudioPlaybackEngine({
         playbackStartedAtRef.current = null;
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = clamp01(analyserSmoothing ?? 0.8);
+        analyser.smoothingTimeConstant = analyserSmoothingRef.current;
         analyserRef.current = analyser;
         bufferRef.current = new Uint8Array(analyser.frequencyBinCount);
         setAudioBinCount(analyser.frequencyBinCount);
@@ -477,7 +461,7 @@ function AudioPlaybackEngine({
       playbackOffsetRef.current = 0;
       playbackStartedAtRef.current = null;
     };
-  }, [analyserSmoothing, setAudioBinCount, setAudioMaxMagnitude, src, stopSourceImmediate]);
+  }, [setAudioBinCount, setAudioMaxMagnitude, src, stopSourceImmediate]);
 
   const stopPlayback = React.useCallback(() => {
     playbackOffsetRef.current = getCurrentPlaybackSeconds();
@@ -493,7 +477,7 @@ function AudioPlaybackEngine({
     }
     const analyser = analyserRef.current ?? audioContext.createAnalyser();
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = clamp01(analyserSmoothing ?? 0.8);
+    analyser.smoothingTimeConstant = analyserSmoothingRef.current;
     analyserRef.current = analyser;
     const normalizedOffset = wrapOffset(typeof offsetSeconds === "number" ? offsetSeconds : getCurrentPlaybackSeconds());
     playbackOffsetRef.current = normalizedOffset;
@@ -514,7 +498,7 @@ function AudioPlaybackEngine({
       bufferRef.current = new Uint8Array(analyser.frequencyBinCount);
       setAudioBinCount(analyser.frequencyBinCount);
     }
-  }, [analyserSmoothing, getCurrentPlaybackSeconds, setAudioBinCount, stopSourceImmediate, wrapOffset]);
+  }, [getCurrentPlaybackSeconds, setAudioBinCount, stopSourceImmediate, wrapOffset]);
 
   React.useEffect(() => {
     if (playing) {
@@ -546,11 +530,21 @@ function AudioPlaybackEngine({
     const data = bufferRef.current;
     if (analyser && data) {
       analyser.getByteFrequencyData(data);
-      const normalized: number[] = new Array(data.length);
+      const normalized = new Float32Array(data.length);
       for (let i = 0; i < data.length; i += 1) {
         normalized[i] = data[i] / 255;
       }
-      setAudioBins(normalized);
+      const processed = processBins(normalized, {
+        attackWeight: clamp01(attackWeight),
+        releaseWeight: clamp01(releaseWeight),
+        blurSigma: Math.max(0, blurSigma || 0),
+        targetBins: clampBetween(Math.round(targetBins || normalized.length), 1, normalized.length),
+        previous: smoothingBufferRef.current,
+      });
+      smoothingBufferRef.current = processed.smoothedSnapshot;
+      const finalBins = processed.resampled;
+      setAudioBins(Array.from(finalBins));
+      setAudioBinCount(finalBins.length);
     }
     const duration = getDuration();
     if (duration > 0) {
@@ -560,4 +554,74 @@ function AudioPlaybackEngine({
   });
 
   return null;
+}
+
+interface ProcessBinsOptions {
+  attackWeight: number;
+  releaseWeight: number;
+  blurSigma: number;
+  targetBins: number;
+  previous: Float32Array | null;
+}
+
+function processBins(source: Float32Array, options: ProcessBinsOptions) {
+  const { attackWeight, releaseWeight, blurSigma, targetBins, previous } = options;
+  const smoothed = new Float32Array(source.length);
+  for (let i = 0; i < source.length; i += 1) {
+    const current = source[i];
+    const prevValue = previous ? previous[i] ?? current : current;
+    const weight = current >= prevValue ? attackWeight : releaseWeight;
+    smoothed[i] = prevValue + (current - prevValue) * weight;
+  }
+  const blurred = blurSigma > 0.001 ? applyGaussianBlur(smoothed, blurSigma) : smoothed;
+  const resampled = resampleBins(blurred, targetBins);
+  return { smoothedSnapshot: smoothed, resampled };
+}
+
+function applyGaussianBlur(values: Float32Array, sigma: number): Float32Array {
+  const radius = Math.max(1, Math.floor(sigma * 3));
+  const kernelSize = radius * 2 + 1;
+  const kernel = new Float32Array(kernelSize);
+  const denom = Math.max(Number.EPSILON, 2 * sigma * sigma);
+  let weightSum = 0;
+  for (let i = 0; i < kernelSize; i += 1) {
+    const offset = i - radius;
+    const weight = Math.exp(-(offset * offset) / denom);
+    kernel[i] = weight;
+    weightSum += weight;
+  }
+  for (let i = 0; i < kernelSize; i += 1) {
+    kernel[i] /= weightSum || 1;
+  }
+  const result = new Float32Array(values.length);
+  for (let i = 0; i < values.length; i += 1) {
+    let sample = 0;
+    for (let k = -radius; k <= radius; k += 1) {
+      const index = clampBetween(i + k, 0, values.length - 1);
+      sample += values[index] * kernel[k + radius];
+    }
+    result[i] = sample;
+  }
+  return result;
+}
+
+function resampleBins(values: Float32Array, targetBins: number): Float32Array {
+  const count = Math.max(1, Math.round(targetBins));
+  if (count === values.length) return values;
+  const result = new Float32Array(count);
+  if (count === 1) {
+    result[0] = values[0] ?? 0;
+    return result;
+  }
+  const maxIndex = values.length - 1;
+  for (let i = 0; i < count; i += 1) {
+    const position = (i / (count - 1)) * maxIndex;
+    const lower = Math.floor(position);
+    const upper = Math.min(maxIndex, lower + 1);
+    const t = position - lower;
+    const lowerValue = values[lower] ?? 0;
+    const upperValue = values[upper] ?? 0;
+    result[i] = lowerValue + (upperValue - lowerValue) * t;
+  }
+  return result;
 }

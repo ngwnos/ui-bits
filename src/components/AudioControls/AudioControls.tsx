@@ -2,7 +2,7 @@ import React from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import AudioFFTWindow from "../AudioFFTWindow/AudioFFTWindow";
 import LFOSlider from "../LFOSlider";
-import { useSliderStoreState, useSliderActions } from "../../sliderStore";
+import { useSliderActions } from "../../sliderStore";
 import { useFrame } from "../LFOSlider";
 import { flexoki } from "../../flexoki";
 
@@ -55,8 +55,9 @@ export default function AudioControls({
   const [attackValue, setAttackValue] = React.useState<number>(() => roundUnit(fftAttack));
   const [releaseValue, setReleaseValue] = React.useState<number>(() => roundUnit(fftRelease));
   const [blurValue, setBlurValue] = React.useState<number>(() => roundSigma(fftBlurSigma ?? 0));
+  const rawFftRef = React.useRef<Uint8Array | null>(null);
+  const [rawFftMeta, setRawFftMeta] = React.useState<{ version: number; binCount: number }>({ version: 0, binCount: 0 });
   const clampBins = React.useCallback((value: number) => clampBetween(Math.round(value || 0), 1, 1024), []);
-  const { audioBins } = useSliderStoreState();
   const sliderUnitPx = React.useMemo(() => {
     const previewFontSize = fontSize || 16;
     const previewPaddingEm = 0.35;
@@ -86,6 +87,18 @@ export default function AudioControls({
     const clamped = clamp01(ratio);
     seekTokenRef.current += 1;
     setSeekCommand({ ratio: clamped, token: seekTokenRef.current });
+  }, []);
+
+  const handleRawFftData = React.useCallback((data: Uint8Array) => {
+    if (!data?.length) return;
+    if (!rawFftRef.current || rawFftRef.current.length !== data.length) {
+      rawFftRef.current = new Uint8Array(data.length);
+    }
+    rawFftRef.current.set(data);
+    setRawFftMeta((prev) => ({
+      version: prev.version + 1,
+      binCount: data.length,
+    }));
   }, []);
 
   const handleProgress = React.useCallback((ratio: number) => {
@@ -149,6 +162,7 @@ export default function AudioControls({
         releaseWeight={releaseWeight}
         blurSigma={blurValue}
         targetBins={clampBins(binSliderValue)}
+        onRawFftFrame={handleRawFftData}
       />
       <div
         style={{
@@ -165,7 +179,6 @@ export default function AudioControls({
           unitSizePx={sliderUnitPx}
           maxWidth="100%"
           maxBins={binSliderValue}
-          bins={audioBins}
           peakDecay={peakDecayRate}
           playbackRatio={playheadRatio}
           onScrubStart={handleScrubStart}
@@ -173,6 +186,12 @@ export default function AudioControls({
           onScrubEnd={handleScrubEnd}
           activeColor={safeA}
           inactiveColor={safeB}
+          rawFftDataRef={rawFftRef}
+          rawFrameVersion={rawFftMeta.version}
+          rawBinCount={rawFftMeta.binCount}
+          attackWeight={attackWeight}
+          releaseWeight={releaseWeight}
+          blurSigma={blurValue}
         />
       </div>
       <div
@@ -354,6 +373,7 @@ interface AudioPlaybackEngineProps {
   releaseWeight?: number;
   blurSigma?: number;
   targetBins?: number;
+  onRawFftFrame?: (data: Uint8Array) => void;
 }
 
 function AudioPlaybackEngine({
@@ -366,6 +386,7 @@ function AudioPlaybackEngine({
   releaseWeight = 0.2,
   blurSigma = 0,
   targetBins = 1024,
+  onRawFftFrame,
 }: AudioPlaybackEngineProps) {
   const {
     setAudioBins,
@@ -569,6 +590,9 @@ function AudioPlaybackEngine({
     const data = bufferRef.current;
     if (analyser && data) {
       analyser.getByteFrequencyData(data);
+      if (onRawFftFrame) {
+        onRawFftFrame(data);
+      }
       const processed = processBinsFromBytes(
         data,
         {

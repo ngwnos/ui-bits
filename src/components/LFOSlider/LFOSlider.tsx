@@ -43,6 +43,13 @@ const visuallyHiddenStyle: React.CSSProperties = {
   border: 0,
 };
 
+const EMPTY_AUDIO_BINS: readonly number[] = [];
+const AUDIO_RESPONSE_MIN = -1;
+const AUDIO_RESPONSE_MAX = 1;
+const AUDIO_RESPONSE_STEP = 0.01;
+const AUDIO_FREQUENCY_MIN = 0;
+const AUDIO_FREQUENCY_MAX = 1;
+const AUDIO_FREQUENCY_STEP = 0.01;
 
 const DRAWER_ICON_DEFS: Array<{
   waveform: Waveform;
@@ -76,6 +83,13 @@ const DRAWER_ICON_DEFS: Array<{
     waveform: 'square',
     label: 'Square',
     path: 'M0 0 H50 V75 H100',
+    lineCap: 'round',
+    lineJoin: 'round',
+  },
+  {
+    waveform: 'audio',
+    label: 'Audio',
+    path: 'M8.333 31.250 V40.625 M25.000 18.750 V53.125 M41.667 9.375 V65.625 M58.333 25.000 V46.875 M75.000 15.625 V56.250 M91.667 31.250 V40.625',
     lineCap: 'round',
     lineJoin: 'round',
   },
@@ -125,6 +139,14 @@ export interface LFOSliderProps {
   parseDisplayValue?: ParseDisplayValueFn;
   displayFormatterPreset?: DisplayValueFormatterPreset;
   displayFormatterPresetOptions?: DisplayFormatterPresetOptions;
+  audioBins?: readonly number[];
+  audioBinCount?: number;
+  audioMaxMagnitude?: number;
+  initialAudioResponse?: number;
+  onAudioResponseChange?: (value: number) => void;
+  initialAudioSamplePosition?: number;
+  onAudioSamplePositionChange?: (value: number) => void;
+  borderMask?: Partial<Record<'top' | 'right' | 'bottom' | 'left', boolean>>;
 };
 
 function LFOSlider({
@@ -167,6 +189,14 @@ function LFOSlider({
   parseDisplayValue,
   displayFormatterPreset,
   displayFormatterPresetOptions,
+  audioBins,
+  audioBinCount,
+  audioMaxMagnitude,
+  initialAudioResponse,
+  onAudioResponseChange,
+  initialAudioSamplePosition,
+  onAudioSamplePositionChange,
+  borderMask,
 }: LFOSliderProps) {
   const precInit = precisionFrom(min, max, step);
   const [text, setText] = useState<string>(() => (defaultValue !== undefined ? Number(defaultValue).toFixed(precInit) : '0'));
@@ -323,6 +353,24 @@ function LFOSlider({
   const phaseOffsetRef = useRef(0);
   const lastEmitMsRef = useRef(0);
   const lastNowSecRef = useRef(0);
+  const [audioResponse, setAudioResponse] = useState<number>(() => clamp(
+    initialAudioResponse ?? 0,
+    AUDIO_RESPONSE_MIN,
+    AUDIO_RESPONSE_MAX,
+  ));
+  useEffect(() => {
+    if (initialAudioResponse === undefined) return;
+    setAudioResponse(clamp(initialAudioResponse, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX));
+  }, [initialAudioResponse]);
+  const [audioSamplePosition, setAudioSamplePosition] = useState<number>(() => clamp(
+    initialAudioSamplePosition ?? 0.5,
+    AUDIO_FREQUENCY_MIN,
+    AUDIO_FREQUENCY_MAX,
+  ));
+  useEffect(() => {
+    if (initialAudioSamplePosition === undefined) return;
+    setAudioSamplePosition(clamp(initialAudioSamplePosition, AUDIO_FREQUENCY_MIN, AUDIO_FREQUENCY_MAX));
+  }, [initialAudioSamplePosition]);
 
   // DOM refs
   const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
@@ -400,6 +448,12 @@ function LFOSlider({
   const fallbackRight = '#f0f0f0';
   const bgLeft = leftColor ?? fallbackLeft;
   const bgRight = rightColor ?? fallbackRight;
+  const normalizedMask = useMemo(() => ({
+    top: borderMask?.top ?? true,
+    right: borderMask?.right ?? true,
+    bottom: borderMask?.bottom ?? true,
+    left: borderMask?.left ?? true,
+  }), [borderMask]);
   const textLeft = bgRight;
   const textRight = bgLeft;
   const gradient = useMemo(
@@ -430,10 +484,10 @@ function LFOSlider({
       backgroundSize: '100% 100%',
       backgroundOrigin: 'padding-box' as const,
       borderRadius: sliderBorderRadius,
-      borderTop: showBorder ? `1px solid ${outerBorderColor}` : '1px solid transparent',
-      borderLeft: `1px solid ${resolvedOuterColor}`,
-      borderRight: `1px solid ${resolvedOuterColor}`,
-      borderBottom: `1px solid ${bgRight}`,
+      borderTop: normalizedMask.top ? (showBorder ? `1px solid ${outerBorderColor}` : '1px solid transparent') : 'none',
+      borderLeft: normalizedMask.left ? `1px solid ${resolvedOuterColor}` : 'none',
+      borderRight: normalizedMask.right ? `1px solid ${resolvedOuterColor}` : 'none',
+      borderBottom: normalizedMask.bottom ? `1px solid ${bgRight}` : 'none',
       boxShadow: showBorder ? 'none' : 'inset 0 0 0 1px rgba(0,0,0,0)',
       backgroundClip: 'padding-box',
       boxSizing: 'border-box' as const,
@@ -446,7 +500,10 @@ function LFOSlider({
       backgroundSize: '100% 100%',
       backgroundOrigin: 'padding-box' as const,
       borderRadius: sliderBorderRadius,
-      border: `1px solid ${resolvedOuterColor}`,
+      borderTop: normalizedMask.top ? (showBorder ? `1px solid ${resolvedOuterColor}` : '1px solid transparent') : 'none',
+      borderRight: normalizedMask.right ? (showBorder ? `1px solid ${resolvedOuterColor}` : '1px solid transparent') : 'none',
+      borderBottom: normalizedMask.bottom ? (showBorder ? `1px solid ${resolvedOuterColor}` : '1px solid transparent') : 'none',
+      borderLeft: normalizedMask.left ? `1px solid ${resolvedOuterColor}` : 'none',
       boxShadow: showBorder ? 'none' : '0 0 0 1px rgba(0,0,0,0)',
       backgroundClip: 'padding-box',
       boxSizing: 'border-box' as const,
@@ -465,12 +522,92 @@ function LFOSlider({
     setPhaseDial(next);
     onPhaseChange?.(next);
   }, [onPhaseChange]);
-  const FREQUENCY_MIN = 0.1;
-  const FREQUENCY_MAX = 2;
-  const FREQUENCY_STEP = 0.01;
+  const handleAudioResponseChange = useCallback((next: number) => {
+    const clamped = clamp(next, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX);
+    setAudioResponse(clamped);
+    onAudioResponseChange?.(clamped);
+  }, [onAudioResponseChange]);
+  const handleAudioSampleChange = useCallback((next: number) => {
+    const clamped = clamp(next, AUDIO_FREQUENCY_MIN, AUDIO_FREQUENCY_MAX);
+    setAudioSamplePosition(clamped);
+    onAudioSamplePositionChange?.(clamped);
+  }, [onAudioSamplePositionChange]);
+  const DEFAULT_FREQUENCY_MIN = 0.1;
+  const DEFAULT_FREQUENCY_MAX = 2;
+  const DEFAULT_FREQUENCY_STEP = 0.01;
+  const isAudioWaveform = activeWaveform === 'audio';
+  const frequencyRange = isAudioWaveform
+    ? {
+      min: AUDIO_FREQUENCY_MIN,
+      max: AUDIO_FREQUENCY_MAX,
+      step: AUDIO_FREQUENCY_STEP,
+    }
+    : {
+      min: DEFAULT_FREQUENCY_MIN,
+      max: DEFAULT_FREQUENCY_MAX,
+      step: DEFAULT_FREQUENCY_STEP,
+    };
+  const frequencySuffix = isAudioWaveform ? undefined : 'Hz';
+  const lfoFrequencyValue = clamp(knobFrequency, DEFAULT_FREQUENCY_MIN, DEFAULT_FREQUENCY_MAX);
+  const audioSampleValue = clamp(audioSamplePosition, AUDIO_FREQUENCY_MIN, AUDIO_FREQUENCY_MAX);
+  const frequencySliderValue = isAudioWaveform ? audioSampleValue : lfoFrequencyValue;
+  const resolvedAudioBins = audioBins ?? EMPTY_AUDIO_BINS;
+  const availableAudioBins = resolvedAudioBins.length;
+  const rawAudioBinCount = Number(audioBinCount);
+  const requestedAudioBinCount = Number.isFinite(rawAudioBinCount)
+    ? Math.floor(rawAudioBinCount)
+    : availableAudioBins;
+  const effectiveAudioBinCount = Math.min(
+    availableAudioBins,
+    Math.max(0, requestedAudioBinCount ?? availableAudioBins),
+  );
+  const rawAudioMaxMagnitude = Number(audioMaxMagnitude);
+  const effectiveAudioMaxMagnitude = Number.isFinite(rawAudioMaxMagnitude) && rawAudioMaxMagnitude > 0
+    ? rawAudioMaxMagnitude
+    : 1;
+  const audioDriveEnabled = isAudioWaveform
+    && availableAudioBins > 0
+    && effectiveAudioBinCount > 0
+    && effectiveAudioMaxMagnitude > 0;
   const PHASE_MIN = 0;
   const PHASE_MAX = Math.PI * 2;
   const PHASE_STEP = Math.PI / 100;
+  const frequencyLabel = isAudioWaveform ? `${label} sample position` : `${label} frequency`;
+  const phaseLabel = isAudioWaveform ? `${label} audio bias` : `${label} phase`;
+  const phaseSliderValue = isAudioWaveform
+    ? clamp(audioResponse, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX)
+    : phaseDial;
+  const phaseSliderMin = isAudioWaveform ? AUDIO_RESPONSE_MIN : PHASE_MIN;
+  const phaseSliderMax = isAudioWaveform ? AUDIO_RESPONSE_MAX : PHASE_MAX;
+  const phaseSliderStep = isAudioWaveform ? AUDIO_RESPONSE_STEP : PHASE_STEP;
+  const phaseSliderSuffix = isAudioWaveform ? undefined : 'rad';
+  const formatPhaseSliderValue = isAudioWaveform
+    ? (value: number) => value.toFixed(2).padStart(5, ' ')
+    : formatPhase;
+  const handlePhaseSliderChange = isAudioWaveform ? handleAudioResponseChange : handlePhaseChange;
+  const handleFrequencySliderChange = isAudioWaveform ? handleAudioSampleChange : handleFrequencyChange;
+  const sampleAudioBinValue = useCallback((position: number): number | null => {
+    if (!audioDriveEnabled || effectiveAudioBinCount <= 0 || !Number.isFinite(drawerValueMin) || !Number.isFinite(drawerValueMax)) {
+      return null;
+    }
+    const ratio = clamp(position, 0, 1);
+    const scaledIndex = Math.min(
+      effectiveAudioBinCount - 1,
+      Math.max(0, Math.floor(ratio * effectiveAudioBinCount)),
+    );
+    const raw = resolvedAudioBins[scaledIndex];
+    if (raw == null || Number.isNaN(raw) || !Number.isFinite(raw)) return null;
+    const bounded = clamp(raw, 0, effectiveAudioMaxMagnitude);
+    if (!Number.isFinite(bounded) || effectiveAudioMaxMagnitude <= 0) return null;
+    const normalized = bounded / effectiveAudioMaxMagnitude;
+    const shaped = applyAudioResponseCurve(normalized, phaseSliderValue);
+    const span = drawerValueMax - drawerValueMin;
+    const mapped = drawerValueMin + shaped * span;
+    if (!Number.isFinite(mapped)) return null;
+    const lo = Math.min(drawerValueMin, drawerValueMax);
+    const hi = Math.max(drawerValueMin, drawerValueMax);
+    return clamp(mapped, lo, hi);
+  }, [audioDriveEnabled, drawerValueMax, drawerValueMin, effectiveAudioBinCount, effectiveAudioMaxMagnitude, phaseSliderValue, resolvedAudioBins]);
   const [measuredWidth, setMeasuredWidth] = useState<number>(() => (
     typeof width === 'number' ? width : Number(width) || 0
   ));
@@ -682,6 +819,13 @@ function LFOSlider({
 
   const frameFn = useCallback((nowSec: number) => {
     lastNowSecRef.current = nowSec;
+    if (audioDriveEnabled) {
+      const sampled = sampleAudioBinValue(audioSampleValue);
+      if (sampled !== null) {
+        applyWaveValue(sampled, nowSec);
+      }
+      return;
+    }
     if (!Number.isFinite(drawerValueMin) || !Number.isFinite(drawerValueMax)) return;
     const activeMode = mode === 'auto'
       ? (lfoEnabled ? 'lfo' : (readExternal ? 'external' : 'manual'))
@@ -694,7 +838,7 @@ function LFOSlider({
         ...lfoSettings,
         phase: phaseBase,
         waveform: activeWaveform,
-        frequency: knobFrequency,
+        frequency: lfoFrequencyValue,
       };
       nextVal = lfoValue(withPhase, nowSec, drawerValueMin, drawerValueMax);
     } else if (activeMode === 'external' && readExternal) {
@@ -705,7 +849,7 @@ function LFOSlider({
     }
     if (nextVal === undefined) return;
     applyWaveValue(nextVal, nowSec);
-  }, [activeWaveform, applyWaveValue, drawerValueMax, drawerValueMin, knobFrequency, phaseDial, lfoEnabled, lfoSettings, mode, readExternal]);
+  }, [activeWaveform, applyWaveValue, audioDriveEnabled, audioSampleValue, drawerValueMax, drawerValueMin, lfoFrequencyValue, lfoEnabled, lfoSettings, mode, phaseDial, readExternal, sampleAudioBinValue]);
   useFrame(frameFn);
   const readLiveValue = useCallback(
     () => valueFromSplit(splitRef.current, min, max, step),
@@ -744,6 +888,14 @@ function LFOSlider({
   useEffect(() => {
     setKnobFrequency(lfoSettings.frequency ?? 0.5);
   }, [lfoSettings.frequency]);
+
+  useEffect(() => {
+    if (!isAudioWaveform) return;
+    setKnobFrequency((prev) => {
+      const clamped = clamp(prev, AUDIO_FREQUENCY_MIN, AUDIO_FREQUENCY_MAX);
+      return Math.abs(prev - clamped) < 1e-6 ? prev : clamped;
+    });
+  }, [isAudioWaveform]);
 
   useEffect(() => {
     setPhaseDial(initialPhase ?? lfoSettings.phase ?? 0);
@@ -1496,10 +1648,10 @@ function LFOSlider({
             })}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: actionGapWide }}>
               <MiniReadoutSlider
-                label={`${label} frequency`}
-                value={knobFrequency}
+                label={frequencyLabel}
+                value={frequencySliderValue}
                 formatValue={formatFrequency}
-                suffix="Hz"
+                suffix={frequencySuffix}
                 fontSize={infoFontSize}
                 minValueWidthCh={5}
                 paddingX={infoPaddingX}
@@ -1507,16 +1659,16 @@ function LFOSlider({
                 borderWidth={infoBorderWidth}
                 bgLeft={bgLeft}
                 bgRight={bgRight}
-                min={FREQUENCY_MIN}
-                max={FREQUENCY_MAX}
-                step={FREQUENCY_STEP}
-                onChange={handleFrequencyChange}
+                min={frequencyRange.min}
+                max={frequencyRange.max}
+                step={frequencyRange.step}
+                onChange={handleFrequencySliderChange}
               />
               <MiniReadoutSlider
-                label={`${label} phase`}
-                value={phaseDial}
-                formatValue={formatPhase}
-                suffix="rad"
+                label={phaseLabel}
+                value={phaseSliderValue}
+                formatValue={formatPhaseSliderValue}
+                suffix={phaseSliderSuffix}
                 fontSize={infoFontSize}
                 minValueWidthCh={5}
                 paddingX={infoPaddingX}
@@ -1524,10 +1676,10 @@ function LFOSlider({
                 borderWidth={infoBorderWidth}
                 bgLeft={bgLeft}
                 bgRight={bgRight}
-                min={PHASE_MIN}
-                max={PHASE_MAX}
-                step={PHASE_STEP}
-                onChange={handlePhaseChange}
+                min={phaseSliderMin}
+                max={phaseSliderMax}
+                step={phaseSliderStep}
+                onChange={handlePhaseSliderChange}
               />
             </div>
           </div>
@@ -1766,3 +1918,14 @@ function MiniReadoutSlider({
 }
 
 export default LFOSlider;
+function applyAudioResponseCurve(value: number, bias: number) {
+  const t = clamp(value, 0, 1);
+  const b = clamp(bias, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX);
+  if (!Number.isFinite(b) || b === 0) return t;
+  if (b > 0) {
+    const gamma = Math.max(0.05, 1 - b * 0.8);
+    return Math.pow(t, gamma);
+  }
+  const gamma = 1 + Math.abs(b) * 4;
+  return Math.pow(t, gamma);
+}

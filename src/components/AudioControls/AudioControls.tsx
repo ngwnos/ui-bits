@@ -299,6 +299,7 @@ export default function AudioControls({
             step={1}
             width="100%"
             border="left"
+            borderMask={{ top: false, bottom: false, right: true, left: true }}
             leftColor={safeA}
             rightColor={safeB}
             fontSize={fontSize}
@@ -325,6 +326,7 @@ export default function AudioControls({
             step={0.01}
             width="100%"
             border="left"
+            borderMask={{ top: false, bottom: false, right: true, left: true }}
             leftColor={safeA}
             rightColor={safeB}
             fontSize={fontSize}
@@ -341,6 +343,7 @@ export default function AudioControls({
             step={0.01}
             width="100%"
             border="left"
+            borderMask={{ top: false, bottom: false, right: true, left: true }}
             leftColor={safeA}
             rightColor={safeB}
             fontSize={fontSize}

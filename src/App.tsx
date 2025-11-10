@@ -1539,19 +1539,21 @@ function AudioControls({
   const textColor = safeA;
   return (
     <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
-      <div
-        style={{
-          border: `1px solid ${seamColor}`,
-          borderRadius: '3px 3px 0 0',
-          borderBottom: 'none',
-          overflow: 'hidden',
-        }}
-      >
-        <AudioFFTWindow
-          heightUnits={8}
-          unitSizePx={sliderUnitPx}
-          maxWidth="100%"
-          bins={audioBins}
+        <div
+          style={{
+            borderTop: `1px solid ${sideBorderColor}`,
+            borderLeft: `1px solid ${sideBorderColor}`,
+            borderRight: `1px solid ${sideBorderColor}`,
+            borderRadius: '3px 3px 0 0',
+            borderBottom: 'none',
+            overflow: 'hidden',
+          }}
+        >
+          <AudioFFTWindow
+            heightUnits={8}
+            unitSizePx={sliderUnitPx}
+            maxWidth="100%"
+            bins={audioBins}
         />
       </div>
       <div

@@ -1,5 +1,10 @@
 import React from "react";
-import { Volume2, VolumeX } from "lucide-react";
+import {
+  ChartColumnIncreasing,
+  ChartSpline,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import AudioFFTWindow from "../AudioFFTWindow/AudioFFTWindow";
 import LFOSlider from "../LFOSlider";
 import { useSliderActions } from "../../sliderStore";
@@ -57,6 +62,7 @@ export default function AudioControls({
   const [blurValue, setBlurValue] = React.useState<number>(() => roundSigma(fftBlurSigma ?? 0));
   const rawFftRef = React.useRef<Uint8Array | null>(null);
   const [rawFftMeta, setRawFftMeta] = React.useState<{ version: number; binCount: number }>({ version: 0, binCount: 0 });
+  const [useDiscreteBins, setUseDiscreteBins] = React.useState<boolean>(true);
   const clampBins = React.useCallback((value: number) => clampBetween(Math.round(value || 0), 1, 1024), []);
   const sliderUnitPx = React.useMemo(() => {
     const previewFontSize = fontSize || 16;
@@ -78,6 +84,9 @@ export default function AudioControls({
       : safeA;
   const textColor = safeA;
   const actionButtonSize = Math.max(18, sliderUnitPx - 8);
+  const interpolationLabel = useDiscreteBins
+    ? "Show interpolated FFT bins"
+    : "Show discrete FFT bins";
   const playPauseLabel = isPlaying ? "Pause audio analysis" : "Play audio analysis";
   const attackWeight = clamp01(attackValue);
   const releaseWeight = clamp01(releaseValue);
@@ -148,10 +157,39 @@ export default function AudioControls({
           background: safeB,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           padding: '0 0.75rem',
+          gap: 8,
         }}
-      />
+      >
+        <button
+          type="button"
+          onClick={() => setUseDiscreteBins((prev) => !prev)}
+          aria-pressed={!useDiscreteBins}
+          aria-label={interpolationLabel}
+          title={interpolationLabel}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            borderRadius: 3,
+            border: `1px solid ${safeA}`,
+            background: useDiscreteBins ? safeA : safeB,
+            color: useDiscreteBins ? safeB : safeA,
+            padding: '0.25rem 0.5rem',
+            cursor: 'pointer',
+            transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
+            fontSize: Math.max(12, fontSize * 0.8),
+          }}
+        >
+          {useDiscreteBins ? (
+            <ChartColumnIncreasing size={Math.max(14, fontSize)} strokeWidth={1.6} />
+          ) : (
+            <ChartSpline size={Math.max(14, fontSize)} strokeWidth={1.6} />
+          )}
+          <span>{useDiscreteBins ? "Discrete" : "Interpolated"}</span>
+        </button>
+      </div>
       <AudioPlaybackEngine
         src={audioSrc}
         playing={isPlaying}
@@ -192,6 +230,7 @@ export default function AudioControls({
           attackWeight={attackWeight}
           releaseWeight={releaseWeight}
           blurSigma={blurValue}
+          discreteBins={useDiscreteBins}
         />
       </div>
       <div

@@ -20,6 +20,7 @@ export interface AudioFFTWindowProps {
   attackWeight?: number;
   releaseWeight?: number;
   blurSigma?: number;
+  discreteBins?: boolean;
 }
 
 type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
@@ -108,6 +109,7 @@ struct Uniforms {
   gravity : f32,
   peakDecay : f32,
   holdSeconds : f32,
+  discreteMode : f32,
 };
 
 @group(0) @binding(0) var<storage, read> rawFft : array<f32>;
@@ -169,6 +171,7 @@ struct Uniforms {
   gravity : f32,
   peakDecay : f32,
   holdSeconds : f32,
+  discreteMode : f32,
 };
 
 struct VertexOutput {
@@ -206,7 +209,13 @@ fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
 fn sampleStateNormalized(u : f32) -> vec2<f32> {
   let bins = max(1.0, uniforms.binCount);
   let maxIndex = max(0.0, bins - 1.0);
-  let scaled = clamp(u, 0.0, 1.0) * maxIndex;
+  let clamped = clamp(u, 0.0, 1.0);
+  if (uniforms.discreteMode > 0.5 || maxIndex <= 0.0) {
+    let scaled = clamp(floor(clamped * bins), 0.0, maxIndex);
+    let discreteIdx = i32(scaled);
+    return textureLoad(stateTexture, vec2<i32>(discreteIdx, 0)).xy;
+  }
+  let scaled = clamped * maxIndex;
   let lower = i32(floor(scaled));
   let upper = i32(min(maxIndex, f32(lower) + 1.0));
   let frac = scaled - f32(lower);
@@ -406,6 +415,7 @@ export default function AudioFFTWindow({
   attackWeight = 0.6,
   releaseWeight = 0.2,
   blurSigma = 0,
+  discreteBins = true,
 }: AudioFFTWindowProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
@@ -422,6 +432,7 @@ export default function AudioFFTWindow({
   const attackWeightRef = React.useRef<number>(Math.max(0, Math.min(1, attackWeight)));
   const releaseWeightRef = React.useRef<number>(Math.max(0, Math.min(1, releaseWeight)));
   const peakDecayRef = React.useRef<number>(Math.max(0.0005, peakDecay));
+  const discreteModeRef = React.useRef<number>(discreteBins ? 1 : 0);
   const maxBinCountRef = React.useRef<number>(Math.max(1, Math.floor(maxBins)));
   const rawUploadPendingRef = React.useRef<boolean>(false);
   const lastTimestampRef = React.useRef<number>(typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -455,6 +466,10 @@ export default function AudioFFTWindow({
   React.useEffect(() => {
     peakDecayRef.current = Math.max(0.0005, peakDecay);
   }, [peakDecay]);
+
+  React.useEffect(() => {
+    discreteModeRef.current = discreteBins ? 1 : 0;
+  }, [discreteBins]);
 
   React.useEffect(() => {
     maxBinCountRef.current = Math.max(1, Math.floor(maxBins));
@@ -630,7 +645,7 @@ export default function AudioFFTWindow({
         uniformArray[15] = PEAK_GRAVITY;
         uniformArray[16] = peakDecayRef.current;
         uniformArray[17] = HOLD_SECONDS;
-        uniformArray[18] = 0;
+        uniformArray[18] = discreteModeRef.current;
         uniformArray[19] = 0;
         queue.writeBuffer(currentResources.uniformBuffer, 0, uniformArray.buffer, uniformArray.byteOffset, uniformArray.byteLength);
 

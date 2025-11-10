@@ -1,6 +1,7 @@
 import React from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import AudioFFTWindow from "../AudioFFTWindow/AudioFFTWindow";
+import LFOSlider from "../LFOSlider";
 import { useSliderStoreState, useSliderActions } from "../../sliderStore";
 import { useFrame } from "../LFOSlider";
 import { flexoki } from "../../flexoki";
@@ -37,6 +38,8 @@ export default function AudioControls({
   const [isScrubbing, setIsScrubbing] = React.useState<boolean>(false);
   const [seekCommand, setSeekCommand] = React.useState<{ ratio: number; token: number } | null>(null);
   const seekTokenRef = React.useRef<number>(0);
+  const [binSliderValue, setBinSliderValue] = React.useState<number>(256);
+  const clampBins = React.useCallback((value: number) => Math.min(1024, Math.max(1, Math.round(value))), []);
   const { audioBins } = useSliderStoreState();
   const sliderUnitPx = React.useMemo(() => {
     const previewFontSize = fontSize || 16;
@@ -59,7 +62,6 @@ export default function AudioControls({
   const textColor = safeA;
   const actionButtonSize = Math.max(18, sliderUnitPx - 8);
   const playPauseLabel = isPlaying ? "Pause audio analysis" : "Play audio analysis";
-  const statusText = isPlaying ? "Playing" : "Paused";
 
   const issueSeek = React.useCallback((ratio: number) => {
     const clamped = clamp01(ratio);
@@ -91,6 +93,27 @@ export default function AudioControls({
     setIsScrubbing(false);
   }, [issueSeek]);
 
+  const resizedBins = React.useMemo(() => {
+    if (!audioBins || audioBins.length === 0) return undefined;
+    const targetBins = clampBins(binSliderValue);
+    const sourceLength = audioBins.length;
+    if (targetBins === sourceLength) return audioBins;
+    if (targetBins <= 1) {
+      return [audioBins[0] ?? 0];
+    }
+    const result = new Array<number>(targetBins);
+    for (let i = 0; i < targetBins; i += 1) {
+      const position = (i / (targetBins - 1)) * (sourceLength - 1);
+      const lower = Math.floor(position);
+      const upper = Math.min(sourceLength - 1, lower + 1);
+      const t = position - lower;
+      const lowerValue = audioBins[lower] ?? 0;
+      const upperValue = audioBins[upper] ?? 0;
+      result[i] = lowerValue + (upperValue - lowerValue) * t;
+    }
+    return result;
+  }, [audioBins, binSliderValue, clampBins]);
+
   return (
     <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
       <AudioPlaybackEngine
@@ -113,7 +136,8 @@ export default function AudioControls({
           heightUnits={8}
           unitSizePx={sliderUnitPx}
           maxWidth="100%"
-          bins={audioBins}
+          maxBins={binSliderValue}
+          bins={resizedBins ?? audioBins}
           playbackRatio={playheadRatio}
           onScrubStart={handleScrubStart}
           onScrub={handleScrubMove}
@@ -125,7 +149,7 @@ export default function AudioControls({
       <div
         style={{
           width: '100%',
-          height: sliderUnitPx,
+          minHeight: sliderUnitPx,
           borderTop: `1px solid ${seamColor}`,
           borderLeft: `1px solid ${sideBorderColor}`,
           borderRight: `1px solid ${sideBorderColor}`,
@@ -136,38 +160,74 @@ export default function AudioControls({
           color: textColor,
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '0 0.75rem',
+          overflow: 'hidden',
         }}
       >
-        <button
-          type="button"
-          onClick={() => setIsPlaying((prev) => !prev)}
-          aria-pressed={isPlaying}
-          aria-label={playPauseLabel}
-          title={playPauseLabel}
+        <div
           style={{
-            width: actionButtonSize,
-            height: actionButtonSize,
-            borderRadius: 3,
-            border: `1px solid ${safeA}`,
-            background: isPlaying ? safeA : safeB,
-            color: isPlaying ? safeB : safeA,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: 0,
-            cursor: 'pointer',
-            transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
+            flexShrink: 0,
+            width: actionButtonSize + 6,
           }}
         >
-          {isPlaying ? (
-            <Volume2 size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
-          ) : (
-            <VolumeX size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
-          )}
-        </button>
-        <span style={{ fontSize: Math.max(10, fontSize - 2), fontWeight: 600 }}>{statusText}</span>
+          <button
+            type="button"
+            onClick={() => setIsPlaying((prev) => !prev)}
+            aria-pressed={isPlaying}
+            aria-label={playPauseLabel}
+            title={playPauseLabel}
+            style={{
+              width: actionButtonSize,
+              height: actionButtonSize,
+              borderRadius: 3,
+              border: `1px solid ${safeA}`,
+              background: isPlaying ? safeA : safeB,
+              color: isPlaying ? safeB : safeA,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              cursor: 'pointer',
+              transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
+            }}
+          >
+            {isPlaying ? (
+              <Volume2 size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
+            ) : (
+              <VolumeX size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
+            )}
+          </button>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <LFOSlider
+            label="Bins"
+            min={1}
+            max={1024}
+            step={1}
+            width="100%"
+            border="none"
+            leftColor={safeA}
+            rightColor={safeB}
+            fontSize={fontSize}
+            mode="external"
+            readExternal={() => binSliderValue}
+            onUserChange={(value: number) => {
+              setBinSliderValue((prev) => {
+                const next = clampBins(value);
+                return prev === next ? prev : next;
+              });
+            }}
+            onAnimatedUpdate={(value: number) => {
+              setBinSliderValue((prev) => {
+                const next = clampBins(value);
+                return prev === next ? prev : next;
+              });
+            }}
+            style={{ gap: 0 }}
+          />
+        </div>
       </div>
     </div>
   );

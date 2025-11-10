@@ -313,7 +313,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   let bins = max(1.0, uniforms.binCount);
   let dims = textureDimensions(fftTexture);
   let texWidth = max(1.0, f32(dims.x));
-  let indexF = clamp(round(in.uv.x * (bins - 1.0)), 0.0, bins - 1.0);
+  let indexF = clamp(floor(in.uv.x * bins), 0.0, bins - 1.0);
   let clampedIndex = clamp(indexF, 0.0, texWidth - 1.0);
   let amplitude = textureLoad(fftTexture, vec2<i32>(i32(clampedIndex), 0), 0).r;
   let normalized = clamp(amplitude, 0.0, 1.0);

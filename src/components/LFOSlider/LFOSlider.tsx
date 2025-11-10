@@ -50,6 +50,9 @@ const AUDIO_RESPONSE_STEP = 0.01;
 const AUDIO_FREQUENCY_MIN = 0;
 const AUDIO_FREQUENCY_MAX = 1;
 const AUDIO_FREQUENCY_STEP = 0.01;
+const LFO_FREQUENCY_MIN_DEFAULT = 0.1;
+const LFO_FREQUENCY_MAX_DEFAULT = 2;
+const LFO_FREQUENCY_STEP_DEFAULT = 0.01;
 
 const DRAWER_ICON_DEFS: Array<{
   waveform: Waveform;
@@ -108,6 +111,12 @@ export interface LFOSliderProps {
   width?: number | string;
   drawerLines?: [number, number];
   lfoRange?: [number, number];
+  lfoFrequencyMin?: number;
+  lfoFrequencyMax?: number;
+  lfoFrequencyStep?: number;
+  audioFrequencyMin?: number;
+  audioFrequencyMax?: number;
+  audioFrequencyStep?: number;
   leftColor?: string;
   rightColor?: string;
   border?: SliderBorder;
@@ -158,6 +167,12 @@ function LFOSlider({
   width,
   drawerLines,
   lfoRange,
+  lfoFrequencyMin,
+  lfoFrequencyMax,
+  lfoFrequencyStep,
+  audioFrequencyMin,
+  audioFrequencyMax,
+  audioFrequencyStep,
   leftColor,
   rightColor,
   border = 'left',
@@ -198,6 +213,12 @@ function LFOSlider({
   onAudioSamplePositionChange,
   borderMask,
 }: LFOSliderProps) {
+  const resolvedLfoFrequencyMin = lfoFrequencyMin ?? LFO_FREQUENCY_MIN_DEFAULT;
+  const resolvedLfoFrequencyMax = lfoFrequencyMax ?? LFO_FREQUENCY_MAX_DEFAULT;
+  const resolvedLfoFrequencyStep = lfoFrequencyStep ?? LFO_FREQUENCY_STEP_DEFAULT;
+  const resolvedAudioFrequencyMin = audioFrequencyMin ?? AUDIO_FREQUENCY_MIN;
+  const resolvedAudioFrequencyMax = audioFrequencyMax ?? AUDIO_FREQUENCY_MAX;
+  const resolvedAudioFrequencyStep = audioFrequencyStep ?? AUDIO_FREQUENCY_STEP;
   const precInit = precisionFrom(min, max, step);
   const [text, setText] = useState<string>(() => (defaultValue !== undefined ? Number(defaultValue).toFixed(precInit) : '0'));
   const lfoSettings = useMemo<LfoSettings>(() => {
@@ -228,7 +249,11 @@ function LFOSlider({
   const [activeWaveform, setActiveWaveform] = useState<Waveform>(defaultWaveform);
   const initialLfoEnabled = lfoRunning ?? (showLfoControls ? false : (lfoSettings.enabled ?? true));
   const [lfoEnabled, setLfoEnabled] = useState<boolean>(initialLfoEnabled);
-  const [knobFrequency, setKnobFrequency] = useState<number>(initialFrequency ?? lfoSettings.frequency ?? 0.5);
+  const [knobFrequency, setKnobFrequency] = useState<number>(() => clamp(
+    initialFrequency ?? lfoSettings.frequency ?? 0.5,
+    resolvedLfoFrequencyMin,
+    resolvedLfoFrequencyMax,
+  ));
   const [phaseDial, setPhaseDial] = useState<number>(initialPhase ?? lfoSettings.phase ?? 0);
 
   useEffect(() => {
@@ -364,13 +389,13 @@ function LFOSlider({
   }, [initialAudioResponse]);
   const [audioSamplePosition, setAudioSamplePosition] = useState<number>(() => clamp(
     initialAudioSamplePosition ?? 0.5,
-    AUDIO_FREQUENCY_MIN,
-    AUDIO_FREQUENCY_MAX,
+    resolvedAudioFrequencyMin,
+    resolvedAudioFrequencyMax,
   ));
   useEffect(() => {
     if (initialAudioSamplePosition === undefined) return;
-    setAudioSamplePosition(clamp(initialAudioSamplePosition, AUDIO_FREQUENCY_MIN, AUDIO_FREQUENCY_MAX));
-  }, [initialAudioSamplePosition]);
+    setAudioSamplePosition(clamp(initialAudioSamplePosition, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax));
+  }, [initialAudioSamplePosition, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
 
   // DOM refs
   const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
@@ -515,9 +540,10 @@ function LFOSlider({
   const formatFrequency = (value: number) => value.toFixed(2).padStart(5, ' ');
   const formatPhase = (value: number) => `${(value / Math.PI).toFixed(2).padStart(5, ' ')}π`;
   const handleFrequencyChange = useCallback((next: number) => {
-    setKnobFrequency(next);
-    onFrequencyChange?.(next);
-  }, [onFrequencyChange]);
+    const clamped = clamp(next, resolvedLfoFrequencyMin, resolvedLfoFrequencyMax);
+    setKnobFrequency(clamped);
+    onFrequencyChange?.(clamped);
+  }, [onFrequencyChange, resolvedLfoFrequencyMax, resolvedLfoFrequencyMin]);
   const handlePhaseChange = useCallback((next: number) => {
     setPhaseDial(next);
     onPhaseChange?.(next);
@@ -528,28 +554,25 @@ function LFOSlider({
     onAudioResponseChange?.(clamped);
   }, [onAudioResponseChange]);
   const handleAudioSampleChange = useCallback((next: number) => {
-    const clamped = clamp(next, AUDIO_FREQUENCY_MIN, AUDIO_FREQUENCY_MAX);
+    const clamped = clamp(next, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax);
     setAudioSamplePosition(clamped);
     onAudioSamplePositionChange?.(clamped);
-  }, [onAudioSamplePositionChange]);
-  const DEFAULT_FREQUENCY_MIN = 0.1;
-  const DEFAULT_FREQUENCY_MAX = 2;
-  const DEFAULT_FREQUENCY_STEP = 0.01;
+  }, [onAudioSamplePositionChange, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
   const isAudioWaveform = activeWaveform === 'audio';
   const frequencyRange = isAudioWaveform
     ? {
-      min: AUDIO_FREQUENCY_MIN,
-      max: AUDIO_FREQUENCY_MAX,
-      step: AUDIO_FREQUENCY_STEP,
+      min: resolvedAudioFrequencyMin,
+      max: resolvedAudioFrequencyMax,
+      step: resolvedAudioFrequencyStep,
     }
     : {
-      min: DEFAULT_FREQUENCY_MIN,
-      max: DEFAULT_FREQUENCY_MAX,
-      step: DEFAULT_FREQUENCY_STEP,
+      min: resolvedLfoFrequencyMin,
+      max: resolvedLfoFrequencyMax,
+      step: resolvedLfoFrequencyStep,
     };
   const frequencySuffix = isAudioWaveform ? undefined : 'Hz';
-  const lfoFrequencyValue = clamp(knobFrequency, DEFAULT_FREQUENCY_MIN, DEFAULT_FREQUENCY_MAX);
-  const audioSampleValue = clamp(audioSamplePosition, AUDIO_FREQUENCY_MIN, AUDIO_FREQUENCY_MAX);
+  const lfoFrequencyValue = clamp(knobFrequency, resolvedLfoFrequencyMin, resolvedLfoFrequencyMax);
+  const audioSampleValue = clamp(audioSamplePosition, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax);
   const frequencySliderValue = isAudioWaveform ? audioSampleValue : lfoFrequencyValue;
   const resolvedAudioBins = audioBins ?? EMPTY_AUDIO_BINS;
   const availableAudioBins = resolvedAudioBins.length;
@@ -886,16 +909,20 @@ function LFOSlider({
   }, [activeWaveform, knobFrequency, phaseDial, lfoSettings.depth, lfoSettings.offset]);
 
   useEffect(() => {
-    setKnobFrequency(lfoSettings.frequency ?? 0.5);
-  }, [lfoSettings.frequency]);
+    setKnobFrequency(clamp(
+      lfoSettings.frequency ?? 0.5,
+      resolvedLfoFrequencyMin,
+      resolvedLfoFrequencyMax,
+    ));
+  }, [lfoSettings.frequency, resolvedLfoFrequencyMax, resolvedLfoFrequencyMin]);
 
   useEffect(() => {
     if (!isAudioWaveform) return;
     setKnobFrequency((prev) => {
-      const clamped = clamp(prev, AUDIO_FREQUENCY_MIN, AUDIO_FREQUENCY_MAX);
+      const clamped = clamp(prev, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax);
       return Math.abs(prev - clamped) < 1e-6 ? prev : clamped;
     });
-  }, [isAudioWaveform]);
+  }, [isAudioWaveform, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
 
   useEffect(() => {
     setPhaseDial(initialPhase ?? lfoSettings.phase ?? 0);

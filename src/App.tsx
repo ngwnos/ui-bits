@@ -15,6 +15,8 @@ import {
   Square,
   SquareDashed,
   Sun,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import {
@@ -24,9 +26,11 @@ import {
   Dropdown,
   SegmentBar,
 } from "./components";
+import AudioFFTWindow from "./components/AudioFFTWindow/AudioFFTWindow";
 import type { SegmentBarBorderStyle } from "./components";
 import LFOSlider, {
   FrameLoopProvider,
+  useFrame,
   type SliderBorder,
   createDayOfYearFormatter,
   createTimeFormatter,
@@ -401,6 +405,7 @@ function ConnectedSlider({
   const definition = useSliderDefinition(sliderId);
   const state = useSliderState(sliderId);
   const actions = useSliderActions();
+  const { audioBins, audioBinCount, audioMaxMagnitude } = useSliderStoreState();
   const resolvedWidth = widthOverride ?? definition.width;
 
   return (
@@ -422,6 +427,8 @@ function ConnectedSlider({
       initialWaveform={state.waveform}
       initialFrequency={state.frequency}
       initialPhase={state.phase}
+      initialAudioResponse={state.audioResponse}
+      initialAudioSamplePosition={state.audioSamplePosition}
       onUserChange={(value: number) => actions.setSliderValue(sliderId, value)}
       onAnimatedUpdate={(value: number) => actions.setSliderValue(sliderId, value)}
       onDrawerOpenChange={(open: boolean) => actions.setSliderDrawerOpen(sliderId, open)}
@@ -430,9 +437,139 @@ function ConnectedSlider({
       onWaveformChange={(waveform: Waveform) => actions.setSliderWaveform(sliderId, waveform)}
       onFrequencyChange={(frequency: number) => actions.setSliderFrequency(sliderId, frequency)}
       onPhaseChange={(phase: number) => actions.setSliderPhase(sliderId, phase)}
+      onAudioResponseChange={(value: number) => actions.setSliderAudioResponse(sliderId, value)}
+      onAudioSamplePositionChange={(value: number) => actions.setSliderAudioSamplePosition(sliderId, value)}
+      audioBins={audioBins}
+      audioBinCount={audioBinCount}
+      audioMaxMagnitude={audioMaxMagnitude}
       style={isFullWidth ? { width: '100%' } : undefined}
     />
   );
+}
+
+function AudioFFTDriver({ src, playing }: { src: string; playing: boolean }) {
+  const {
+    setAudioBins,
+    setAudioBinCount,
+    setAudioMaxMagnitude,
+  } = useSliderActions();
+  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const analyserRef = React.useRef<AnalyserNode | null>(null);
+  const bufferRef = React.useRef<Uint8Array | null>(null);
+  const sourceRef = React.useRef<AudioBufferSourceNode | null>(null);
+  const silentGainRef = React.useRef<GainNode | null>(null);
+  const audioBufferRef = React.useRef<AudioBuffer | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function loadAudio() {
+      try {
+        const audioContext = new AudioContext();
+        audioContextRef.current = audioContext;
+        const response = await fetch(src);
+        if (!response.ok) throw new Error(`Failed to load audio sample: ${response.status}`);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        if (cancelled) {
+          audioContext.close();
+          return;
+        }
+        audioBufferRef.current = audioBuffer;
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.8;
+        analyserRef.current = analyser;
+        bufferRef.current = new Uint8Array(analyser.frequencyBinCount);
+        setAudioBinCount(analyser.frequencyBinCount);
+        setAudioMaxMagnitude(1);
+      } catch (error) {
+        console.error("Failed to load audio for FFT", error);
+      }
+    }
+    loadAudio();
+    return () => {
+      cancelled = true;
+      analyserRef.current = null;
+      bufferRef.current = null;
+      try {
+        sourceRef.current?.stop();
+      } catch {
+        // ignore
+      }
+      sourceRef.current?.disconnect();
+      silentGainRef.current?.disconnect();
+      audioContextRef.current?.close();
+      audioContextRef.current = null;
+      sourceRef.current = null;
+      silentGainRef.current = null;
+      audioBufferRef.current = null;
+    };
+  }, [setAudioBinCount, setAudioMaxMagnitude, src]);
+
+  const stopPlayback = React.useCallback(() => {
+    try {
+      sourceRef.current?.stop();
+    } catch {
+      // ignore
+    }
+    sourceRef.current?.disconnect();
+    silentGainRef.current?.disconnect();
+    sourceRef.current = null;
+    silentGainRef.current = null;
+  }, []);
+
+  const startPlayback = React.useCallback(async () => {
+    if (!audioBufferRef.current || !audioContextRef.current) return;
+    stopPlayback();
+    const audioContext = audioContextRef.current;
+    if (audioContext.state === "suspended") {
+      await audioContext.resume().catch(() => {});
+    }
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBufferRef.current;
+    source.loop = true;
+    const analyser = analyserRef.current ?? audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.8;
+    analyserRef.current = analyser;
+    const silentGain = audioContext.createGain();
+    silentGain.gain.value = 0;
+    source.connect(analyser);
+    analyser.connect(silentGain);
+    silentGain.connect(audioContext.destination);
+    source.start(0);
+    sourceRef.current = source;
+    silentGainRef.current = silentGain;
+    if (!bufferRef.current) {
+      bufferRef.current = new Uint8Array(analyser.frequencyBinCount);
+      setAudioBinCount(analyser.frequencyBinCount);
+    }
+  }, [setAudioBinCount, stopPlayback]);
+
+  React.useEffect(() => {
+    if (playing) {
+      startPlayback();
+    } else {
+      stopPlayback();
+    }
+    return () => {
+      stopPlayback();
+    };
+  }, [playing, startPlayback, stopPlayback]);
+
+  useFrame(() => {
+    const analyser = analyserRef.current;
+    const data = bufferRef.current;
+    if (!analyser || !data) return;
+    analyser.getByteFrequencyData(data);
+    const normalized: number[] = new Array(data.length);
+    for (let i = 0; i < data.length; i += 1) {
+      normalized[i] = data[i] / 255;
+    }
+    setAudioBins(normalized);
+  });
+
+  return null;
 }
 
 function EditableRectPOC() {
@@ -477,6 +614,14 @@ function EditableRectPOC() {
       const index = SEGMENT_BORDER_STYLES.indexOf(prev);
       const next = SEGMENT_BORDER_STYLES[(index + 1) % SEGMENT_BORDER_STYLES.length];
       return next;
+    });
+  };
+
+  const cycleAudioBorderStyle = () => {
+    setAudioBorderStyle((prev) => {
+      if (prev === 'a') return 'b';
+      if (prev === 'b') return 'none';
+      return 'a';
     });
   };
   const handleTogglePalette = () => {
@@ -543,6 +688,9 @@ function EditableRectPOC() {
   }, [customDefinition.width]);
 
   const [sliderFontSize, setSliderFontSize] = React.useState<number>(12);
+  const [audioPreviewValue, setAudioPreviewValue] = React.useState<number>(42);
+  const [audioBorderStyle, setAudioBorderStyle] = React.useState<'a' | 'b' | 'none'>('a');
+  const [audioPlaying, setAudioPlaying] = React.useState<boolean>(false);
   const CONTROL_FONT_SIZE = 12;
   const columnGap = 5;
   const MAX_COLUMN_WIDTH = 440;
@@ -558,6 +706,7 @@ const tabs = [
     { value: 'dropdown', label: 'Dropdown' },
     { value: 'selection-grid', label: 'Selection Grid' },
     { value: 'typegpu-test', label: 'TypeGPU Test' },
+    { value: 'audio-controls', label: 'Audio Controls' },
   ];
   const tabsRootStyle: React.CSSProperties = {
     display: 'flex',
@@ -708,6 +857,7 @@ const tabs = [
 
   return (
     <FrameLoopProvider>
+      <AudioFFTDriver src="/audio/credits.mp3" playing={audioPlaying} />
       <div
         style={{
           display: 'flex',
@@ -735,35 +885,55 @@ const tabs = [
             ))}
           </Tabs.List>
           <Tabs.Content value="lfo-slider" style={tabBodyStyle}>
-            <button
-              type="button"
-              onClick={handleTogglePalette}
-              aria-pressed={previewDarkMode}
-              aria-label={previewDarkMode ? 'Switch to light preview' : 'Switch to dark preview'}
-              style={{
-                width: columnButtonSize,
-                height: columnButtonSize,
-                borderRadius: 3,
-                border: `1px solid ${previewDarkMode ? flexoki.purple['100'] : flexoki.yellow['700']}`,
-                background: previewDarkMode ? flexoki.purple['700'] : flexoki.yellow['100'],
-                color: previewDarkMode ? flexoki.purple['100'] : flexoki.yellow['700'],
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: CONTROL_FONT_SIZE,
-                fontWeight: 600,
-                lineHeight: 1,
-                userSelect: 'none',
-                padding: 2,
-              }}
-            >
-              {previewDarkMode ? (
-                <Moon size={toggleIconSize} strokeWidth={1.8} />
-              ) : (
-                <Sun size={toggleIconSize} strokeWidth={1.8} />
-              )}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleTogglePalette}
+                aria-pressed={previewDarkMode}
+                aria-label={previewDarkMode ? 'Switch to light preview' : 'Switch to dark preview'}
+                style={{
+                  width: columnButtonSize,
+                  height: columnButtonSize,
+                  borderRadius: 3,
+                  border: `1px solid ${previewDarkMode ? flexoki.purple['100'] : flexoki.yellow['700']}`,
+                  background: previewDarkMode ? flexoki.purple['700'] : flexoki.yellow['100'],
+                  color: previewDarkMode ? flexoki.purple['100'] : flexoki.yellow['700'],
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: CONTROL_FONT_SIZE,
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  userSelect: 'none',
+                  padding: 2,
+                }}
+              >
+                {previewDarkMode ? (
+                  <Moon size={toggleIconSize} strokeWidth={1.8} />
+                ) : (
+                  <Sun size={toggleIconSize} strokeWidth={1.8} />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAudioPlaying((prev) => !prev)}
+                aria-pressed={audioPlaying}
+                aria-label={audioPlaying ? "Pause audio analysis" : "Start audio analysis"}
+                title={audioPlaying ? "Pause audio-driven sliders" : "Start audio-driven sliders"}
+                style={{
+                  ...iconButtonStyle,
+                  background: audioPlaying ? flexoki.green['500'] : iconButtonStyle.background,
+                  color: audioPlaying ? flexoki.base['50'] : iconButtonStyle.color,
+                }}
+              >
+                {audioPlaying ? (
+                  <Volume2 size={toggleIconSize} strokeWidth={1.8} />
+                ) : (
+                  <VolumeX size={toggleIconSize} strokeWidth={1.8} />
+                )}
+              </button>
+            </div>
             <div style={fontSizeControlStyle}>
               <button
                 type="button"
@@ -1267,6 +1437,49 @@ const tabs = [
           <Tabs.Content value="typegpu-test" style={tabBodyStyle}>
             <TypeGPUTest />
           </Tabs.Content>
+          <Tabs.Content value="audio-controls" style={tabBodyStyle}>
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+                alignItems: 'center',
+              }}
+            >
+            <AudioControls
+              fontSize={sliderFontSize}
+              colorA={flexoki.red['600']}
+              colorB={flexoki.red['100']}
+              borderStyle={audioBorderStyle}
+            />
+            <button
+              type="button"
+              onClick={cycleAudioBorderStyle}
+              style={{
+                ...iconButtonStyle,
+                width: 140,
+                fontSize: CONTROL_FONT_SIZE,
+              }}
+            >
+              Audio border: {audioBorderStyle.toUpperCase()}
+            </button>
+              <LFOSlider
+                label="Audio Preview"
+                min={0}
+                max={100}
+                step={1}
+                width={720}
+                defaultValue={audioPreviewValue}
+                leftColor={flexoki.base['600']}
+                rightColor={flexoki.base['50']}
+                border="left"
+                fontSize={12}
+                onUserChange={setAudioPreviewValue}
+                onAnimatedUpdate={setAudioPreviewValue}
+              />
+            </div>
+          </Tabs.Content>
         </Tabs.Root>
       </div>
     </FrameLoopProvider>
@@ -1278,5 +1491,83 @@ export default function App() {
     <SliderStoreProvider>
       <EditableRectPOC />
     </SliderStoreProvider>
+  );
+}
+
+type AudioControlsBorder = 'a' | 'b' | 'none';
+
+interface AudioControlsProps {
+  fontSize: number;
+  colorA?: string;
+  colorB?: string;
+  borderStyle?: AudioControlsBorder;
+}
+
+function resolveColors(colorA?: string, colorB?: string) {
+  const fallbackA = flexoki.base['700'];
+  const fallbackB = flexoki.base['100'];
+  const safeA = colorA ?? fallbackA;
+  const safeB = colorB ?? fallbackB;
+  return { safeA, safeB };
+}
+
+function AudioControls({
+  fontSize,
+  colorA,
+  colorB,
+  borderStyle = 'a',
+}: AudioControlsProps) {
+  const { audioBins } = useSliderStoreState();
+  const sliderUnitPx = React.useMemo(() => {
+    const previewFontSize = fontSize || 16;
+    const previewPaddingEm = 0.35;
+    const previewPaddingPx = previewFontSize * previewPaddingEm;
+    const previewLineHeight = 1;
+    const baseLabelHeight = previewFontSize * previewLineHeight;
+    return Math.max(
+      Math.round(baseLabelHeight + previewPaddingPx * 2 + 2),
+      Math.round(previewFontSize + previewPaddingPx * 1.5),
+    );
+  }, [fontSize]);
+  const { safeA, safeB } = resolveColors(colorA, colorB);
+  const seamColor = safeA;
+  const sideBorderColor = borderStyle === 'none'
+    ? "transparent"
+    : borderStyle === 'b'
+      ? safeB
+      : safeA;
+  const textColor = safeA;
+  return (
+    <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          border: `1px solid ${seamColor}`,
+          borderRadius: '3px 3px 0 0',
+          borderBottom: 'none',
+          overflow: 'hidden',
+        }}
+      >
+        <AudioFFTWindow
+          heightUnits={8}
+          unitSizePx={sliderUnitPx}
+          maxWidth="100%"
+          bins={audioBins}
+        />
+      </div>
+      <div
+        style={{
+          width: '100%',
+          height: sliderUnitPx,
+          borderTop: `1px solid ${seamColor}`,
+          borderLeft: `1px solid ${sideBorderColor}`,
+          borderRight: `1px solid ${sideBorderColor}`,
+          borderBottom: `1px solid ${sideBorderColor}`,
+          borderBottomLeftRadius: 3,
+          borderBottomRightRadius: 3,
+          background: safeB,
+          color: textColor,
+        }}
+      />
+    </div>
   );
 }

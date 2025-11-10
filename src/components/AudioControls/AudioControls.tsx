@@ -382,7 +382,16 @@ function AudioPlaybackEngine({
   const playbackStartedAtRef = React.useRef<number | null>(null);
   const onProgressRef = React.useRef<typeof onProgress>(onProgress);
   const analyserSmoothingRef = React.useRef<number>(clamp01(analyserSmoothing ?? 0.8));
-  const smoothingBufferRef = React.useRef<Float32Array | null>(null);
+  const smoothingStateRef = React.useRef<SmoothingState>({
+    previous: null,
+    scratch: null,
+    length: 0,
+    hasHistory: false,
+  });
+  const blurBufferRef = React.useRef<Float32Array | null>(null);
+  const resampleBufferRef = React.useRef<Float32Array | null>(null);
+  const gaussianKernelCacheRef = React.useRef<Map<number, GaussianKernel>>(new Map());
+  const lastBinCountRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     onProgressRef.current = onProgress;
@@ -431,6 +440,7 @@ function AudioPlaybackEngine({
   }, []);
 
   React.useEffect(() => {
+    const kernelCache = gaussianKernelCacheRef.current;
     let cancelled = false;
     async function loadAudio() {
       try {
@@ -479,6 +489,16 @@ function AudioPlaybackEngine({
       audioBufferRef.current = null;
       playbackOffsetRef.current = 0;
       playbackStartedAtRef.current = null;
+      smoothingStateRef.current = {
+        previous: null,
+        scratch: null,
+        length: 0,
+        hasHistory: false,
+      };
+      blurBufferRef.current = null;
+      resampleBufferRef.current = null;
+      kernelCache.clear();
+      lastBinCountRef.current = null;
     };
   }, [setAudioBinCount, setAudioMaxMagnitude, src, stopSourceImmediate]);
 
@@ -549,21 +569,25 @@ function AudioPlaybackEngine({
     const data = bufferRef.current;
     if (analyser && data) {
       analyser.getByteFrequencyData(data);
-      const normalized = new Float32Array(data.length);
-      for (let i = 0; i < data.length; i += 1) {
-        normalized[i] = data[i] / 255;
-      }
-      const processed = processBins(normalized, {
-        attackWeight: clamp01(attackWeight),
-        releaseWeight: clamp01(releaseWeight),
-        blurSigma: Math.max(0, blurSigma || 0),
-        targetBins: clampBetween(Math.round(targetBins || normalized.length), 1, normalized.length),
-        previous: smoothingBufferRef.current,
-      });
-      smoothingBufferRef.current = processed.smoothedSnapshot;
+      const processed = processBinsFromBytes(
+        data,
+        {
+          attackWeight: clamp01(attackWeight),
+          releaseWeight: clamp01(releaseWeight),
+          blurSigma: Math.max(0, blurSigma || 0),
+          targetBins: clampBetween(Math.round(targetBins || data.length), 1, data.length),
+        },
+        smoothingStateRef.current,
+        blurBufferRef,
+        resampleBufferRef,
+        gaussianKernelCacheRef.current,
+      );
       const finalBins = processed.resampled;
       setAudioBins(Array.from(finalBins));
-      setAudioBinCount(finalBins.length);
+      if (lastBinCountRef.current !== finalBins.length) {
+        lastBinCountRef.current = finalBins.length;
+        setAudioBinCount(finalBins.length);
+      }
     }
     const duration = getDuration();
     if (duration > 0) {
@@ -580,24 +604,96 @@ interface ProcessBinsOptions {
   releaseWeight: number;
   blurSigma: number;
   targetBins: number;
+}
+
+interface SmoothingState {
   previous: Float32Array | null;
+  scratch: Float32Array | null;
+  length: number;
+  hasHistory: boolean;
 }
 
-function processBins(source: Float32Array, options: ProcessBinsOptions) {
-  const { attackWeight, releaseWeight, blurSigma, targetBins, previous } = options;
-  const smoothed = new Float32Array(source.length);
-  for (let i = 0; i < source.length; i += 1) {
-    const current = source[i];
-    const prevValue = previous ? previous[i] ?? current : current;
-    const weight = current >= prevValue ? attackWeight : releaseWeight;
-    smoothed[i] = prevValue + (current - prevValue) * weight;
+interface GaussianKernel {
+  radius: number;
+  kernel: Float32Array;
+}
+
+function processBinsFromBytes(
+  source: Uint8Array,
+  options: ProcessBinsOptions,
+  smoothingState: SmoothingState,
+  blurBufferRef: React.MutableRefObject<Float32Array | null>,
+  resampleBufferRef: React.MutableRefObject<Float32Array | null>,
+  kernelCache: Map<number, GaussianKernel>,
+) {
+  const length = source.length;
+  if (smoothingState.length !== length) {
+    smoothingState.length = length;
+    smoothingState.hasHistory = false;
+    smoothingState.previous = null;
+    smoothingState.scratch = null;
   }
-  const blurred = blurSigma > 0.001 ? applyGaussianBlur(smoothed, blurSigma) : smoothed;
-  const resampled = resampleBins(blurred, targetBins);
-  return { smoothedSnapshot: smoothed, resampled };
+  const prevBuffer = smoothingState.previous && smoothingState.previous.length === length
+    ? smoothingState.previous
+    : null;
+  const scratchBuffer = smoothingState.scratch && smoothingState.scratch.length === length
+    ? smoothingState.scratch
+    : null;
+  const prev = prevBuffer ?? new Float32Array(length);
+  const next = scratchBuffer ?? new Float32Array(length);
+  const useHistory = smoothingState.hasHistory && prevBuffer !== null;
+  const attackWeight = clamp01(options.attackWeight);
+  const releaseWeight = clamp01(options.releaseWeight);
+  for (let i = 0; i < length; i += 1) {
+    const current = source[i] / 255;
+    const prevValue = useHistory ? prev[i] : current;
+    const weight = current >= prevValue ? attackWeight : releaseWeight;
+    next[i] = prevValue + (current - prevValue) * weight;
+  }
+  smoothingState.hasHistory = true;
+  smoothingState.previous = next;
+  smoothingState.scratch = prev;
+
+  let working = next;
+  if (options.blurSigma > 0.001) {
+    working = applyGaussianBlurCached(working, options.blurSigma, blurBufferRef, kernelCache);
+  }
+  const resampled = resampleBinsCached(working, options.targetBins, resampleBufferRef);
+
+  return { smoothedSnapshot: next, resampled };
 }
 
-function applyGaussianBlur(values: Float32Array, sigma: number): Float32Array {
+function applyGaussianBlurCached(
+  values: Float32Array,
+  sigma: number,
+  blurBufferRef: React.MutableRefObject<Float32Array | null>,
+  kernelCache: Map<number, GaussianKernel>,
+): Float32Array {
+  const normalizedSigma = Math.max(0.001, sigma);
+  let blurred = blurBufferRef.current;
+  if (!blurred || blurred.length !== values.length) {
+    blurred = new Float32Array(values.length);
+    blurBufferRef.current = blurred;
+  }
+  const { radius, kernel } = getGaussianKernel(normalizedSigma, kernelCache);
+  const length = values.length;
+  for (let i = 0; i < length; i += 1) {
+    let sample = 0;
+    for (let k = -radius; k <= radius; k += 1) {
+      let index = i + k;
+      if (index < 0) index = 0;
+      else if (index >= length) index = length - 1;
+      sample += values[index] * kernel[k + radius];
+    }
+    blurred[i] = sample;
+  }
+  return blurred;
+}
+
+function getGaussianKernel(sigma: number, cache: Map<number, GaussianKernel>): GaussianKernel {
+  const key = Math.round(sigma * 100) / 100;
+  const cached = cache.get(key);
+  if (cached) return cached;
   const radius = Math.max(1, Math.floor(sigma * 3));
   const kernelSize = radius * 2 + 1;
   const kernel = new Float32Array(kernelSize);
@@ -609,25 +705,27 @@ function applyGaussianBlur(values: Float32Array, sigma: number): Float32Array {
     kernel[i] = weight;
     weightSum += weight;
   }
+  const normalization = weightSum || 1;
   for (let i = 0; i < kernelSize; i += 1) {
-    kernel[i] /= weightSum || 1;
+    kernel[i] /= normalization;
   }
-  const result = new Float32Array(values.length);
-  for (let i = 0; i < values.length; i += 1) {
-    let sample = 0;
-    for (let k = -radius; k <= radius; k += 1) {
-      const index = clampBetween(i + k, 0, values.length - 1);
-      sample += values[index] * kernel[k + radius];
-    }
-    result[i] = sample;
-  }
-  return result;
+  const kernelData: GaussianKernel = { radius, kernel };
+  cache.set(key, kernelData);
+  return kernelData;
 }
 
-function resampleBins(values: Float32Array, targetBins: number): Float32Array {
+function resampleBinsCached(
+  values: Float32Array,
+  targetBins: number,
+  resampleBufferRef: React.MutableRefObject<Float32Array | null>,
+): Float32Array {
   const count = Math.max(1, Math.round(targetBins));
   if (count === values.length) return values;
-  const result = new Float32Array(count);
+  let result = resampleBufferRef.current;
+  if (!result || result.length !== count) {
+    result = new Float32Array(count);
+    resampleBufferRef.current = result;
+  }
   if (count === 1) {
     result[0] = values[0] ?? 0;
     return result;

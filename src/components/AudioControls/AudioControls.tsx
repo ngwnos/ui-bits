@@ -2,6 +2,8 @@ import React from "react";
 import {
   ChartColumnIncreasing,
   ChartSpline,
+  Pause,
+  Play,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -37,6 +39,9 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const clampBetween = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const roundUnit = (value: number) => Math.round(clamp01(value) * 10) / 10;
 const roundSigma = (value: number) => Math.round(clampBetween(value, 0, 3) * 10) / 10;
+const DEFAULT_SAMPLE_RATE = 44100;
+const DEFAULT_NYQUIST = DEFAULT_SAMPLE_RATE / 2;
+const MIN_FREQ_HZ_GAP = 10;
 
 export default function AudioControls({
   fontSize,
@@ -51,6 +56,7 @@ export default function AudioControls({
 }: AudioControlsProps) {
   const analyserSmoothingDefault = clamp01(analyserSmoothing ?? 0.8);
   const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
+  const [isMuted, setIsMuted] = React.useState<boolean>(true);
   const [playheadRatio, setPlayheadRatio] = React.useState<number>(0);
   const [isScrubbing, setIsScrubbing] = React.useState<boolean>(false);
   const [seekCommand, setSeekCommand] = React.useState<{ ratio: number; token: number } | null>(null);
@@ -60,10 +66,51 @@ export default function AudioControls({
   const [attackValue, setAttackValue] = React.useState<number>(() => roundUnit(fftAttack));
   const [releaseValue, setReleaseValue] = React.useState<number>(() => roundUnit(fftRelease));
   const [blurValue, setBlurValue] = React.useState<number>(() => roundSigma(fftBlurSigma ?? 0));
+  const [useDiscreteBins, setUseDiscreteBins] = React.useState<boolean>(true);
+  const [nyquistHz, setNyquistHz] = React.useState<number>(DEFAULT_NYQUIST);
+  const [freqMinRatio, setFreqMinRatio] = React.useState<number>(0);
+  const [freqMaxRatio, setFreqMaxRatio] = React.useState<number>(1);
   const rawFftRef = React.useRef<Uint8Array | null>(null);
   const [rawFftMeta, setRawFftMeta] = React.useState<{ version: number; binCount: number }>({ version: 0, binCount: 0 });
-  const [useDiscreteBins, setUseDiscreteBins] = React.useState<boolean>(true);
   const clampBins = React.useCallback((value: number) => clampBetween(Math.round(value || 0), 1, 1024), []);
+  const minGapRatio = React.useMemo(
+    () => Math.min(0.5, MIN_FREQ_HZ_GAP / Math.max(nyquistHz, MIN_FREQ_HZ_GAP)),
+    [nyquistHz],
+  );
+  const freqMinHz = React.useMemo(() => freqMinRatio * nyquistHz, [freqMinRatio, nyquistHz]);
+  const freqMaxHz = React.useMemo(() => freqMaxRatio * nyquistHz, [freqMaxRatio, nyquistHz]);
+  const freqMinRatioClamped = clampBetween(freqMinRatio, 0, 1);
+  const freqMaxRatioClamped = clampBetween(freqMaxRatio, 0, 1);
+
+  const handleFreqMinChange = React.useCallback((value: number) => {
+    const ratio = nyquistHz > 0 ? value / nyquistHz : 0;
+    const maxAllowed = Math.max(0, freqMaxRatio - minGapRatio);
+    setFreqMinRatio(clampBetween(ratio, 0, maxAllowed));
+  }, [freqMaxRatio, minGapRatio, nyquistHz]);
+
+  const handleFreqMaxChange = React.useCallback((value: number) => {
+    const ratio = nyquistHz > 0 ? value / nyquistHz : 1;
+    const minAllowed = Math.min(1, freqMinRatio + minGapRatio);
+    setFreqMaxRatio(clampBetween(ratio, minAllowed, 1));
+  }, [freqMinRatio, minGapRatio, nyquistHz]);
+
+  React.useEffect(() => {
+    setFreqMinRatio((prev) => {
+      const maxAllowed = Math.max(0, freqMaxRatio - minGapRatio);
+      return prev > maxAllowed ? maxAllowed : prev;
+    });
+  }, [freqMaxRatio, minGapRatio]);
+
+  React.useEffect(() => {
+    setFreqMaxRatio((prev) => {
+      const minAllowed = Math.min(1, freqMinRatio + minGapRatio);
+      return prev < minAllowed ? minAllowed : prev;
+    });
+  }, [freqMinRatio, minGapRatio]);
+
+  const handleSampleRateChange = React.useCallback((sampleRate: number) => {
+    setNyquistHz(Math.max(1, sampleRate / 2));
+  }, []);
   const sliderUnitPx = React.useMemo(() => {
     const previewFontSize = fontSize || 16;
     const previewPaddingEm = 0.35;
@@ -84,10 +131,9 @@ export default function AudioControls({
       : safeA;
   const textColor = safeA;
   const actionButtonSize = Math.max(18, sliderUnitPx - 8);
-  const interpolationLabel = useDiscreteBins
-    ? "Show interpolated FFT bins"
-    : "Show discrete FFT bins";
   const playPauseLabel = isPlaying ? "Pause audio analysis" : "Play audio analysis";
+  const muteLabel = isMuted ? "Unmute audio output" : "Mute audio output";
+  const interpolationLabel = useDiscreteBins ? "Show interpolated FFT bins" : "Show discrete FFT bins";
   const attackWeight = clamp01(attackValue);
   const releaseWeight = clamp01(releaseValue);
   const peakDecayRate = Math.max(0.001, releaseWeight * 0.25);
@@ -157,38 +203,107 @@ export default function AudioControls({
           background: safeB,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
-          padding: '0 0.75rem',
-          gap: 8,
+          overflow: 'hidden',
         }}
       >
-        <button
-          type="button"
-          onClick={() => setUseDiscreteBins((prev) => !prev)}
-          aria-pressed={!useDiscreteBins}
-          aria-label={interpolationLabel}
-          title={interpolationLabel}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            borderRadius: 3,
-            border: `1px solid ${safeA}`,
-            background: useDiscreteBins ? safeA : safeB,
-            color: useDiscreteBins ? safeB : safeA,
-            padding: '0.25rem 0.5rem',
-            cursor: 'pointer',
-            transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
-            fontSize: Math.max(12, fontSize * 0.8),
-          }}
-        >
-          {useDiscreteBins ? (
-            <ChartColumnIncreasing size={Math.max(14, fontSize)} strokeWidth={1.6} />
-          ) : (
-            <ChartSpline size={Math.max(14, fontSize)} strokeWidth={1.6} />
-          )}
-          <span>{useDiscreteBins ? "Discrete" : "Interpolated"}</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: actionButtonSize + 6 }}>
+            <button
+              type="button"
+              onClick={() => setIsPlaying((prev) => !prev)}
+              aria-pressed={isPlaying}
+              aria-label={playPauseLabel}
+              title={playPauseLabel}
+              style={{
+                width: actionButtonSize,
+                height: actionButtonSize,
+                borderRadius: 3,
+                border: `1px solid ${safeA}`,
+                background: isPlaying ? safeA : safeB,
+                color: isPlaying ? safeB : safeA,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                cursor: 'pointer',
+                transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
+              }}
+            >
+              {isPlaying ? (
+                <Pause size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
+              ) : (
+                <Play size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
+              )}
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: actionButtonSize + 6, marginLeft: 2 }}>
+            <button
+              type="button"
+              onClick={() => setUseDiscreteBins((prev) => !prev)}
+              aria-pressed={!useDiscreteBins}
+              aria-label={interpolationLabel}
+              title={interpolationLabel}
+              style={{
+                width: actionButtonSize,
+                height: actionButtonSize,
+                borderRadius: 3,
+                border: `1px solid ${safeA}`,
+                background: useDiscreteBins ? safeA : safeB,
+                color: useDiscreteBins ? safeB : safeA,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                cursor: 'pointer',
+                transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
+              }}
+            >
+              {useDiscreteBins ? (
+                <ChartColumnIncreasing size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
+              ) : (
+                <ChartSpline size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
+              )}
+            </button>
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 0, padding: '0 0.5rem 0 0', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+          <LFOSlider
+            label="Fmin"
+            min={0}
+            max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
+            step={1}
+            width="100%"
+            border="left"
+            borderMask={{ top: false, bottom: false, right: true, left: true }}
+            leftColor={safeA}
+            rightColor={safeB}
+            fontSize={fontSize}
+            mode="external"
+            readExternal={() => freqMinHz}
+            onUserChange={handleFreqMinChange}
+            onAnimatedUpdate={handleFreqMinChange}
+            formatDisplayValue={(value) => `${Math.round(value)} Hz`}
+            style={{ gap: 0 }}
+          />
+          <LFOSlider
+            label="Fmax"
+            min={MIN_FREQ_HZ_GAP}
+            max={Math.max(MIN_FREQ_HZ_GAP, nyquistHz)}
+            step={1}
+            width="100%"
+            border="left"
+            borderMask={{ top: false, bottom: false, right: true, left: true }}
+            leftColor={safeA}
+            rightColor={safeB}
+            fontSize={fontSize}
+            mode="external"
+            readExternal={() => freqMaxHz}
+            onUserChange={handleFreqMaxChange}
+            onAnimatedUpdate={handleFreqMaxChange}
+            formatDisplayValue={(value) => `${Math.round(value)} Hz`}
+            style={{ gap: 0 }}
+          />
+        </div>
       </div>
       <AudioPlaybackEngine
         src={audioSrc}
@@ -201,6 +316,10 @@ export default function AudioControls({
         blurSigma={blurValue}
         targetBins={clampBins(binSliderValue)}
         onRawFftFrame={handleRawFftData}
+        frequencyMin={freqMinRatioClamped}
+        frequencyMax={freqMaxRatioClamped}
+        onSampleRateChange={handleSampleRateChange}
+        muted={isMuted}
       />
       <div
         style={{
@@ -226,11 +345,12 @@ export default function AudioControls({
           inactiveColor={safeB}
           rawFftDataRef={rawFftRef}
           rawFrameVersion={rawFftMeta.version}
-          rawBinCount={rawFftMeta.binCount}
           attackWeight={attackWeight}
           releaseWeight={releaseWeight}
           blurSigma={blurValue}
           discreteBins={useDiscreteBins}
+          frequencyMin={freqMinRatioClamped}
+          frequencyMax={freqMaxRatioClamped}
         />
       </div>
       <div
@@ -261,17 +381,17 @@ export default function AudioControls({
         >
           <button
             type="button"
-            onClick={() => setIsPlaying((prev) => !prev)}
-            aria-pressed={isPlaying}
-            aria-label={playPauseLabel}
-            title={playPauseLabel}
+            onClick={() => setIsMuted((prev) => !prev)}
+            aria-pressed={!isMuted}
+            aria-label={muteLabel}
+            title={muteLabel}
             style={{
               width: actionButtonSize,
               height: actionButtonSize,
               borderRadius: 3,
               border: `1px solid ${safeA}`,
-              background: isPlaying ? safeA : safeB,
-              color: isPlaying ? safeB : safeA,
+              background: isMuted ? safeB : safeA,
+              color: isMuted ? safeA : safeB,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -280,10 +400,10 @@ export default function AudioControls({
               transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
             }}
           >
-            {isPlaying ? (
-              <Volume2 size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
-            ) : (
+            {isMuted ? (
               <VolumeX size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
+            ) : (
+              <Volume2 size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
             )}
           </button>
         </div>
@@ -413,6 +533,10 @@ interface AudioPlaybackEngineProps {
   blurSigma?: number;
   targetBins?: number;
   onRawFftFrame?: (data: Uint8Array) => void;
+  frequencyMin?: number;
+  frequencyMax?: number;
+  onSampleRateChange?: (sampleRate: number) => void;
+  muted?: boolean;
 }
 
 function AudioPlaybackEngine({
@@ -426,6 +550,10 @@ function AudioPlaybackEngine({
   blurSigma = 0,
   targetBins = 1024,
   onRawFftFrame,
+  frequencyMin = 0,
+  frequencyMax = 1,
+  onSampleRateChange,
+  muted = true,
 }: AudioPlaybackEngineProps) {
   const {
     setAudioBins,
@@ -442,6 +570,8 @@ function AudioPlaybackEngine({
   const playbackStartedAtRef = React.useRef<number | null>(null);
   const onProgressRef = React.useRef<typeof onProgress>(onProgress);
   const analyserSmoothingRef = React.useRef<number>(clamp01(analyserSmoothing ?? 0.8));
+  const onSampleRateChangeRef = React.useRef<typeof onSampleRateChange>(onSampleRateChange);
+  const mutedRef = React.useRef<boolean>(muted);
   const smoothingStateRef = React.useRef<SmoothingState>({
     previous: null,
     scratch: null,
@@ -456,6 +586,19 @@ function AudioPlaybackEngine({
   React.useEffect(() => {
     onProgressRef.current = onProgress;
   }, [onProgress]);
+
+  React.useEffect(() => {
+    onSampleRateChangeRef.current = onSampleRateChange;
+  }, [onSampleRateChange]);
+
+  React.useEffect(() => {
+    mutedRef.current = muted;
+    const gain = silentGainRef.current;
+    const audioContext = audioContextRef.current;
+    if (gain && audioContext) {
+      gain.gain.setTargetAtTime(muted ? 0 : 1, audioContext.currentTime, 0.01);
+    }
+  }, [muted]);
 
   React.useEffect(() => {
     const clamped = clamp01(analyserSmoothing ?? 0.8);
@@ -506,6 +649,7 @@ function AudioPlaybackEngine({
       try {
         const audioContext = new AudioContext();
         audioContextRef.current = audioContext;
+        onSampleRateChangeRef.current?.(audioContext.sampleRate);
         const response = await fetch(src);
         if (!response.ok) throw new Error(`Failed to load audio sample: ${response.status}`);
         const arrayBuffer = await response.arrayBuffer();
@@ -586,7 +730,7 @@ function AudioPlaybackEngine({
     source.buffer = audioBufferRef.current;
     source.loop = true;
     const silentGain = audioContext.createGain();
-    silentGain.gain.value = 0;
+    silentGain.gain.value = mutedRef.current ? 0 : 1;
     source.connect(analyser);
     analyser.connect(silentGain);
     silentGain.connect(audioContext.destination);
@@ -639,6 +783,8 @@ function AudioPlaybackEngine({
           releaseWeight: clamp01(releaseWeight),
           blurSigma: Math.max(0, blurSigma || 0),
           targetBins: clampBetween(Math.round(targetBins || data.length), 1, data.length),
+          frequencyMin,
+          frequencyMax,
         },
         smoothingStateRef.current,
         blurBufferRef,
@@ -667,6 +813,8 @@ interface ProcessBinsOptions {
   releaseWeight: number;
   blurSigma: number;
   targetBins: number;
+  frequencyMin: number;
+  frequencyMax: number;
 }
 
 interface SmoothingState {
@@ -721,7 +869,13 @@ function processBinsFromBytes(
   if (options.blurSigma > 0.001) {
     working = applyGaussianBlurCached(working, options.blurSigma, blurBufferRef, kernelCache);
   }
-  const resampled = resampleBinsCached(working, options.targetBins, resampleBufferRef);
+  const resampled = resampleBinsCached(
+    working,
+    options.targetBins,
+    resampleBufferRef,
+    options.frequencyMin,
+    options.frequencyMax,
+  );
 
   return { smoothedSnapshot: next, resampled };
 }
@@ -781,21 +935,37 @@ function resampleBinsCached(
   values: Float32Array,
   targetBins: number,
   resampleBufferRef: React.MutableRefObject<Float32Array | null>,
+  frequencyMin: number,
+  frequencyMax: number,
 ): Float32Array {
   const count = Math.max(1, Math.round(targetBins));
-  if (count === values.length) return values;
   let result = resampleBufferRef.current;
   if (!result || result.length !== count) {
     result = new Float32Array(count);
     resampleBufferRef.current = result;
   }
-  if (count === 1) {
-    result[0] = values[0] ?? 0;
+  const maxIndex = Math.max(0, values.length - 1);
+  if (maxIndex === 0) {
+    result.fill(values[0] ?? 0);
     return result;
   }
-  const maxIndex = values.length - 1;
+  const safeMin = clampBetween(frequencyMin, 0, 1);
+  const safeMax = clampBetween(frequencyMax, Math.min(1, safeMin + 1e-3), 1);
+  const minPos = safeMin * maxIndex;
+  const maxPos = safeMax * maxIndex;
+  if (count === 1) {
+    const position = (minPos + maxPos) * 0.5;
+    const lower = Math.floor(position);
+    const upper = Math.min(maxIndex, lower + 1);
+    const t = position - lower;
+    const lowerValue = values[lower] ?? 0;
+    const upperValue = values[upper] ?? lowerValue;
+    result[0] = lowerValue + (upperValue - lowerValue) * t;
+    return result;
+  }
   for (let i = 0; i < count; i += 1) {
-    const position = (i / (count - 1)) * maxIndex;
+    const ratio = i / (count - 1);
+    const position = minPos + ratio * (maxPos - minPos);
     const lower = Math.floor(position);
     const upper = Math.min(maxIndex, lower + 1);
     const t = position - lower;

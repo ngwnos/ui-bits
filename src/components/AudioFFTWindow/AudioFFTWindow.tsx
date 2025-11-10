@@ -16,11 +16,12 @@ export interface AudioFFTWindowProps {
   peakDecay?: number;
   rawFftDataRef?: React.RefObject<Uint8Array | null>;
   rawFrameVersion?: number;
-  rawBinCount?: number;
   attackWeight?: number;
   releaseWeight?: number;
   blurSigma?: number;
   discreteBins?: boolean;
+  frequencyMin?: number;
+  frequencyMax?: number;
 }
 
 type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
@@ -35,6 +36,9 @@ const WORKGROUP_SIZE = 64;
 const HOLD_SECONDS = 0.2;
 const PEAK_GRAVITY = 4;
 const MAX_GAUSSIAN_RADIUS = 12;
+const FREQUENCY_GAP = 0.01;
+
+const clampBetween = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 interface FftGpuResources {
   context: GPUCanvasContext;
@@ -397,6 +401,41 @@ function buildResources(device: GPUDevice, canvas: HTMLCanvasElement, binCapacit
   };
 }
 
+function resampleUint8Frame(
+  source: Uint8Array,
+  destination: Float32Array,
+  frequencyMin: number,
+  frequencyMax: number,
+) {
+  if (!source.length || !destination.length) {
+    destination.fill(0);
+    return;
+  }
+  const srcMaxIndex = Math.max(0, source.length - 1);
+  if (srcMaxIndex === 0) {
+    const value = (source[0] ?? 0) / 255;
+    for (let i = 0; i < displayBins && i < destination.length; i += 1) {
+      destination[i] = value;
+    }
+    return;
+  }
+  const safeMin = clampBetween(frequencyMin, 0, Math.min(1, frequencyMax - FREQUENCY_GAP));
+  const safeMax = clampBetween(frequencyMax, safeMin + FREQUENCY_GAP, 1);
+  const minPos = safeMin * srcMaxIndex;
+  const maxPos = safeMax * srcMaxIndex;
+  const count = destination.length;
+  for (let i = 0; i < count; i += 1) {
+    const ratio = count === 1 ? 0.5 : (i / (count - 1));
+    const position = minPos + ratio * (maxPos - minPos);
+    const lower = Math.floor(position);
+    const upper = Math.min(srcMaxIndex, lower + 1);
+    const t = position - lower;
+    const lowerValue = (source[lower] ?? 0) / 255;
+    const upperValue = (source[upper] ?? 0) / 255;
+    destination[i] = lowerValue + (upperValue - lowerValue) * t;
+  }
+}
+
 export default function AudioFFTWindow({
   heightUnits = 6,
   unitSizePx,
@@ -411,11 +450,12 @@ export default function AudioFFTWindow({
   peakDecay = 0.05,
   rawFftDataRef,
   rawFrameVersion,
-  rawBinCount = 0,
   attackWeight = 0.6,
   releaseWeight = 0.2,
   blurSigma = 0,
   discreteBins = true,
+  frequencyMin = 0,
+  frequencyMax = 1,
 }: AudioFFTWindowProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
@@ -433,6 +473,8 @@ export default function AudioFFTWindow({
   const releaseWeightRef = React.useRef<number>(Math.max(0, Math.min(1, releaseWeight)));
   const peakDecayRef = React.useRef<number>(Math.max(0.0005, peakDecay));
   const discreteModeRef = React.useRef<number>(discreteBins ? 1 : 0);
+  const freqMinRef = React.useRef<number>(Math.max(0, Math.min(1, frequencyMin)));
+  const freqMaxRef = React.useRef<number>(Math.max(0, Math.min(1, frequencyMax)));
   const maxBinCountRef = React.useRef<number>(Math.max(1, Math.floor(maxBins)));
   const rawUploadPendingRef = React.useRef<boolean>(false);
   const lastTimestampRef = React.useRef<number>(typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -472,11 +514,22 @@ export default function AudioFFTWindow({
   }, [discreteBins]);
 
   React.useEffect(() => {
+    freqMinRef.current = clampBetween(frequencyMin, 0, Math.min(1, frequencyMax - FREQUENCY_GAP));
+  }, [frequencyMin, frequencyMax]);
+
+  React.useEffect(() => {
+    freqMaxRef.current = clampBetween(frequencyMax, Math.min(1, frequencyMin + FREQUENCY_GAP), 1);
+  }, [frequencyMax, frequencyMin]);
+
+  React.useEffect(() => {
+    rawUploadPendingRef.current = true;
+  }, [frequencyMin, frequencyMax, maxBins]);
+
+  React.useEffect(() => {
     maxBinCountRef.current = Math.max(1, Math.floor(maxBins));
-    const needed = Math.max(maxBinCountRef.current, rawBinCount, 1);
-    const aligned = Math.max(1, Math.ceil(needed / WORKGROUP_SIZE) * WORKGROUP_SIZE);
+    const aligned = Math.max(1, Math.ceil(maxBinCountRef.current / WORKGROUP_SIZE) * WORKGROUP_SIZE);
     setBinCapacity((prev) => (prev === aligned ? prev : aligned));
-  }, [maxBins, rawBinCount]);
+  }, [maxBins]);
 
   React.useEffect(() => {
     rawUploadPendingRef.current = true;
@@ -623,8 +676,8 @@ export default function AudioFFTWindow({
 
         const deltaSeconds = Math.max(0.0005, (timestamp - lastTimestampRef.current) / 1000);
         lastTimestampRef.current = timestamp;
-        const effectiveBinCount = Math.max(1, Math.min(maxBinCountRef.current, rawBinCount || maxBinCountRef.current));
-        const binStep = effectiveBinCount > 1 ? 1 / (effectiveBinCount - 1) : 0;
+        const effectiveBinCount = Math.max(1, maxBinCountRef.current);
+        const binStep = effectiveBinCount > 1 ? 1 / (effectiveBinCount - 1) : 1;
 
         const uniformArray = uniformArrayRef.current;
         uniformArray[0] = effectiveBinCount;
@@ -651,20 +704,18 @@ export default function AudioFFTWindow({
 
         if (rawUploadPendingRef.current && rawFftDataRef?.current) {
           const data = rawFftDataRef.current;
-          if (data.length > currentResources.binCapacity) {
-            const alignedCapacity = Math.max(1, Math.ceil(data.length / WORKGROUP_SIZE) * WORKGROUP_SIZE);
-            setBinCapacity((prev) => (prev === alignedCapacity ? prev : alignedCapacity));
-            rawUploadPendingRef.current = true;
-            animationFrame = requestAnimationFrame(frame);
-            return;
-          }
-          if (!normalizedFftRef.current || normalizedFftRef.current.length !== data.length) {
-            normalizedFftRef.current = new Float32Array(data.length);
+          const destLength = currentResources.binCapacity;
+          if (!normalizedFftRef.current || normalizedFftRef.current.length !== destLength) {
+            normalizedFftRef.current = new Float32Array(destLength);
           }
           const normalized = normalizedFftRef.current;
-          for (let i = 0; i < data.length; i += 1) {
-            normalized[i] = data[i] / 255;
-          }
+          normalized.fill(0);
+          resampleUint8Frame(
+            data,
+            normalized,
+            freqMinRef.current,
+            freqMaxRef.current,
+          );
           queue.writeBuffer(
             currentResources.rawBuffer,
             0,
@@ -676,7 +727,7 @@ export default function AudioFFTWindow({
         }
 
         const commandEncoder = device.createCommandEncoder();
-        if (rawFftDataRef?.current && rawBinCount) {
+        if (rawFftDataRef?.current) {
           const computePass = commandEncoder.beginComputePass();
           const bindGroup = currentResources.computeBindGroups[stateIndexRef.current];
           computePass.setPipeline(currentResources.computePipeline);
@@ -716,7 +767,7 @@ export default function AudioFFTWindow({
       disposeResources(resourcesRef.current);
       resourcesRef.current = null;
     };
-  }, [supportsWebGPU, size.width, size.height, binCapacity, rawBinCount, rawFftDataRef]);
+  }, [supportsWebGPU, size.width, size.height, binCapacity, rawFftDataRef]);
 
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth ?? "100%";
   const widthPx = Math.round(size.width);

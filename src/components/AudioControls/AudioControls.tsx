@@ -118,6 +118,8 @@ export default function AudioControls({
           onScrubStart={handleScrubStart}
           onScrub={handleScrubMove}
           onScrubEnd={handleScrubEnd}
+          activeColor={safeA}
+          inactiveColor={safeB}
         />
       </div>
       <div

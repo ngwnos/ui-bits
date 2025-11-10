@@ -12,11 +12,43 @@ export interface AudioFFTWindowProps {
   onScrubStart?: () => void;
   onScrub?: (ratio: number) => void;
   onScrubEnd?: (ratio: number) => void;
+  activeColor?: string;
+  inactiveColor?: string;
 }
 
 type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
 let sharedRoot: TypeGpuRoot | null = null;
 let sharedRootPromise: Promise<TypeGpuRoot | null> | null = null;
+const DEFAULT_ACTIVE_COLOR: [number, number, number] = [0.16, 0.47, 0.86];
+const DEFAULT_INACTIVE_COLOR: [number, number, number] = [0.02, 0.02, 0.04];
+const UNIFORM_FLOAT_COUNT = 12;
+const UNIFORM_BUFFER_SIZE = UNIFORM_FLOAT_COUNT * Float32Array.BYTES_PER_ELEMENT;
+
+function hexChannel(value: string) {
+  return Number.parseInt(value, 16) / 255;
+}
+
+function parseHexColor(color?: string, fallback: [number, number, number] = [0, 0, 0]): [number, number, number] {
+  if (!color) return fallback;
+  const normalized = color.trim();
+  if (normalized.startsWith("#")) {
+    if (normalized.length === 7) {
+      return [
+        hexChannel(normalized.slice(1, 3)),
+        hexChannel(normalized.slice(3, 5)),
+        hexChannel(normalized.slice(5, 7)),
+      ];
+    }
+    if (normalized.length === 4) {
+      return [
+        hexChannel(normalized[1] + normalized[1]),
+        hexChannel(normalized[2] + normalized[2]),
+        hexChannel(normalized[3] + normalized[3]),
+      ];
+    }
+  }
+  return fallback;
+}
 
 async function getSharedRoot(): Promise<TypeGpuRoot | null> {
   if (!navigator.gpu) return null;
@@ -44,6 +76,8 @@ export default function AudioFFTWindow({
   onScrubStart,
   onScrub,
   onScrubEnd,
+  activeColor,
+  inactiveColor,
 }: AudioFFTWindowProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
@@ -61,6 +95,16 @@ export default function AudioFFTWindow({
   const needsUploadRef = React.useRef<boolean>(false);
   const playbackRatioRef = React.useRef<number>(Math.max(0, Math.min(1, playbackRatio)));
   const pointerStateRef = React.useRef<{ active: boolean; pointerId: number | null }>({ active: false, pointerId: null });
+  const activeColorVec = React.useMemo(
+    () => parseHexColor(activeColor, DEFAULT_ACTIVE_COLOR),
+    [activeColor],
+  );
+  const inactiveColorVec = React.useMemo(
+    () => parseHexColor(inactiveColor, DEFAULT_INACTIVE_COLOR),
+    [inactiveColor],
+  );
+  const activeColorRef = React.useRef<[number, number, number]>(activeColorVec);
+  const inactiveColorRef = React.useRef<[number, number, number]>(inactiveColorVec);
 
   React.useEffect(() => {
     binDataRef.current = new Float32Array(binTextureWidth);
@@ -70,6 +114,14 @@ export default function AudioFFTWindow({
   React.useEffect(() => {
     playbackRatioRef.current = Math.max(0, Math.min(1, playbackRatio));
   }, [playbackRatio]);
+
+  React.useEffect(() => {
+    activeColorRef.current = activeColorVec;
+  }, [activeColorVec]);
+
+  React.useEffect(() => {
+    inactiveColorRef.current = inactiveColorVec;
+  }, [inactiveColorVec]);
 
   React.useEffect(() => {
     const nextHeight = Math.max(1, heightUnits) * unitSizePx;
@@ -247,6 +299,10 @@ struct Uniforms {
   amp : f32,
   binCount : f32,
   playback : f32,
+  colorActive : vec3<f32>,
+  padding0 : f32,
+  colorInactive : vec3<f32>,
+  padding1 : f32,
 };
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -262,19 +318,16 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   let amplitude = textureLoad(fftTexture, vec2<i32>(i32(clampedIndex), 0), 0).r;
   let normalized = clamp(amplitude, 0.0, 1.0);
   let y = 1.0 - in.uv.y;
-  let bar = smoothstep(normalized - 0.01, normalized, y);
-  let glow = smoothstep(0.0, 0.3, normalized) * smoothstep(0.7, 1.0, y);
-  let baseColor = vec3<f32>(0.16, 0.47, 0.86);
-  let bgColor = vec3<f32>(0.02, 0.02, 0.04);
-  let accent = vec3<f32>(0.9, 0.4, 0.8) * glow;
-  var color = mix(bgColor, baseColor, bar) + accent;
+  let edgeMask = smoothstep(normalized - 0.01, normalized, y);
+  let activeMask = 1.0 - edgeMask;
+  var color = mix(uniforms.colorInactive, uniforms.colorActive, activeMask);
   let playhead = clamp(uniforms.playback, 0.0, 1.0);
   let lineWidth = 0.004;
   let distance = abs(in.uv.x - playhead);
   let lineFeather = smoothstep(lineWidth * 0.5, lineWidth, distance);
   let lineMask = 1.0 - lineFeather;
-  let playColor = vec3<f32>(1.0, 0.87, 0.35);
-  color = mix(color, playColor, lineMask);
+  let invertedColor = mix(uniforms.colorActive, uniforms.colorInactive, activeMask);
+  color = mix(color, invertedColor, lineMask);
   return vec4<f32>(color, 1.0);
 }
 `,
@@ -292,7 +345,7 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
       });
 
       const uniformBuffer = device.createBuffer({
-        size: 16,
+        size: UNIFORM_BUFFER_SIZE,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
       const fftTexture = device.createTexture({
@@ -313,7 +366,22 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
         const secs = time / 1000;
         const amp = 0.25 + (Math.sin(secs * 0.5) * 0.25 + 0.25);
         const binCount = Math.max(1, binCountRef.current || maxBinCount);
-        const uniformData = new Float32Array([secs * 2, amp, binCount, playbackRatioRef.current]);
+        const activeColorCurrent = activeColorRef.current;
+        const inactiveColorCurrent = inactiveColorRef.current;
+        const uniformData = new Float32Array([
+          secs * 2,
+          amp,
+          binCount,
+          playbackRatioRef.current,
+          activeColorCurrent[0],
+          activeColorCurrent[1],
+          activeColorCurrent[2],
+          0,
+          inactiveColorCurrent[0],
+          inactiveColorCurrent[1],
+          inactiveColorCurrent[2],
+          0,
+        ]);
         device.queue.writeBuffer(uniformBuffer, 0, uniformData);
         if (needsUploadRef.current) {
           needsUploadRef.current = false;

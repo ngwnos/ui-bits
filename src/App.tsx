@@ -15,8 +15,6 @@ import {
   Square,
   SquareDashed,
   Sun,
-  Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
 import {
@@ -26,11 +24,10 @@ import {
   Dropdown,
   SegmentBar,
 } from "./components";
-import AudioFFTWindow from "./components/AudioFFTWindow/AudioFFTWindow";
+import AudioControls, { type AudioControlsBorder } from "./components/AudioControls/AudioControls";
 import type { SegmentBarBorderStyle } from "./components";
 import LFOSlider, {
   FrameLoopProvider,
-  useFrame,
   type SliderBorder,
   createDayOfYearFormatter,
   createTimeFormatter,
@@ -447,130 +444,6 @@ function ConnectedSlider({
   );
 }
 
-function AudioFFTDriver({ src, playing }: { src: string; playing: boolean }) {
-  const {
-    setAudioBins,
-    setAudioBinCount,
-    setAudioMaxMagnitude,
-  } = useSliderActions();
-  const audioContextRef = React.useRef<AudioContext | null>(null);
-  const analyserRef = React.useRef<AnalyserNode | null>(null);
-  const bufferRef = React.useRef<Uint8Array | null>(null);
-  const sourceRef = React.useRef<AudioBufferSourceNode | null>(null);
-  const silentGainRef = React.useRef<GainNode | null>(null);
-  const audioBufferRef = React.useRef<AudioBuffer | null>(null);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    async function loadAudio() {
-      try {
-        const audioContext = new AudioContext();
-        audioContextRef.current = audioContext;
-        const response = await fetch(src);
-        if (!response.ok) throw new Error(`Failed to load audio sample: ${response.status}`);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        if (cancelled) {
-          audioContext.close();
-          return;
-        }
-        audioBufferRef.current = audioBuffer;
-        const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.8;
-        analyserRef.current = analyser;
-        bufferRef.current = new Uint8Array(analyser.frequencyBinCount);
-        setAudioBinCount(analyser.frequencyBinCount);
-        setAudioMaxMagnitude(1);
-      } catch (error) {
-        console.error("Failed to load audio for FFT", error);
-      }
-    }
-    loadAudio();
-    return () => {
-      cancelled = true;
-      analyserRef.current = null;
-      bufferRef.current = null;
-      try {
-        sourceRef.current?.stop();
-      } catch {
-        // ignore
-      }
-      sourceRef.current?.disconnect();
-      silentGainRef.current?.disconnect();
-      audioContextRef.current?.close();
-      audioContextRef.current = null;
-      sourceRef.current = null;
-      silentGainRef.current = null;
-      audioBufferRef.current = null;
-    };
-  }, [setAudioBinCount, setAudioMaxMagnitude, src]);
-
-  const stopPlayback = React.useCallback(() => {
-    try {
-      sourceRef.current?.stop();
-    } catch {
-      // ignore
-    }
-    sourceRef.current?.disconnect();
-    silentGainRef.current?.disconnect();
-    sourceRef.current = null;
-    silentGainRef.current = null;
-  }, []);
-
-  const startPlayback = React.useCallback(async () => {
-    if (!audioBufferRef.current || !audioContextRef.current) return;
-    stopPlayback();
-    const audioContext = audioContextRef.current;
-    if (audioContext.state === "suspended") {
-      await audioContext.resume().catch(() => {});
-    }
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBufferRef.current;
-    source.loop = true;
-    const analyser = analyserRef.current ?? audioContext.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.8;
-    analyserRef.current = analyser;
-    const silentGain = audioContext.createGain();
-    silentGain.gain.value = 0;
-    source.connect(analyser);
-    analyser.connect(silentGain);
-    silentGain.connect(audioContext.destination);
-    source.start(0);
-    sourceRef.current = source;
-    silentGainRef.current = silentGain;
-    if (!bufferRef.current) {
-      bufferRef.current = new Uint8Array(analyser.frequencyBinCount);
-      setAudioBinCount(analyser.frequencyBinCount);
-    }
-  }, [setAudioBinCount, stopPlayback]);
-
-  React.useEffect(() => {
-    if (playing) {
-      startPlayback();
-    } else {
-      stopPlayback();
-    }
-    return () => {
-      stopPlayback();
-    };
-  }, [playing, startPlayback, stopPlayback]);
-
-  useFrame(() => {
-    const analyser = analyserRef.current;
-    const data = bufferRef.current;
-    if (!analyser || !data) return;
-    analyser.getByteFrequencyData(data);
-    const normalized: number[] = new Array(data.length);
-    for (let i = 0; i < data.length; i += 1) {
-      normalized[i] = data[i] / 255;
-    }
-    setAudioBins(normalized);
-  });
-
-  return null;
-}
 
 function EditableRectPOC() {
   const { columns, customSliderId } = useSliderLayout();
@@ -689,8 +562,7 @@ function EditableRectPOC() {
 
   const [sliderFontSize, setSliderFontSize] = React.useState<number>(12);
   const [audioPreviewValue, setAudioPreviewValue] = React.useState<number>(42);
-  const [audioBorderStyle, setAudioBorderStyle] = React.useState<'a' | 'b' | 'none'>('a');
-  const [audioPlaying, setAudioPlaying] = React.useState<boolean>(false);
+  const [audioBorderStyle, setAudioBorderStyle] = React.useState<AudioControlsBorder>('a');
   const CONTROL_FONT_SIZE = 12;
   const columnGap = 5;
   const MAX_COLUMN_WIDTH = 440;
@@ -857,7 +729,6 @@ const tabs = [
 
   return (
     <FrameLoopProvider>
-      <AudioFFTDriver src="/audio/credits.mp3" playing={audioPlaying} />
       <div
         style={{
           display: 'flex',
@@ -913,24 +784,6 @@ const tabs = [
                   <Moon size={toggleIconSize} strokeWidth={1.8} />
                 ) : (
                   <Sun size={toggleIconSize} strokeWidth={1.8} />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setAudioPlaying((prev) => !prev)}
-                aria-pressed={audioPlaying}
-                aria-label={audioPlaying ? "Pause audio analysis" : "Start audio analysis"}
-                title={audioPlaying ? "Pause audio-driven sliders" : "Start audio-driven sliders"}
-                style={{
-                  ...iconButtonStyle,
-                  background: audioPlaying ? flexoki.green['500'] : iconButtonStyle.background,
-                  color: audioPlaying ? flexoki.base['50'] : iconButtonStyle.color,
-                }}
-              >
-                {audioPlaying ? (
-                  <Volume2 size={toggleIconSize} strokeWidth={1.8} />
-                ) : (
-                  <VolumeX size={toggleIconSize} strokeWidth={1.8} />
                 )}
               </button>
             </div>
@@ -1437,7 +1290,7 @@ const tabs = [
           <Tabs.Content value="typegpu-test" style={tabBodyStyle}>
             <TypeGPUTest />
           </Tabs.Content>
-          <Tabs.Content value="audio-controls" style={tabBodyStyle}>
+          <Tabs.Content value="audio-controls" style={tabBodyStyle} forceMount>
             <div
               style={{
                 width: '100%',
@@ -1447,23 +1300,23 @@ const tabs = [
                 alignItems: 'center',
               }}
             >
-            <AudioControls
-              fontSize={sliderFontSize}
-              colorA={flexoki.red['600']}
-              colorB={flexoki.red['100']}
-              borderStyle={audioBorderStyle}
-            />
-            <button
-              type="button"
-              onClick={cycleAudioBorderStyle}
-              style={{
-                ...iconButtonStyle,
-                width: 140,
-                fontSize: CONTROL_FONT_SIZE,
-              }}
-            >
-              Audio border: {audioBorderStyle.toUpperCase()}
-            </button>
+              <AudioControls
+                fontSize={sliderFontSize}
+                colorA={flexoki.red['600']}
+                colorB={flexoki.red['100']}
+                borderStyle={audioBorderStyle}
+              />
+              <button
+                type="button"
+                onClick={cycleAudioBorderStyle}
+                style={{
+                  ...iconButtonStyle,
+                  width: 140,
+                  fontSize: CONTROL_FONT_SIZE,
+                }}
+              >
+                Audio border: {audioBorderStyle.toUpperCase()}
+              </button>
               <LFOSlider
                 label="Audio Preview"
                 min={0}
@@ -1491,85 +1344,5 @@ export default function App() {
     <SliderStoreProvider>
       <EditableRectPOC />
     </SliderStoreProvider>
-  );
-}
-
-type AudioControlsBorder = 'a' | 'b' | 'none';
-
-interface AudioControlsProps {
-  fontSize: number;
-  colorA?: string;
-  colorB?: string;
-  borderStyle?: AudioControlsBorder;
-}
-
-function resolveColors(colorA?: string, colorB?: string) {
-  const fallbackA = flexoki.base['700'];
-  const fallbackB = flexoki.base['100'];
-  const safeA = colorA ?? fallbackA;
-  const safeB = colorB ?? fallbackB;
-  return { safeA, safeB };
-}
-
-function AudioControls({
-  fontSize,
-  colorA,
-  colorB,
-  borderStyle = 'a',
-}: AudioControlsProps) {
-  const { audioBins } = useSliderStoreState();
-  const sliderUnitPx = React.useMemo(() => {
-    const previewFontSize = fontSize || 16;
-    const previewPaddingEm = 0.35;
-    const previewPaddingPx = previewFontSize * previewPaddingEm;
-    const previewLineHeight = 1;
-    const baseLabelHeight = previewFontSize * previewLineHeight;
-    return Math.max(
-      Math.round(baseLabelHeight + previewPaddingPx * 2 + 2),
-      Math.round(previewFontSize + previewPaddingPx * 1.5),
-    );
-  }, [fontSize]);
-  const { safeA, safeB } = resolveColors(colorA, colorB);
-  const seamColor = safeA;
-  const sideBorderColor = borderStyle === 'none'
-    ? "transparent"
-    : borderStyle === 'b'
-      ? safeB
-      : safeA;
-  const textColor = safeA;
-  return (
-    <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
-        <div
-          style={{
-            borderTop: `1px solid ${sideBorderColor}`,
-            borderLeft: `1px solid ${sideBorderColor}`,
-            borderRight: `1px solid ${sideBorderColor}`,
-            borderRadius: '3px 3px 0 0',
-            borderBottom: 'none',
-            overflow: 'hidden',
-          }}
-        >
-          <AudioFFTWindow
-            heightUnits={8}
-            unitSizePx={sliderUnitPx}
-            maxWidth="100%"
-            bins={audioBins}
-        />
-      </div>
-      <div
-        style={{
-          width: '100%',
-          height: sliderUnitPx,
-          borderTop: `1px solid ${seamColor}`,
-          borderLeft: `1px solid ${sideBorderColor}`,
-          borderRight: `1px solid ${sideBorderColor}`,
-          borderBottom: `1px solid ${sideBorderColor}`,
-          borderBottomLeftRadius: 3,
-          borderBottomRightRadius: 3,
-          background: safeB,
-          color: textColor,
-        }}
-      />
-    </div>
   );
 }

@@ -197,7 +197,7 @@ export default function AudioControls({
           borderTop: `1px solid ${sideBorderColor}`,
           borderLeft: `1px solid ${sideBorderColor}`,
           borderRight: `1px solid ${sideBorderColor}`,
-          borderBottom: `1px solid ${safeA}`,
+          borderBottom: `1px solid ${safeB}`,
           borderTopLeftRadius: 3,
           borderTopRightRadius: 3,
           background: safeB,
@@ -323,11 +323,11 @@ export default function AudioControls({
       />
       <div
         style={{
-          borderTop: `1px solid ${sideBorderColor}`,
+          borderTop: `1px solid ${seamColor}`,
           borderLeft: `1px solid ${sideBorderColor}`,
           borderRight: `1px solid ${sideBorderColor}`,
           borderRadius: 0,
-          borderBottom: 'none',
+          borderBottom: `1px solid ${safeB}`,
           overflow: 'hidden',
         }}
       >
@@ -345,6 +345,7 @@ export default function AudioControls({
           inactiveColor={safeB}
           rawFftDataRef={rawFftRef}
           rawFrameVersion={rawFftMeta.version}
+          rawBinCount={rawFftMeta.binCount}
           attackWeight={attackWeight}
           releaseWeight={releaseWeight}
           blurSigma={blurValue}
@@ -357,7 +358,7 @@ export default function AudioControls({
         style={{
           width: '100%',
           minHeight: sliderUnitPx,
-          borderTop: `1px solid ${seamColor}`,
+          borderTop: `1px solid ${safeA}`,
           borderLeft: `1px solid ${sideBorderColor}`,
           borderRight: `1px solid ${sideBorderColor}`,
           borderBottom: `1px solid ${sideBorderColor}`,

@@ -17,7 +17,7 @@ import {
   type GradientDefinition,
 } from "../../gradients/matplotlib";
 import { loadHeightTexture, type HeightTextureEntry } from "../../utils/loadHeightTexture";
-import { TERRAIN_TILE_ASSETS } from "../../assets/terrain/tiles";
+import { loadTerrainTileAssets, type TerrainTileAsset } from "../../assets/terrain/tiles";
 import "./selectionGrid.css";
 
 type PaletteInfo = {
@@ -300,6 +300,7 @@ function SelectionGridContent({
   fontSize,
   maxWidth = 360,
 }: SelectionGridProps) {
+  const [terrainTiles, setTerrainTiles] = React.useState<TerrainTileAsset[]>([]);
   const [tileAssignments, setTileAssignments] = React.useState<Record<string, TileAssignment>>({});
 
   const selectionGridState = useSelectionGridState(gridId);
@@ -323,11 +324,29 @@ function SelectionGridContent({
   const usesTerrainTiles = renderMode !== "plain";
 
   React.useEffect(() => {
+    let cancelled = false;
+    if (!usesTerrainTiles) {
+      setTerrainTiles([]);
+      return;
+    }
+    loadTerrainTileAssets()
+      .then((assets) => {
+        if (!cancelled) setTerrainTiles(assets);
+      })
+      .catch(() => {
+        if (!cancelled) setTerrainTiles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [usesTerrainTiles]);
+
+  React.useEffect(() => {
     if (!usesTerrainTiles) {
       setTileAssignments({});
       return;
     }
-    const tiles = TERRAIN_TILE_ASSETS;
+    const tiles = terrainTiles;
     if (tiles.length === 0) {
       setTileAssignments({});
       return;
@@ -340,7 +359,7 @@ function SelectionGridContent({
       assignments[gradient.name] = tile;
     });
     setTileAssignments(assignments);
-  }, [usesTerrainTiles]);
+  }, [terrainTiles, usesTerrainTiles]);
 
   const gradientVisuals = React.useMemo<GradientVisual[]>(() => GRADIENT_BASE_DATA.map((base) => {
     const assignment = usesTerrainTiles ? tileAssignments[base.name] : undefined;

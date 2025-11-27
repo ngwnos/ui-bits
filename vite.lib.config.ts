@@ -12,7 +12,15 @@ export default defineConfig({
       fileName: (format) => `lfoslider.${format}.js`,
     },
     rollupOptions: {
-      external: ["react", "react-dom"],
+      external: [
+        "react",
+        "react-dom",
+        "@radix-ui/react-popover",
+        "@radix-ui/react-scroll-area",
+        "@radix-ui/react-tabs",
+        "lucide-react",
+        "typegpu",
+      ],
       output: {
         globals: {
           react: "React",

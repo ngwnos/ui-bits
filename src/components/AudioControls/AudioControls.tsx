@@ -563,7 +563,7 @@ function AudioPlaybackEngine({
   } = useSliderActions();
   const audioContextRef = React.useRef<AudioContext | null>(null);
   const analyserRef = React.useRef<AnalyserNode | null>(null);
-  const bufferRef = React.useRef<Uint8Array | null>(null);
+const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
   const sourceRef = React.useRef<AudioBufferSourceNode | null>(null);
   const silentGainRef = React.useRef<GainNode | null>(null);
   const audioBufferRef = React.useRef<AudioBuffer | null>(null);
@@ -670,7 +670,7 @@ function AudioPlaybackEngine({
         analyser.fftSize = 2048;
         analyser.smoothingTimeConstant = analyserSmoothingRef.current;
         analyserRef.current = analyser;
-        bufferRef.current = new Uint8Array(analyser.frequencyBinCount);
+        bufferRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
         setAudioBinCount(analyser.frequencyBinCount);
         setAudioMaxMagnitude(1);
       } catch (error) {
@@ -739,7 +739,7 @@ function AudioPlaybackEngine({
     sourceRef.current = source;
     silentGainRef.current = silentGain;
     if (!bufferRef.current) {
-      bufferRef.current = new Uint8Array(analyser.frequencyBinCount);
+      bufferRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
       setAudioBinCount(analyser.frequencyBinCount);
     }
   }, [getCurrentPlaybackSeconds, setAudioBinCount, stopSourceImmediate, wrapOffset]);

@@ -18,23 +18,18 @@ import {
   X,
 } from "lucide-react";
 import {
-  CustomColorPopover,
-  SelectionGrid,
-  TypeGPUTest,
+  DEFAULT_SELECTION_GRID_ID,
   Dropdown,
-  SegmentBar,
-} from "./components";
-import AudioControls, { type AudioControlsBorder } from "./components/AudioControls/AudioControls";
-import type { SegmentBarBorderStyle } from "./components";
-import LFOSlider, {
   FrameLoopProvider,
-  type SliderBorder,
+  LFOSlider,
+  SelectionGrid,
+  SegmentBar,
   createDayOfYearFormatter,
   createTimeFormatter,
-} from "./components/LFOSlider";
-import type { Waveform } from "./lfo";
-import { flexoki } from "./flexoki";
-import {
+  flexoki,
+  type SegmentBarBorderStyle,
+  type SliderBorder,
+  type Waveform,
   SliderStoreProvider,
   useSliderActions,
   useSliderDefinition,
@@ -47,8 +42,10 @@ import {
   type SelectionGridPreviewMode,
   type SliderRuntimeState,
   type SliderId,
-} from "./sliderStore";
-import { DEFAULT_SELECTION_GRID_ID } from "./selectionGridIds";
+} from "ui-bits";
+import AudioControls, { type AudioControlsBorder } from "./components/AudioControls/AudioControls";
+import CustomColorPopover from "./components/CustomColorPopover";
+import TypeGPUTest from "./components/TypeGPUTest";
 
 const BORDER_MODES: SliderBorder[] = ['left', 'right', 'none'];
 const BORDER_ICONS: Record<SliderBorder, React.ComponentType<{ size?: number; strokeWidth?: number }>> = {
@@ -414,8 +411,8 @@ function ConnectedSlider({
       defaultValue={state.value}
       width={resolvedWidth}
       lfoRange={state.drawerLines}
-      leftColor={state.leftColor}
-      rightColor={state.rightColor}
+      colorA={state.colorA}
+      colorB={state.colorB}
       border={state.border}
       fontSize={fontSize}
       showLfoControls={definition.drawerHandle && state.drawerFeatureEnabled}
@@ -668,8 +665,8 @@ const tabs = [
     { value: 'center', label: 'Center' },
     { value: 'right', label: 'Right' },
   ];
-  const selectionGridSliderLeftColor = previewDarkMode ? flexoki.base['100'] : flexoki.base['700'];
-  const selectionGridSliderRightColor = previewDarkMode ? flexoki.base['700'] : flexoki.base['50'];
+  const selectionGridSliderColorA = previewDarkMode ? flexoki.base['100'] : flexoki.base['700'];
+  const selectionGridSliderColorB = previewDarkMode ? flexoki.base['700'] : flexoki.base['50'];
   const selectionGridAlignmentButtonStyle: React.CSSProperties = {
     background: previewDarkMode ? flexoki.base['200'] : flexoki.base['700'],
     color: previewDarkMode ? flexoki.base['900'] : flexoki.base['50'],
@@ -859,11 +856,11 @@ const tabs = [
             >
               <CustomColorPopover
                 label="Left color"
-                previewColor={customState.leftColor}
-                accentColor={customState.rightColor}
+                previewColor={customState.colorA}
+                accentColor={customState.colorB}
                 isDarkMode={previewDarkMode}
                 triggerStyle={iconButtonStyle}
-                onSelect={(color) => actions.setSliderColors(customSliderId, color, customState.rightColor)}
+                onSelect={(color) => actions.setSliderColors(customSliderId, color, customState.colorB)}
               />
               <button
                 type="button"
@@ -903,11 +900,11 @@ const tabs = [
               </button>
               <CustomColorPopover
                 label="Right color"
-                previewColor={customState.rightColor}
-                accentColor={customState.leftColor}
+                previewColor={customState.colorB}
+                accentColor={customState.colorA}
                 isDarkMode={previewDarkMode}
                 triggerStyle={iconButtonStyle}
-                onSelect={(color) => actions.setSliderColors(customSliderId, customState.leftColor, color)}
+                onSelect={(color) => actions.setSliderColors(customSliderId, customState.colorA, color)}
               />
             </div>
             <div
@@ -941,8 +938,8 @@ const tabs = [
                 step={DATE_SLIDER_STEP}
                 width={360}
                 defaultValue={dateSliderValue}
-                leftColor={flexoki.green['700']}
-                rightColor={previewDarkMode ? flexoki.base['100'] : flexoki.base['50']}
+                colorA={flexoki.green['700']}
+                colorB={previewDarkMode ? flexoki.base['100'] : flexoki.base['50']}
                 border="left"
                 fontSize={sliderFontSize}
                 displayFormatterPreset="dayOfYear"
@@ -967,8 +964,8 @@ const tabs = [
                 step={TIME_SLIDER_STEP}
                 width={360}
                 defaultValue={timeSliderValue}
-                leftColor={previewDarkMode ? flexoki.base['200'] : flexoki.base['900']}
-                rightColor={previewDarkMode ? flexoki.blue['400'] : flexoki.blue['100']}
+                colorA={previewDarkMode ? flexoki.base['200'] : flexoki.base['900']}
+                colorB={previewDarkMode ? flexoki.blue['400'] : flexoki.blue['100']}
                 border="right"
                 fontSize={sliderFontSize}
                 displayFormatterPreset="time"
@@ -1023,8 +1020,8 @@ const tabs = [
                 step={1}
                 width={420}
                 defaultValue={segmentCompareValue}
-                leftColor={flexoki.orange['600']}
-                rightColor={flexoki.magenta['300']}
+                colorA={flexoki.orange['600']}
+                colorB={flexoki.magenta['300']}
                 border="left"
                 fontSize={sliderFontSize}
                 onUserChange={(value: number) => setSegmentCompareValue(value)}
@@ -1123,8 +1120,8 @@ const tabs = [
                   step={1}
                   width={360}
                   defaultValue={dropdownSliderValue}
-                  leftColor={flexoki.cyan['600']}
-                  rightColor={flexoki.base['50']}
+                  colorA={flexoki.cyan['600']}
+                  colorB={flexoki.base['50']}
                   border="left"
                   fontSize={sliderFontSize}
                   onUserChange={(value: number) => setDropdownSliderValue(value)}
@@ -1137,8 +1134,8 @@ const tabs = [
                   step={1}
                   width={360}
                   defaultValue={dropdownSliderValueDark}
-                  leftColor={flexoki.base['50']}
-                  rightColor={flexoki.cyan['600']}
+                  colorA={flexoki.base['50']}
+                  colorB={flexoki.cyan['600']}
                   border="right"
                   fontSize={sliderFontSize}
                   onUserChange={(value: number) => setDropdownSliderValueDark(value)}
@@ -1152,8 +1149,8 @@ const tabs = [
                   step={DATE_SLIDER_STEP}
                   width={360}
                   defaultValue={dateSliderValue}
-                  leftColor={flexoki.cyan['700']}
-                  rightColor={flexoki.base['100']}
+                  colorA={flexoki.cyan['700']}
+                  colorB={flexoki.base['100']}
                   border="left"
                   fontSize={sliderFontSize}
                   displayFormatterPreset="dayOfYear"
@@ -1174,8 +1171,8 @@ const tabs = [
                   step={TIME_SLIDER_STEP}
                   width={360}
                   defaultValue={timeSliderValue}
-                  leftColor={flexoki.cyan['800']}
-                  rightColor={flexoki.base['100']}
+                  colorA={flexoki.cyan['800']}
+                  colorB={flexoki.base['100']}
                   border="left"
                   fontSize={sliderFontSize}
                   displayFormatterPreset="time"
@@ -1204,8 +1201,8 @@ const tabs = [
                 width={360}
                 mode="external"
                 readExternal={() => selectionSquareScale}
-                leftColor={selectionGridSliderLeftColor}
-                rightColor={selectionGridSliderRightColor}
+                colorA={selectionGridSliderColorA}
+                colorB={selectionGridSliderColorB}
                 onUserChange={(value: number) => {
                   selectionGridActions.setSelectionGridSquareScale(DEFAULT_SELECTION_GRID_ID, value);
                 }}
@@ -1222,8 +1219,8 @@ const tabs = [
                 width={360}
                 mode="external"
                 readExternal={() => selectionSunAltitude}
-                leftColor={selectionGridSliderLeftColor}
-                rightColor={selectionGridSliderRightColor}
+                colorA={selectionGridSliderColorA}
+                colorB={selectionGridSliderColorB}
                 onUserChange={(value: number) => {
                   selectionGridActions.setSelectionGridSunAltitude(DEFAULT_SELECTION_GRID_ID, value);
                 }}
@@ -1240,8 +1237,8 @@ const tabs = [
                 width={360}
                 mode="external"
                 readExternal={() => selectionSunAzimuth}
-                leftColor={selectionGridSliderLeftColor}
-                rightColor={selectionGridSliderRightColor}
+                colorA={selectionGridSliderColorA}
+                colorB={selectionGridSliderColorB}
                 onUserChange={(value: number) => {
                   selectionGridActions.setSelectionGridSunAzimuth(DEFAULT_SELECTION_GRID_ID, value);
                 }}
@@ -1282,8 +1279,8 @@ const tabs = [
               gridId={DEFAULT_SELECTION_GRID_ID}
               previewDarkMode={previewDarkMode}
               layoutGap={layoutGap}
+              colorA={previewDarkMode ? flexoki.base['50'] : "#ffffff"}
               colorB={flexoki.base['50']}
-              textColor={previewDarkMode ? flexoki.base['50'] : "#ffffff"}
               maxHeightUnits={24}
             />
           </Tabs.Content>
@@ -1327,8 +1324,8 @@ const tabs = [
                   step={1}
                   width="100%"
                   defaultValue={audioPreviewValue}
-                  leftColor={flexoki.base['600']}
-                  rightColor={flexoki.base['50']}
+                  colorA={flexoki.base['600']}
+                  colorB={flexoki.base['50']}
                   border="left"
                   fontSize={12}
                   onUserChange={setAudioPreviewValue}

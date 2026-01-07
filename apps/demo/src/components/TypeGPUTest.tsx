@@ -1,7 +1,6 @@
 import React from "react";
 import tgpu from "typegpu";
-import { MATPLOTLIB_GRADIENTS, buildPalette } from "../gradients/matplotlib";
-import { loadHeightTexture } from "../utils/loadHeightTexture";
+import { MATPLOTLIB_GRADIENTS, buildPalette, loadHeightTexture } from "ui-bits";
 
 const TILE_URL = "/terrain/dem_tiles/tile_r00_c00.png";
 

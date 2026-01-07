@@ -7,11 +7,8 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { LFOSlider, flexoki, useFrame, useSliderActions } from "ui-bits";
 import AudioFFTWindow from "../AudioFFTWindow/AudioFFTWindow";
-import LFOSlider from "../LFOSlider";
-import { useSliderActions } from "../../sliderStore";
-import { useFrame } from "../LFOSlider";
-import { flexoki } from "../../flexoki";
 
 export type AudioControlsBorder = 'a' | 'b' | 'none';
 
@@ -42,6 +39,11 @@ const roundSigma = (value: number) => Math.round(clampBetween(value, 0, 3) * 10)
 const DEFAULT_SAMPLE_RATE = 44100;
 const DEFAULT_NYQUIST = DEFAULT_SAMPLE_RATE / 2;
 const MIN_FREQ_HZ_GAP = 10;
+
+function safeCloseAudioContext(context: AudioContext | null) {
+  if (!context || context.state === "closed") return;
+  void context.close().catch(() => {});
+}
 
 export default function AudioControls({
   fontSize,
@@ -275,8 +277,8 @@ export default function AudioControls({
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
-            leftColor={safeA}
-            rightColor={safeB}
+            colorA={safeA}
+            colorB={safeB}
             fontSize={fontSize}
             mode="external"
             readExternal={() => freqMinHz}
@@ -293,8 +295,8 @@ export default function AudioControls({
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
-            leftColor={safeA}
-            rightColor={safeB}
+            colorA={safeA}
+            colorB={safeB}
             fontSize={fontSize}
             mode="external"
             readExternal={() => freqMaxHz}
@@ -426,8 +428,8 @@ export default function AudioControls({
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
-            leftColor={safeA}
-            rightColor={safeB}
+            colorA={safeA}
+            colorB={safeB}
             fontSize={fontSize}
             mode="external"
             readExternal={() => binSliderValue}
@@ -453,8 +455,8 @@ export default function AudioControls({
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
-            leftColor={safeA}
-            rightColor={safeB}
+            colorA={safeA}
+            colorB={safeB}
             fontSize={fontSize}
             mode="external"
             readExternal={() => attackValue}
@@ -471,8 +473,8 @@ export default function AudioControls({
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
-            leftColor={safeA}
-            rightColor={safeB}
+            colorA={safeA}
+            colorB={safeB}
             fontSize={fontSize}
             mode="external"
             readExternal={() => releaseValue}
@@ -489,8 +491,8 @@ export default function AudioControls({
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
-            leftColor={safeA}
-            rightColor={safeB}
+            colorA={safeA}
+            colorB={safeB}
             fontSize={fontSize}
             mode="external"
             readExternal={() => smoothingValue}
@@ -507,8 +509,8 @@ export default function AudioControls({
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
-            leftColor={safeA}
-            rightColor={safeB}
+            colorA={safeA}
+            colorB={safeB}
             fontSize={fontSize}
             mode="external"
             readExternal={() => blurValue}
@@ -656,11 +658,7 @@ const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
         if (cancelled) {
-          try {
-            audioContext.close();
-          } catch {
-            // ignore double-close
-          }
+          safeCloseAudioContext(audioContext);
           return;
         }
         audioBufferRef.current = audioBuffer;
@@ -683,11 +681,7 @@ const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
       analyserRef.current = null;
       bufferRef.current = null;
       stopSourceImmediate();
-      try {
-        audioContextRef.current?.close();
-      } catch {
-        // ignore double-close
-      }
+      safeCloseAudioContext(audioContextRef.current);
       audioContextRef.current = null;
       sourceRef.current = null;
       silentGainRef.current = null;

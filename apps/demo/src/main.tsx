@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as ScrollArea from '@radix-ui/react-scroll-area'
+import 'ui-bits/style.css'
 import './index.css'
 import App from './App.tsx'
 

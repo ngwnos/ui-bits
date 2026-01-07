@@ -117,8 +117,8 @@ export interface LFOSliderProps {
   audioFrequencyMin?: number;
   audioFrequencyMax?: number;
   audioFrequencyStep?: number;
-  leftColor?: string;
-  rightColor?: string;
+  colorA?: string;
+  colorB?: string;
   border?: SliderBorder;
   fontSize?: number;
   showLfoControls?: boolean;
@@ -173,8 +173,8 @@ function LFOSlider({
   audioFrequencyMin,
   audioFrequencyMax,
   audioFrequencyStep,
-  leftColor,
-  rightColor,
+  colorA,
+  colorB,
   border = 'left',
   fontSize,
   showLfoControls = false,
@@ -247,7 +247,7 @@ function LFOSlider({
   const [drawerOpen, setDrawerOpen] = useState<boolean>(() => controlledDrawerOpen ?? false);
   const [drawerHeight, setDrawerHeight] = useState<number>(0);
   const [activeWaveform, setActiveWaveform] = useState<Waveform>(defaultWaveform);
-  const initialLfoEnabled = lfoRunning ?? (showLfoControls ? false : (lfoSettings.enabled ?? true));
+  const initialLfoEnabled = lfoRunning ?? lfoProp?.enabled ?? false;
   const [lfoEnabled, setLfoEnabled] = useState<boolean>(initialLfoEnabled);
   const [knobFrequency, setKnobFrequency] = useState<number>(() => clamp(
     initialFrequency ?? lfoSettings.frequency ?? 0.5,
@@ -471,8 +471,8 @@ function LFOSlider({
   // Theme colors
   const fallbackLeft = '#2f2f2f';
   const fallbackRight = '#f0f0f0';
-  const bgLeft = leftColor ?? fallbackLeft;
-  const bgRight = rightColor ?? fallbackRight;
+  const bgLeft = colorA ?? fallbackLeft;
+  const bgRight = colorB ?? fallbackRight;
   const normalizedMask = useMemo(() => ({
     top: borderMask?.top ?? true,
     right: borderMask?.right ?? true,
@@ -589,6 +589,7 @@ function LFOSlider({
     ? rawAudioMaxMagnitude
     : 1;
   const audioDriveEnabled = isAudioWaveform
+    && lfoEnabled
     && availableAudioBins > 0
     && effectiveAudioBinCount > 0
     && effectiveAudioMaxMagnitude > 0;
@@ -842,13 +843,6 @@ function LFOSlider({
 
   const frameFn = useCallback((nowSec: number) => {
     lastNowSecRef.current = nowSec;
-    if (audioDriveEnabled) {
-      const sampled = sampleAudioBinValue(audioSampleValue);
-      if (sampled !== null) {
-        applyWaveValue(sampled, nowSec);
-      }
-      return;
-    }
     if (!Number.isFinite(drawerValueMin) || !Number.isFinite(drawerValueMax)) return;
     const activeMode = mode === 'auto'
       ? (lfoEnabled ? 'lfo' : (readExternal ? 'external' : 'manual'))
@@ -856,6 +850,13 @@ function LFOSlider({
     if (draggingSplitRef.current || editingRef.current) return;
     let nextVal: number | undefined;
     if (activeMode === 'lfo' && lfoEnabled) {
+      if (audioDriveEnabled) {
+        const sampled = sampleAudioBinValue(audioSampleValue);
+        if (sampled !== null) {
+          applyWaveValue(sampled, nowSec);
+        }
+        return;
+      }
       const phaseBase = phaseDial + phaseOffsetRef.current;
       const withPhase: LfoSettings = {
         ...lfoSettings,

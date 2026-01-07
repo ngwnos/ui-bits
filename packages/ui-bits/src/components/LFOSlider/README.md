@@ -23,8 +23,8 @@ const Example = () => {
       max={1}
       step={0.01}
       defaultValue={value}
-      leftColor="#24837B"
-      rightColor="#FFFCF0"
+      colorA="#24837B"
+      colorB="#FFFCF0"
       onUserChange={setValue}
       onAnimatedUpdate={setValue}
     />
@@ -40,7 +40,7 @@ const Example = () => {
 | `min`, `max`, `step` | `number` | Range and quantisation of the numeric value. Defaults to `0 → 100` with step `1`. |
 | `defaultValue` | `number` | Initial numerical value; the component keeps its own local text buffer. |
 | `lfoRange` | `[number, number]` | Optional min/max markers shown in the drawer track. Falls back to randomised handles when omitted. |
-| `leftColor`, `rightColor` | `string` | Hex colours for the segmented background. When omitted the slider falls back to neutral grey/white. |
+| `colorA`, `colorB` | `string` | Hex colours for the segmented background. When omitted the slider falls back to neutral grey/white. |
 | `showLfoControls` | `boolean` | Enables the drawer UI (waveform toggles + min/max handles). |
 | `initialWaveform`, `initialFrequency`, `initialPhase` | Numbers describing the starting LFO. |
 | `onUserChange` | `(value: number) => void` | Fired for direct user edits (dragging, typing). |
@@ -62,7 +62,7 @@ The hooks are optional – leaving `mode="manual"`, `mirrorToStore={undefined}`,
 
 ## Styling
 
-The slider uses inline styles for layout and colours, so it does not ship with any external CSS. Provide `leftColor`/`rightColor` values to match your theme.
+The slider uses inline styles for layout and colours, so it does not ship with any external CSS. Provide `colorA`/`colorB` values to match your theme.
 
 ## Types
 

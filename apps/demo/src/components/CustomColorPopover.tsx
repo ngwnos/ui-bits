@@ -1,6 +1,6 @@
 import React from "react";
 import * as Popover from "@radix-ui/react-popover";
-import { flexoki, flexokiShades, type FlexokiHue } from "../flexoki";
+import { flexoki, flexokiShades, type FlexokiHue } from "ui-bits";
 
 const paletteHues: FlexokiHue[] = ['base', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'magenta'];
 const shadesReversed = [...flexokiShades].reverse();

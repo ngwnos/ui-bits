@@ -3,6 +3,10 @@
   "workspaces": {
     "": {
       "name": "ui-bits",
+    },
+    "apps/demo": {
+      "name": "ui-bits-demo",
+      "version": "0.0.0",
       "dependencies": {
         "@radix-ui/react-popover": "^1.1.15",
         "@radix-ui/react-scroll-area": "^1.2.10",
@@ -11,6 +15,7 @@
         "react": "^19.1.1",
         "react-dom": "^19.1.1",
         "typegpu": "^0.8.1",
+        "ui-bits": "workspace:*",
       },
       "devDependencies": {
         "@eslint/js": "^9.36.0",
@@ -26,6 +31,35 @@
         "typescript": "~5.9.3",
         "typescript-eslint": "^8.45.0",
         "vite": "^7.1.7",
+      },
+    },
+    "packages/ui-bits": {
+      "name": "ui-bits",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@eslint/js": "^9.36.0",
+        "@types/node": "^24.6.0",
+        "@types/react": "^19.1.16",
+        "@types/react-dom": "^19.1.9",
+        "@vitejs/plugin-react": "^5.0.4",
+        "@webgpu/types": "^0.1.66",
+        "eslint": "^9.36.0",
+        "eslint-plugin-react-hooks": "^5.2.0",
+        "eslint-plugin-react-refresh": "^0.4.22",
+        "globals": "^16.4.0",
+        "lucide-react": "^0.552.0",
+        "react": "^19.1.1",
+        "react-dom": "^19.1.1",
+        "typegpu": "^0.8.1",
+        "typescript": "~5.9.3",
+        "typescript-eslint": "^8.45.0",
+        "vite": "^7.1.7",
+      },
+      "peerDependencies": {
+        "lucide-react": "^0.552.0",
+        "react": "^19.1.1",
+        "react-dom": "^19.1.1",
+        "typegpu": "^0.8.1",
       },
     },
   },
@@ -555,6 +589,10 @@
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "typescript-eslint": ["typescript-eslint@8.46.2", "", { "dependencies": { "@typescript-eslint/eslint-plugin": "8.46.2", "@typescript-eslint/parser": "8.46.2", "@typescript-eslint/typescript-estree": "8.46.2", "@typescript-eslint/utils": "8.46.2" }, "peerDependencies": { "eslint": "^8.57.0 || ^9.0.0", "typescript": ">=4.8.4 <6.0.0" } }, "sha512-vbw8bOmiuYNdzzV3lsiWv6sRwjyuKJMQqWulBOU7M0RrxedXledX8G8kBbQeiOYDnTfiXz0Y4081E1QMNB6iQg=="],
+
+    "ui-bits": ["ui-bits@workspace:packages/ui-bits"],
+
+    "ui-bits-demo": ["ui-bits-demo@workspace:apps/demo"],
 
     "undici-types": ["undici-types@7.16.0", "", {}, "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="],
 

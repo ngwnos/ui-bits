@@ -59,7 +59,7 @@ export function useSliderActions() {
   const { dispatch } = useSliderStore();
   return useMemo(() => ({
     setSliderValue: (id: SliderId, value: number) => dispatch({ type: "setValue", id, value }),
-    setSliderColors: (id: SliderId, left: string, right: string) => dispatch({ type: "setColors", id, left, right }),
+    setSliderColors: (id: SliderId, colorA: string, colorB: string) => dispatch({ type: "setColors", id, colorA, colorB }),
     setSliderBorder: (id: SliderId, border: SliderBorder) => dispatch({ type: "setBorder", id, border }),
     setSliderDrawerLines: (id: SliderId, lines: [number, number]) => dispatch({ type: "setDrawerLines", id, lines }),
     setSliderDrawerFeatureEnabled: (id: SliderId, enabled: boolean) => dispatch({ type: "setDrawerFeatureEnabled", id, enabled }),

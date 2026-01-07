@@ -1,0 +1,67 @@
+{
+  "name": "ui-bits",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/lfoslider.cjs.js",
+  "module": "./dist/lfoslider.es.js",
+  "types": "./dist/types/library.d.ts",
+  "style": "./dist/ui-bits.css",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/types/library.d.ts",
+      "import": "./dist/lfoslider.es.js",
+      "require": "./dist/lfoslider.cjs.js"
+    },
+    "./style.css": "./dist/ui-bits.css",
+    "./components/LFOSlider": {
+      "types": "./dist/types/components/LFOSlider/LFOSlider.d.ts",
+      "import": "./dist/lfoslider.es.js",
+      "require": "./dist/lfoslider.cjs.js"
+    },
+    "./components/SelectionGrid": {
+      "types": "./dist/types/components/SelectionGrid/SelectionGrid.d.ts",
+      "import": "./dist/lfoslider.es.js",
+      "require": "./dist/lfoslider.cjs.js"
+    },
+    "./components/Dropdown": {
+      "types": "./dist/types/components/Dropdown/Dropdown.d.ts",
+      "import": "./dist/lfoslider.es.js",
+      "require": "./dist/lfoslider.cjs.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "bun run build:lib",
+    "build:lib": "vite build && tsc -p tsconfig.lib.json",
+    "lint": "eslint ."
+  },
+  "peerDependencies": {
+    "lucide-react": "^0.552.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "typegpu": "^0.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@types/node": "^24.6.0",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@webgpu/types": "^0.1.66",
+    "@vitejs/plugin-react": "^5.0.4",
+    "eslint": "^9.36.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.22",
+    "globals": "^16.4.0",
+    "lucide-react": "^0.552.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "typegpu": "^0.8.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.45.0",
+    "vite": "^7.1.7"
+  }
+}

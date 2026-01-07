@@ -281,8 +281,8 @@ export type SelectionGridProps = {
   gridId?: SelectionGridId;
   previewDarkMode: boolean;
   layoutGap: string;
+  colorA: string;
   colorB: string;
-  textColor: string;
   allowEmptySelection?: boolean;
   maxHeightUnits?: number;
   fontSize?: number;
@@ -293,8 +293,8 @@ function SelectionGridContent({
   gridId = DEFAULT_SELECTION_GRID_ID,
   previewDarkMode,
   layoutGap,
+  colorA,
   colorB,
-  textColor,
   allowEmptySelection = false,
   maxHeightUnits = 24,
   fontSize,
@@ -709,7 +709,7 @@ function SelectionGridContent({
                 size={terrainToggleIconSize}
                 strokeWidth={2}
                 style={{
-                  color: textColor,
+                  color: colorA,
                   filter: previewIconFilter,
                 }}
               />
@@ -722,7 +722,7 @@ function SelectionGridContent({
                 lineHeight: previewLineHeight,
                 fontWeight: 600,
                 textTransform: "capitalize",
-                color: textColor,
+                color: colorA,
                 textShadow: previewTextShadow,
                 userSelect: "none",
                 pointerEvents: "none",

@@ -24,8 +24,8 @@ const sliderProps: LFOSliderProps = {
   defaultValue: 440,
   width: 260,
   lfoRange: [400, 16000],
-  leftColor: '#2f2f2f',
-  rightColor: '#f0f0f0',
+  colorA: '#2f2f2f',
+  colorB: '#f0f0f0',
   border: 'left', // 'left' | 'right' | 'none'
   fontSize: 16,
   showLfoControls: true,

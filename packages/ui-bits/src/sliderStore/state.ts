@@ -41,8 +41,8 @@ export interface SliderDefinition {
 
 export interface SliderRuntimeState {
   value: number;
-  leftColor: string;
-  rightColor: string;
+  colorA: string;
+  colorB: string;
   border: SliderBorder;
   drawerFeatureEnabled: boolean;
   drawerLines: [number, number];
@@ -74,7 +74,7 @@ export interface SliderStoreState {
 
 export type SliderStoreAction =
   | { type: "setValue"; id: SliderId; value: number }
-  | { type: "setColors"; id: SliderId; left: string; right: string }
+  | { type: "setColors"; id: SliderId; colorA: string; colorB: string }
   | { type: "setBorder"; id: SliderId; border: SliderBorder }
   | { type: "setDrawerLines"; id: SliderId; lines: [number, number] }
   | { type: "setDrawerFeatureEnabled"; id: SliderId; enabled: boolean }
@@ -222,8 +222,8 @@ type SliderGroupDefinition = {
   variants: Array<{
     key: string;
     label: string;
-    leftColor?: string;
-    rightColor?: string;
+    colorA?: string;
+    colorB?: string;
   }>;
 };
 
@@ -235,9 +235,9 @@ const sliderGroups: SliderGroupDefinition[] = [
     step: 1,
     width: 260,
     variants: [
-      { key: "500-50", label: "Base 500/50", leftColor: flexoki.base["500"], rightColor: flexoki.base["50"] },
+      { key: "500-50", label: "Base 500/50", colorA: flexoki.base["500"], colorB: flexoki.base["50"] },
       { key: "600-100", label: "Base 600/100" },
-      { key: "700-200", label: "Base 700/200", leftColor: flexoki.base["700"], rightColor: flexoki.base["200"] },
+      { key: "700-200", label: "Base 700/200", colorA: flexoki.base["700"], colorB: flexoki.base["200"] },
     ],
   },
   {
@@ -247,9 +247,9 @@ const sliderGroups: SliderGroupDefinition[] = [
     step: 1,
     width: 260,
     variants: [
-      { key: "500-50", label: "Red 500/50", leftColor: flexoki.red["500"], rightColor: flexoki.red["50"] },
+      { key: "500-50", label: "Red 500/50", colorA: flexoki.red["500"], colorB: flexoki.red["50"] },
       { key: "600-100", label: "Red 600/100" },
-      { key: "700-200", label: "Red 700/200", leftColor: flexoki.red["700"], rightColor: flexoki.red["200"] },
+      { key: "700-200", label: "Red 700/200", colorA: flexoki.red["700"], colorB: flexoki.red["200"] },
     ],
   },
   {
@@ -259,9 +259,9 @@ const sliderGroups: SliderGroupDefinition[] = [
     step: 1,
     width: 260,
     variants: [
-      { key: "500-50", label: "Orange 500/50", leftColor: flexoki.orange["500"], rightColor: flexoki.orange["50"] },
+      { key: "500-50", label: "Orange 500/50", colorA: flexoki.orange["500"], colorB: flexoki.orange["50"] },
       { key: "600-100", label: "Orange 600/100" },
-      { key: "700-200", label: "Orange 700/200", leftColor: flexoki.orange["700"], rightColor: flexoki.orange["200"] },
+      { key: "700-200", label: "Orange 700/200", colorA: flexoki.orange["700"], colorB: flexoki.orange["200"] },
     ],
   },
   {
@@ -271,9 +271,9 @@ const sliderGroups: SliderGroupDefinition[] = [
     step: 1,
     width: 260,
     variants: [
-      { key: "500-50", label: "Yellow 500/50", leftColor: flexoki.yellow["500"], rightColor: flexoki.yellow["50"] },
+      { key: "500-50", label: "Yellow 500/50", colorA: flexoki.yellow["500"], colorB: flexoki.yellow["50"] },
       { key: "600-100", label: "Yellow 600/100" },
-      { key: "700-200", label: "Yellow 700/200", leftColor: flexoki.yellow["700"], rightColor: flexoki.yellow["200"] },
+      { key: "700-200", label: "Yellow 700/200", colorA: flexoki.yellow["700"], colorB: flexoki.yellow["200"] },
     ],
   },
   {
@@ -283,9 +283,9 @@ const sliderGroups: SliderGroupDefinition[] = [
     step: 0.5,
     width: 260,
     variants: [
-      { key: "500-50", label: "Green 500/50", leftColor: flexoki.green["500"], rightColor: flexoki.green["50"] },
+      { key: "500-50", label: "Green 500/50", colorA: flexoki.green["500"], colorB: flexoki.green["50"] },
       { key: "600-100", label: "Green 600/100" },
-      { key: "700-200", label: "Green 700/200", leftColor: flexoki.green["700"], rightColor: flexoki.green["200"] },
+      { key: "700-200", label: "Green 700/200", colorA: flexoki.green["700"], colorB: flexoki.green["200"] },
     ],
   },
   {
@@ -295,9 +295,9 @@ const sliderGroups: SliderGroupDefinition[] = [
     step: 0.01,
     width: 260,
     variants: [
-      { key: "500-50", label: "Cyan 500/50", leftColor: flexoki.cyan["500"], rightColor: flexoki.cyan["50"] },
+      { key: "500-50", label: "Cyan 500/50", colorA: flexoki.cyan["500"], colorB: flexoki.cyan["50"] },
       { key: "600-100", label: "Cyan 600/100" },
-      { key: "700-200", label: "Cyan 700/200", leftColor: flexoki.cyan["700"], rightColor: flexoki.cyan["200"] },
+      { key: "700-200", label: "Cyan 700/200", colorA: flexoki.cyan["700"], colorB: flexoki.cyan["200"] },
     ],
   },
   {
@@ -307,9 +307,9 @@ const sliderGroups: SliderGroupDefinition[] = [
     step: 0.01,
     width: 260,
     variants: [
-      { key: "500-50", label: "Blue 500/50", leftColor: flexoki.blue["500"], rightColor: flexoki.blue["50"] },
+      { key: "500-50", label: "Blue 500/50", colorA: flexoki.blue["500"], colorB: flexoki.blue["50"] },
       { key: "600-100", label: "Blue 600/100" },
-      { key: "700-200", label: "Blue 700/200", leftColor: flexoki.blue["700"], rightColor: flexoki.blue["200"] },
+      { key: "700-200", label: "Blue 700/200", colorA: flexoki.blue["700"], colorB: flexoki.blue["200"] },
     ],
   },
   {
@@ -319,9 +319,9 @@ const sliderGroups: SliderGroupDefinition[] = [
     step: 1,
     width: 260,
     variants: [
-      { key: "500-50", label: "Purple 500/50", leftColor: flexoki.purple["500"], rightColor: flexoki.purple["50"] },
+      { key: "500-50", label: "Purple 500/50", colorA: flexoki.purple["500"], colorB: flexoki.purple["50"] },
       { key: "600-100", label: "Purple 600/100" },
-      { key: "700-200", label: "Purple 700/200", leftColor: flexoki.purple["700"], rightColor: flexoki.purple["200"] },
+      { key: "700-200", label: "Purple 700/200", colorA: flexoki.purple["700"], colorB: flexoki.purple["200"] },
     ],
   },
   {
@@ -331,9 +331,9 @@ const sliderGroups: SliderGroupDefinition[] = [
     step: 1,
     width: 260,
     variants: [
-      { key: "500-50", label: "Magenta 500/50", leftColor: flexoki.magenta["500"], rightColor: flexoki.magenta["50"] },
+      { key: "500-50", label: "Magenta 500/50", colorA: flexoki.magenta["500"], colorB: flexoki.magenta["50"] },
       { key: "600-100", label: "Magenta 600/100" },
-      { key: "700-200", label: "Magenta 700/200", leftColor: flexoki.magenta["700"], rightColor: flexoki.magenta["200"] },
+      { key: "700-200", label: "Magenta 700/200", colorA: flexoki.magenta["700"], colorB: flexoki.magenta["200"] },
     ],
   },
 ];
@@ -354,8 +354,8 @@ export function buildInitialState(): SliderStoreState {
       const variant = group.variants[columnIndex];
       if (!variant) return;
       const id = `${group.hue}-${variant.key}`;
-      const leftColor = variant.leftColor ?? flexoki[group.hue]["600"];
-      const rightColor = variant.rightColor ?? flexoki[group.hue]["100"];
+      const colorA = variant.colorA ?? flexoki[group.hue]["600"];
+      const colorB = variant.colorB ?? flexoki[group.hue]["100"];
       definitions[id] = {
         id,
         label: variant.label,
@@ -368,8 +368,8 @@ export function buildInitialState(): SliderStoreState {
       };
       sliders[id] = {
         value: randomValue({ min: group.min, max: group.max, step: group.step }),
-        leftColor,
-        rightColor,
+        colorA,
+        colorB,
         border: "none",
         drawerFeatureEnabled: definitions[id].drawerHandle,
         drawerLines: [
@@ -406,8 +406,8 @@ export function buildInitialState(): SliderStoreState {
   };
   sliders[customSliderId] = {
     value: randomValue({ min: customMin, max: customMax, step: customStep }),
-    leftColor: "#205EA6",
-    rightColor: "#ECCB60",
+    colorA: "#205EA6",
+    colorB: "#ECCB60",
     border: "none",
     drawerFeatureEnabled: definitions[customSliderId].drawerHandle,
     drawerLines: [
@@ -461,8 +461,8 @@ export function sliderStoreReducer(state: SliderStoreState, action: SliderStoreA
           ...state.sliders,
           [action.id]: {
             ...state.sliders[action.id],
-            leftColor: action.left,
-            rightColor: action.right,
+            colorA: action.colorA,
+            colorB: action.colorB,
           },
         },
       };
@@ -617,7 +617,7 @@ export function sliderStoreReducer(state: SliderStoreState, action: SliderStoreA
       const nextSliders = Object.fromEntries(
         Object.entries(state.sliders).map(([id, slider]) => [
           id,
-          { ...slider, leftColor: slider.rightColor, rightColor: slider.leftColor },
+          { ...slider, colorA: slider.colorB, colorB: slider.colorA },
         ]),
       );
       return { ...state, sliders: nextSliders };
@@ -627,7 +627,7 @@ export function sliderStoreReducer(state: SliderStoreState, action: SliderStoreA
       action.ids.forEach((id) => {
         const current = nextSliders[id];
         if (!current) return;
-        nextSliders[id] = { ...current, leftColor: current.rightColor, rightColor: current.leftColor };
+        nextSliders[id] = { ...current, colorA: current.colorB, colorB: current.colorA };
       });
       return { ...state, sliders: nextSliders };
     }

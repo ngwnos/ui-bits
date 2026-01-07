@@ -15,9 +15,6 @@ export default defineConfig({
       external: [
         "react",
         "react-dom",
-        "@radix-ui/react-popover",
-        "@radix-ui/react-scroll-area",
-        "@radix-ui/react-tabs",
         "lucide-react",
         "typegpu",
       ],

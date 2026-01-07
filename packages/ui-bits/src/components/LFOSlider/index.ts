@@ -3,6 +3,8 @@ export {
   type LFOSliderProps,
   type LFOSliderMode,
   type SliderBorder,
+  type SliderBarStyle,
+  type SliderVariant,
 } from "./LFOSlider";
 export type {
   DisplayValueFormatContext,

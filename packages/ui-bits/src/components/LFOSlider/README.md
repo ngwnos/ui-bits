@@ -38,6 +38,9 @@ const Example = () => {
 | --- | --- | --- |
 | `label` | `string` | Accessible label and on-screen caption. |
 | `min`, `max`, `step` | `number` | Range and quantisation of the numeric value. Defaults to `0 → 100` with step `1`. |
+| `variant` | `'full' \| 'basic'` | `basic` disables text editing + LFO drawer controls to create a minimal slider for nested usage. |
+| `barStyle` | `'continuous' \| 'discrete'` | Controls how the bar fill renders; discrete snaps the fill without changing the numeric value step. |
+| `barSegmentCount` | `number` | Visual segment count used when `barStyle="discrete"`. |
 | `defaultValue` | `number` | Initial numerical value; the component keeps its own local text buffer. |
 | `lfoRange` | `[number, number]` | Optional min/max markers shown in the drawer track. Falls back to randomised handles when omitted. |
 | `colorA`, `colorB` | `string` | Hex colours for the segmented background. When omitted the slider falls back to neutral grey/white. |
@@ -67,10 +70,10 @@ The slider uses inline styles for layout and colours, so it does not ship with a
 ## Types
 
 ```ts
-import { LFOSliderMode, LFOSliderProps } from "../components";
+import { LFOSliderMode, LFOSliderProps, SliderBarStyle, SliderVariant } from "../components";
 ```
 
-`LFOSliderMode` enumerates the allowed LFO behaviour hints (`'auto' | 'manual' | 'lfo' | 'external'`).
+`LFOSliderMode` enumerates the allowed LFO behaviour hints (`'auto' | 'manual' | 'lfo' | 'external'`). `SliderVariant` toggles full vs. basic interaction, and `SliderBarStyle` controls continuous vs. discrete bar rendering.
 
 ## Example Integration
 

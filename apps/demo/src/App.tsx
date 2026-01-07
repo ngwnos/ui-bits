@@ -21,6 +21,7 @@ import {
   DEFAULT_SELECTION_GRID_ID,
   Dropdown,
   FrameLoopProvider,
+  IconButton,
   LFOSlider,
   SelectionGrid,
   SegmentBar,
@@ -571,6 +572,7 @@ function EditableRectPOC() {
   const horizontalPadding = Math.max(columnGap * 2, 16);
 const tabs = [
     { value: 'lfo-slider', label: 'LFO Slider' },
+    { value: 'icon-button', label: 'Icon Button' },
     { value: 'segment-bar', label: 'Segment Bar' },
     { value: 'dropdown', label: 'Dropdown' },
     { value: 'selection-grid', label: 'Selection Grid' },
@@ -635,6 +637,10 @@ const tabs = [
     background: buttonBackground,
     color: buttonForeground,
   };
+  const iconButtonBorderStyles: Array<'a' | 'b' | 'none'> = ['a', 'b', 'none'];
+  const iconButtonFontSizes = [10, 12, 14, 16];
+  const iconButtonColorA = buttonForeground;
+  const iconButtonColorB = buttonBackground;
   const selectionPreviewMode = selectionGridState.previewMode;
   const selectionPreviewModeIndex = SELECTION_PREVIEW_MODE_SEQUENCE.indexOf(selectionPreviewMode);
   const safeSelectionPreviewModeIndex = selectionPreviewModeIndex >= 0 ? selectionPreviewModeIndex : 0;
@@ -979,6 +985,90 @@ const tabs = [
               <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.85 }}>
                 Selected: {formatTimeLabel(timeSliderValue)}
               </span>
+            </div>
+          </Tabs.Content>
+          <Tabs.Content value="icon-button" style={tabBodyStyle}>
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 520,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+                color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'],
+              }}
+            >
+              <p style={{ margin: 0, fontSize: CONTROL_FONT_SIZE }}>
+                Icon Button keeps the two-color palette and supports solid, soft, outline, and ghost treatments.
+              </p>
+              <div
+                style={{
+                  display: 'grid',
+                  gap: 12,
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                }}
+              >
+                {iconButtonBorderStyles.map((borderStyle) => (
+                  <div
+                    key={borderStyle}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: CONTROL_FONT_SIZE, textTransform: 'uppercase' }}>{borderStyle}</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <IconButton
+                        borderStyle={borderStyle}
+                        fontSize={CONTROL_FONT_SIZE}
+                        colorA={iconButtonColorA}
+                        colorB={iconButtonColorB}
+                        aria-label={`${borderStyle} icon button`}
+                      >
+                        <Sun strokeWidth={1.6} />
+                      </IconButton>
+                      <IconButton
+                        borderStyle={borderStyle}
+                        fontSize={CONTROL_FONT_SIZE}
+                        colorA={iconButtonColorA}
+                        colorB={iconButtonColorB}
+                        aria-label={`${borderStyle} icon button alt`}
+                      >
+                        <Moon strokeWidth={1.6} />
+                      </IconButton>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.8 }}>Sizes</span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {iconButtonFontSizes.map((size) => (
+                    <IconButton
+                      key={`icon-size-${size}`}
+                      borderStyle="a"
+                      fontSize={size}
+                      colorA={iconButtonColorA}
+                      colorB={iconButtonColorB}
+                      aria-label={`Icon button size ${size}`}
+                    >
+                      <AudioWaveform strokeWidth={1.6} />
+                    </IconButton>
+                  ))}
+                  <IconButton
+                    borderStyle="a"
+                    fontSize={CONTROL_FONT_SIZE}
+                    colorA={iconButtonColorA}
+                    colorB={iconButtonColorB}
+                    disabled
+                    aria-label="Disabled icon button"
+                  >
+                    <X strokeWidth={1.6} />
+                  </IconButton>
+                </div>
+              </div>
             </div>
           </Tabs.Content>
           <Tabs.Content value="segment-bar" style={tabBodyStyle}>

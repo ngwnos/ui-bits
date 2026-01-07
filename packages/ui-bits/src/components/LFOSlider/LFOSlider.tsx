@@ -101,12 +101,17 @@ const DRAWER_ICON_DEFS: Array<{
 // =================== LFOSlider component ===================
 
 export type LFOSliderMode = 'auto' | 'manual' | 'lfo' | 'external';
+export type SliderVariant = 'full' | 'basic';
+export type SliderBarStyle = 'continuous' | 'discrete';
 
 export interface LFOSliderProps {
   label: string;
   min?: number;
   max?: number;
   step?: number;
+  variant?: SliderVariant;
+  barStyle?: SliderBarStyle;
+  barSegmentCount?: number;
   defaultValue?: number;
   width?: number | string;
   drawerLines?: [number, number];
@@ -158,11 +163,14 @@ export interface LFOSliderProps {
   borderMask?: Partial<Record<'top' | 'right' | 'bottom' | 'left', boolean>>;
 };
 
-function LFOSlider({
+function SliderCore({
   label,
   min = 0,
   max = 100,
   step = 1,
+  variant = 'full',
+  barStyle = 'discrete',
+  barSegmentCount = 32,
   defaultValue,
   width,
   drawerLines,
@@ -220,6 +228,7 @@ function LFOSlider({
   const resolvedAudioFrequencyMax = audioFrequencyMax ?? AUDIO_FREQUENCY_MAX;
   const resolvedAudioFrequencyStep = audioFrequencyStep ?? AUDIO_FREQUENCY_STEP;
   const precInit = precisionFrom(min, max, step);
+  const isBasic = variant === 'basic';
   const [text, setText] = useState<string>(() => (defaultValue !== undefined ? Number(defaultValue).toFixed(precInit) : '0'));
   const lfoSettings = useMemo<LfoSettings>(() => {
     const defaults: LfoSettings = {
@@ -234,7 +243,8 @@ function LFOSlider({
     return { ...defaults, ...(lfoProp ?? {}) };
   }, [initialFrequency, initialWaveform, lfoProp, phase]);
   const defaultWaveform = initialWaveform ?? lfoSettings.waveform ?? 'sine';
-  const drawerHandleActive = showLfoControls;
+  const resolvedShowLfoControls = !isBasic && showLfoControls;
+  const drawerHandleActive = resolvedShowLfoControls;
 
   // Selection model
   const [selStart, setSelStart] = useState<number>(text.length);
@@ -247,7 +257,7 @@ function LFOSlider({
   const [drawerOpen, setDrawerOpen] = useState<boolean>(() => controlledDrawerOpen ?? false);
   const [drawerHeight, setDrawerHeight] = useState<number>(0);
   const [activeWaveform, setActiveWaveform] = useState<Waveform>(defaultWaveform);
-  const initialLfoEnabled = lfoRunning ?? lfoProp?.enabled ?? false;
+  const initialLfoEnabled = isBasic ? false : (lfoRunning ?? lfoProp?.enabled ?? false);
   const [lfoEnabled, setLfoEnabled] = useState<boolean>(initialLfoEnabled);
   const [knobFrequency, setKnobFrequency] = useState<number>(() => clamp(
     initialFrequency ?? lfoSettings.frequency ?? 0.5,
@@ -486,14 +496,14 @@ function LFOSlider({
     [bgLeft, bgRight],
   );
   const padY = '0.35em';
-  const padRight = '0.5rem';
+  const padRight = '0.5em';
   const infoPaddingY = 1; // px padding around readout text
   const infoPaddingX = 6; // px horizontal padding around readout text
   const infoBorderWidth = 1; // px border width around readout blocks
   const actionBarPadY = `calc(${padY} - ${(infoPaddingY + infoBorderWidth)}px)`;
   const handleSize = Math.max(10, Math.round(appliedFontSize));
   const handleOffset = drawerHandleActive ? Math.max(3, Math.round(handleSize / 3)) : 0;
-  const padLeft = drawerHandleActive ? `${handleOffset + handleSize + handleOffset}px` : '0.5rem';
+  const padLeft = drawerHandleActive ? `${handleOffset + handleSize + handleOffset}px` : '0.5em';
   const actionGapValuePx = drawerHandleActive ? handleOffset : 8;
   const actionGap = `${actionGapValuePx}px`;
   const actionGapWide = `${actionGapValuePx * 2}px`;
@@ -596,8 +606,8 @@ function LFOSlider({
   const PHASE_MIN = 0;
   const PHASE_MAX = Math.PI * 2;
   const PHASE_STEP = Math.PI / 100;
-  const frequencyLabel = isAudioWaveform ? `${label} sample position` : `${label} frequency`;
-  const phaseLabel = isAudioWaveform ? `${label} audio bias` : `${label} phase`;
+  const frequencyLabel = isAudioWaveform ? 'Freq' : '';
+  const phaseLabel = isAudioWaveform ? 'Bias' : '';
   const phaseSliderValue = isAudioWaveform
     ? clamp(audioResponse, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX)
     : phaseDial;
@@ -659,17 +669,28 @@ function LFOSlider({
     ? clamp((split - handleLeftRatio) / Math.max(handleSpanRatio, Number.EPSILON), 0, 1)
     : 0;
   const handleSplitPct = (handleSplitLocal * 100).toFixed(3);
+  const resolvedBarStyle = isBasic ? 'continuous' : barStyle;
+  const resolvedBarSegmentCount = resolvedBarStyle === 'discrete' && Number.isFinite(barSegmentCount)
+    ? Math.floor(barSegmentCount)
+    : 0;
+  const quantizeSplitRatio = useCallback((ratio: number) => {
+    if (resolvedBarSegmentCount <= 1) return ratio;
+    const clamped = clamp(ratio, 0, 1);
+    const snapped = Math.round(clamped * resolvedBarSegmentCount) / resolvedBarSegmentCount;
+    return clamp(snapped, 0, 1);
+  }, [resolvedBarSegmentCount]);
   const writeSplitVars = useCallback((ratio: number) => {
     const host = containerRef.current;
     if (!host) return;
-    host.style.setProperty('--split', ratio.toFixed(6));
-    host.style.setProperty('--splitPct', `${(ratio * 100).toFixed(3)}%`);
+    const visualRatio = quantizeSplitRatio(ratio);
+    host.style.setProperty('--split', visualRatio.toFixed(6));
+    host.style.setProperty('--splitPct', `${(visualRatio * 100).toFixed(3)}%`);
     if (drawerHandleActive) {
       const span = Math.max(handleSpanRatio, Number.EPSILON);
-      const local = clamp((ratio - handleLeftRatio) / span, 0, 1);
+      const local = clamp((visualRatio - handleLeftRatio) / span, 0, 1);
       host.style.setProperty('--handleSplitPct', `${(local * 100).toFixed(3)}%`);
     }
-  }, [drawerHandleActive, handleLeftRatio, handleSpanRatio]);
+  }, [drawerHandleActive, handleLeftRatio, handleSpanRatio, quantizeSplitRatio]);
   const reflectValueToDom = useCallback((numeric: number, formatted: string) => {
     liveValueRef.current = numeric;
     if (activeDrawerValueRef.current !== null) return;
@@ -765,7 +786,8 @@ function LFOSlider({
   }, [finishDrawerDrag]);
 
   // Helpers
-  const hasSelection = selStart !== selEnd;
+  const allowTextEditing = !isBasic;
+  const hasSelection = allowTextEditing && selStart !== selEnd;
   const caret = selEnd;
   const setSelection = (a: number, b: number) => {
     const [s, e] = normalizeSelection(a, b, text.length);
@@ -929,9 +951,9 @@ function LFOSlider({
     setPhaseDial(initialPhase ?? lfoSettings.phase ?? 0);
   }, [initialPhase, lfoSettings.phase]);
   useEffect(() => {
-    if (lfoRunning === undefined) return;
+    if (isBasic || lfoRunning === undefined) return;
     setLfoEnabled(lfoRunning);
-  }, [lfoRunning]);
+  }, [isBasic, lfoRunning]);
   useEffect(() => {
     if (controlledDrawerOpen === undefined) return;
     setDrawerOpen(controlledDrawerOpen);
@@ -940,11 +962,11 @@ function LFOSlider({
     }
   }, [controlledDrawerOpen]);
   useEffect(() => {
-    if (showLfoControls) return;
+    if (resolvedShowLfoControls) return;
     setDrawerOpen(false);
     setActiveDrawerValue(null);
     setLfoEnabled(false);
-  }, [showLfoControls]);
+  }, [resolvedShowLfoControls]);
   const toggleDrawer = () => {
     if (!drawerHandleActive) return;
     setDrawerOpen((prev) => {
@@ -1018,6 +1040,19 @@ function LFOSlider({
     const handleX = r.left + r.width * split;
     return Math.abs(clientX - handleX) <= radiusPx;
   };
+  const updateSplitFromClientX = useCallback((clientX: number) => {
+    const newSplit = getSplitFromX(clientX);
+    splitRef.current = newSplit;
+    writeSplitVars(newSplit);
+    setSplit(newSplit);
+    const val = valueFromSplit(newSplit, min, max, step);
+    const formatted = val.toFixed(precision);
+    reflectValueToDom(val, formatted);
+    textRef.current = formatted;
+    setText(formatted);
+    setSelection(formatted.length, formatted.length);
+    onUserChange?.(val);
+  }, [getSplitFromX, max, min, onUserChange, precision, reflectValueToDom, setSelection, step, writeSplitVars]);
 
   // Edit operations
   const replaceSelection = (insertStr: string) => {
@@ -1088,7 +1123,7 @@ function LFOSlider({
     }
   };
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
-    if (!focused) return;
+    if (!allowTextEditing || !focused) return;
     if ((e.key === 'a' || e.key === 'A') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setSelection(0, text.length); return; }
     if (e.key.length === 1 && !e.altKey && !e.metaKey && !e.ctrlKey) {
       e.preventDefault();
@@ -1144,6 +1179,7 @@ function LFOSlider({
   }, []);
 
   const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
+    if (!allowTextEditing) return;
     const insideText = clickIsInsideText(e.clientX) && text.length > 0;
     if (!insideText) return;
     e.preventDefault();
@@ -1155,6 +1191,14 @@ function LFOSlider({
   };
 
   const onPointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    if (!allowTextEditing) {
+      draggingSplitRef.current = true;
+      capturePointer(e.pointerId);
+      updateSplitFromClientX(e.clientX);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     const rawInsideText = clickIsInsideText(e.clientX) && text.length > 0;
     const isTouch = e.pointerType === 'touch';
     const insideText = rawInsideText && !isTouch;
@@ -1182,16 +1226,7 @@ function LFOSlider({
         setFocused(false);
       }
       editingRef.current = false;
-      const newSplit = getSplitFromX(e.clientX);
-      splitRef.current = newSplit;
-      writeSplitVars(newSplit);
-      setSplit(newSplit);
-      const val = valueFromSplit(newSplit, min, max, step);
-      const formatted = val.toFixed(precision);
-      reflectValueToDom(val, formatted);
-      textRef.current = formatted; setText(formatted);
-      setSelection(formatted.length, formatted.length);
-      onUserChange?.(val);
+      updateSplitFromClientX(e.clientX);
       draggingSplitRef.current = true;
       capturePointer(e.pointerId);
       e.preventDefault();
@@ -1208,6 +1243,13 @@ function LFOSlider({
     e.preventDefault();
   };
   const onPointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    if (!allowTextEditing) {
+      if (!draggingSplitRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      updateSplitFromClientX(e.clientX);
+      return;
+    }
     const rawInsideText = clickIsInsideText(e.clientX) && text.length > 0;
     const isTouch = e.pointerType === 'touch';
     const insideText = rawInsideText && !isTouch;
@@ -1217,16 +1259,7 @@ function LFOSlider({
     if (draggingSplitRef.current) {
       e.preventDefault();
       e.stopPropagation();
-      const newSplit = getSplitFromX(e.clientX);
-      splitRef.current = newSplit;
-      writeSplitVars(newSplit);
-      setSplit(newSplit);
-      const val = valueFromSplit(newSplit, min, max, step);
-      const formatted = val.toFixed(precision);
-      reflectValueToDom(val, formatted);
-      textRef.current = formatted; setText(formatted);
-      setSelection(formatted.length, formatted.length);
-      onUserChange?.(val);
+      updateSplitFromClientX(e.clientX);
       return;
     }
 
@@ -1238,6 +1271,15 @@ function LFOSlider({
     setSelection(s, ee);
   };
   const onPointerUp: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    if (!allowTextEditing) {
+      if (draggingSplitRef.current) {
+        draggingSplitRef.current = false;
+        releasePointer(e.pointerId);
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return;
+    }
     if (draggingSplitRef.current) {
       draggingSplitRef.current = false;
       releasePointer(e.pointerId);
@@ -1250,14 +1292,20 @@ function LFOSlider({
     setOverHandle(isOnHandle(e.clientX));
   };
 
-  const onPointerLeave: React.PointerEventHandler<HTMLDivElement> = () => { setHoverInside(false); setOverHandle(false); };
+  const onPointerLeave: React.PointerEventHandler<HTMLDivElement> = () => {
+    if (!allowTextEditing) return;
+    setHoverInside(false);
+    setOverHandle(false);
+  };
   const onPointerEnter: React.PointerEventHandler<HTMLDivElement> = (e) => {
+    if (!allowTextEditing) return;
     const insideText = clickIsInsideText(e.clientX) && text.length > 0;
     setHoverInside(insideText);
     setOverHandle(!insideText && isOnHandle(e.clientX));
   };
 
   const onFocus: React.FocusEventHandler<HTMLDivElement> = () => {
+    if (!allowTextEditing) return;
     preEditTextRef.current = textRef.current;
     editingRef.current = true;
     setFocused(true);
@@ -1267,6 +1315,7 @@ function LFOSlider({
   };
 
   const onBlur: React.FocusEventHandler<HTMLDivElement> = () => {
+    if (!allowTextEditing) return;
     if (editingRef.current && textRef.current.length === 0) {
       const restore = preEditTextRef.current || '';
       setText(restore); setSelection(restore.length, restore.length); textRef.current = restore;
@@ -1302,17 +1351,17 @@ function LFOSlider({
     return blinkOn ? `1px solid ${col}` : '1px solid transparent';
   };
 
-  const cursorClass = overHandle
-    ? 'cursor-col-resize'
-    : (hoverInside && text.length > 0 ? 'cursor-text' : 'cursor-col-resize');
+  const cursorClass = allowTextEditing
+    ? (overHandle ? 'cursor-col-resize' : (hoverInside && text.length > 0 ? 'cursor-text' : 'cursor-col-resize'))
+    : 'cursor-col-resize';
 
   const selectionStart = Math.min(selStart, selEnd);
   const selectionEnd = Math.max(selStart, selEnd);
-  const hasActiveSelection = focused && selectionEnd > selectionStart;
+  const hasActiveSelection = allowTextEditing && focused && selectionEnd > selectionStart;
   const highlightColorLeft = hexToRGBA(bgRight, 0.36);
   const highlightColorRight = hexToRGBA(bgLeft, 0.36);
 
-  const stackGap = drawerHandleActive ? '0' : '0.25rem';
+  const stackGap = drawerHandleActive ? '0' : '0.25em';
 
   const wrapperClassName = ['flex flex-col', className].filter(Boolean).join(' ');
   const resolvedMaxWidth = width == null
@@ -1339,7 +1388,7 @@ function LFOSlider({
         role="textbox"
         aria-label={label}
         aria-multiline={false}
-        tabIndex={0}
+        tabIndex={allowTextEditing ? 0 : -1}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
         onPointerDown={onPointerDown}
@@ -1419,7 +1468,7 @@ function LFOSlider({
             className="absolute inset-0"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `${padY} ${padRight} ${padY} ${padLeft}`, lineHeight: '1' }}
           >
-            <span style={{ color: textLeft, marginRight: '0.5rem', flexShrink: 0 }}>{label}</span>
+            <span style={{ color: textLeft, marginRight: '0.5em', flexShrink: 0 }}>{label}</span>
             <span
               style={{ color: textLeft, whiteSpace: 'pre', textAlign: 'right', flex: '1 1 auto', display: 'flex', justifyContent: 'flex-end' }}
             >
@@ -1440,7 +1489,7 @@ function LFOSlider({
             className="absolute inset-0"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `${padY} ${padRight} ${padY} ${padLeft}`, lineHeight: '1' }}
           >
-            <span style={{ color: textRight, marginRight: '0.5rem', flexShrink: 0 }}>{label}</span>
+            <span style={{ color: textRight, marginRight: '0.5em', flexShrink: 0 }}>{label}</span>
             <span
               style={{ color: textRight, whiteSpace: 'pre', textAlign: 'right', flex: '1 1 auto', display: 'flex', justifyContent: 'flex-end' }}
             >
@@ -1464,7 +1513,7 @@ function LFOSlider({
           className="text-transparent z-10"
           style={{ display: 'flex', alignItems: 'center', padding: `${padY} ${padRight} ${padY} ${padLeft}`, lineHeight: '1', width: '100%' }}
         >
-          <span style={{ flexShrink: 0, marginRight: '0.5rem' }}>{label}</span>
+          <span style={{ flexShrink: 0, marginRight: '0.5em' }}>{label}</span>
           <span
             className="whitespace-pre"
             style={{ flex: '1 1 auto', display: 'flex', justifyContent: 'flex-end' }}
@@ -1833,11 +1882,18 @@ function MiniReadoutSlider({
   const textColorLeft = bgRight;
   const textColorRight = bgLeft;
   const display = formatValue(value);
-  const hiddenLabel = `${label}: ${display.trim()}${suffix ? ` ${suffix}` : ''}`;
+  const labelText = label.trim();
+  const hiddenLabel = labelText
+    ? `${labelText}: ${display.trim()}${suffix ? ` ${suffix}` : ''}`
+    : `${display.trim()}${suffix ? ` ${suffix}` : ''}`;
   const cornerRadius = 3;
   const overlayPadding = `${paddingY}px ${paddingX}px`;
   const gradient = `linear-gradient(90deg, ${bgLeft} 0%, ${bgLeft} ${splitPercent}, ${bgRight} ${splitPercent}, ${bgRight} 100%)`;
   const seamWidth = Math.max(borderWidth, 1);
+  const labelStyle: React.CSSProperties = {
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  };
 
   const valueStyle: React.CSSProperties = {
     fontFeatureSettings: '"tnum"',
@@ -1875,7 +1931,7 @@ function MiniReadoutSlider({
         lineHeight: 1,
       }}
     >
-      <span style={{ ...visuallyHiddenStyle, pointerEvents: 'none' }}>
+        <span style={{ ...visuallyHiddenStyle, pointerEvents: 'none' }}>
         {hiddenLabel}
       </span>
       <div
@@ -1889,6 +1945,7 @@ function MiniReadoutSlider({
           padding: overlayPadding,
         }}
       >
+        {labelText ? <span style={labelStyle}>{labelText}</span> : null}
         <span style={valueStyle}>{display}</span>
         {suffix ? <span style={suffixStyle}>{suffix}</span> : null}
       </div>
@@ -1921,6 +1978,7 @@ function MiniReadoutSlider({
           pointerEvents: 'none',
         }}
       >
+        {labelText ? <span style={labelStyle}>{labelText}</span> : null}
         <span style={valueStyle}>{display}</span>
         {suffix ? <span style={suffixStyle}>{suffix}</span> : null}
       </div>
@@ -1938,11 +1996,16 @@ function MiniReadoutSlider({
           pointerEvents: 'none',
         }}
       >
+        {labelText ? <span style={labelStyle}>{labelText}</span> : null}
         <span style={valueStyle}>{display}</span>
         {suffix ? <span style={suffixStyle}>{suffix}</span> : null}
       </div>
     </div>
   );
+}
+
+function LFOSlider(props: LFOSliderProps) {
+  return <SliderCore {...props} />;
 }
 
 export default LFOSlider;

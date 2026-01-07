@@ -16,6 +16,7 @@ export interface AudioFFTWindowProps {
   peakDecay?: number;
   rawFftDataRef?: React.RefObject<Uint8Array | null>;
   rawFrameVersion?: number;
+  rawBinCount?: number;
   attackWeight?: number;
   releaseWeight?: number;
   blurSigma?: number;
@@ -30,7 +31,7 @@ let sharedRootPromise: Promise<TypeGpuRoot | null> | null = null;
 
 const DEFAULT_ACTIVE_COLOR: [number, number, number] = [0.16, 0.47, 0.86];
 const DEFAULT_INACTIVE_COLOR: [number, number, number] = [0.02, 0.02, 0.04];
-const UNIFORM_FLOAT_COUNT = 20;
+const UNIFORM_FLOAT_COUNT = 24;
 const UNIFORM_BUFFER_SIZE = UNIFORM_FLOAT_COUNT * Float32Array.BYTES_PER_ELEMENT;
 const WORKGROUP_SIZE = 64;
 const HOLD_SECONDS = 0.2;
@@ -45,6 +46,7 @@ interface FftGpuResources {
   format: GPUTextureFormat;
   uniformBuffer: GPUBuffer;
   rawBuffer: GPUBuffer;
+  rawCapacity: number;
   stateTextures: [GPUTexture, GPUTexture];
   stateStorageViews: [GPUTextureView, GPUTextureView];
   computePipeline: GPUComputePipeline;
@@ -114,6 +116,9 @@ struct Uniforms {
   peakDecay : f32,
   holdSeconds : f32,
   discreteMode : f32,
+  rawBinCount : f32,
+  frequencyMin : f32,
+  frequencyMax : f32,
 };
 
 @group(0) @binding(0) var<storage, read> rawFft : array<f32>;
@@ -121,14 +126,60 @@ struct Uniforms {
 @group(0) @binding(2) var stateDst : texture_storage_2d<rgba32float, write>;
 @group(0) @binding(3) var<uniform> uniforms : Uniforms;
 
+fn sampleRaw(position : f32) -> f32 {
+  let maxIndex = max(0.0, uniforms.rawBinCount - 1.0);
+  if (maxIndex <= 0.0) {
+    return rawFft[0];
+  }
+  let clamped = clamp(position, 0.0, maxIndex);
+  let lower = i32(floor(clamped));
+  let upper = min(i32(maxIndex), lower + 1);
+  let t = clamped - f32(lower);
+  let lowerValue = rawFft[lower];
+  let upperValue = rawFft[upper];
+  return mix(lowerValue, upperValue, t);
+}
+
 @compute @workgroup_size(${WORKGROUP_SIZE})
 fn cs_main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let binCount = max(1.0, uniforms.binCount);
   let index = gid.x;
-  if (f32(index) >= uniforms.binCount) {
+  if (f32(index) >= binCount) {
     return;
   }
+  let maxRawIndex = max(0.0, uniforms.rawBinCount - 1.0);
+  if (maxRawIndex <= 0.0) {
+    textureStore(stateDst, vec2<i32>(i32(index), 0), vec4<f32>(0.0, 0.0, 0.0, 0.0));
+    return;
+  }
+  let minPos = uniforms.frequencyMin * maxRawIndex;
+  let maxPos = uniforms.frequencyMax * maxRawIndex;
+  var ratio = 0.5;
+  if (binCount > 1.0) {
+    ratio = f32(index) / (binCount - 1.0);
+  }
+  let position = mix(minPos, maxPos, ratio);
+  let binSpan = max(1.0, binCount - 1.0);
+  let deltaPos = (maxPos - minPos) / binSpan;
+  var current = sampleRaw(position);
+  if (uniforms.blurSigma > 0.001) {
+    let radius = min(${MAX_GAUSSIAN_RADIUS}, i32(ceil(uniforms.blurSigma * 3.0)));
+    if (radius > 0) {
+      var accum = current;
+      var weightSum = 1.0;
+      for (var offset = 1; offset <= ${MAX_GAUSSIAN_RADIUS}; offset = offset + 1) {
+        if (offset > radius) { continue; }
+        let distance = f32(offset);
+        let weight = exp(-(distance * distance) / (2.0 * uniforms.blurSigma * uniforms.blurSigma));
+        let delta = distance * deltaPos;
+        accum = accum + sampleRaw(position + delta) * weight;
+        accum = accum + sampleRaw(position - delta) * weight;
+        weightSum = weightSum + 2.0 * weight;
+      }
+      current = accum / max(weightSum, 1e-4);
+    }
+  }
   let coord = vec2<i32>(i32(index), 0);
-  let current = rawFft[index];
   let previous = textureLoad(stateSrc, coord);
   let prevValue = previous.x;
   let prevPeak = previous.y;
@@ -228,38 +279,12 @@ fn sampleStateNormalized(u : f32) -> vec2<f32> {
   return lowerSample + (upperSample - lowerSample) * frac;
 }
 
-fn blurredAmplitude(u : f32) -> f32 {
-  let sigma = max(0.0, uniforms.blurSigma);
-  let base = sampleStateNormalized(u).x;
-  if (sigma < 0.001) {
-    return base;
-  }
-  let radius = min(MAX_RADIUS, i32(ceil(sigma * 3.0)));
-  if (radius <= 0) {
-    return base;
-  }
-  var accum = base;
-  var weightSum = 1.0;
-  let binStep = uniforms.binStep;
-  for (var offset = 1; offset <= MAX_RADIUS; offset = offset + 1) {
-    if (offset > radius) {
-      continue;
-    }
-    let distance = f32(offset);
-    let weight = exp(-(distance * distance) / (2.0 * sigma * sigma));
-    let delta = distance * binStep;
-    accum = accum + sampleStateNormalized(u + delta).x * weight;
-    accum = accum + sampleStateNormalized(u - delta).x * weight;
-    weightSum = weightSum + 2.0 * weight;
-  }
-  return accum / max(weightSum, 1e-4);
-}
-
 @fragment
 fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   let normalizedX = in.uv.x;
-  let amplitude = blurredAmplitude(normalizedX);
-  let peak = sampleStateNormalized(normalizedX).y;
+  let sample = sampleStateNormalized(normalizedX);
+  let amplitude = sample.x;
+  let peak = sample.y;
   let y = 1.0 - in.uv.y;
   let edgeMask = smoothstep(amplitude - 0.01, amplitude, y);
   let activeMask = 1.0 - edgeMask;
@@ -302,7 +327,7 @@ function disposeResources(resources: FftGpuResources | null) {
   resources.stateTextures[1].destroy();
 }
 
-function buildResources(device: GPUDevice, canvas: HTMLCanvasElement, binCapacity: number): FftGpuResources | null {
+function buildResources(device: GPUDevice, canvas: HTMLCanvasElement, binCapacity: number, rawCapacity: number): FftGpuResources | null {
   const context = canvas.getContext("webgpu");
   if (!context) return null;
   const format = navigator.gpu.getPreferredCanvasFormat();
@@ -317,7 +342,7 @@ function buildResources(device: GPUDevice, canvas: HTMLCanvasElement, binCapacit
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
   const rawBuffer = device.createBuffer({
-    size: binCapacity * Float32Array.BYTES_PER_ELEMENT,
+    size: Math.max(1, rawCapacity) * Float32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
   const stateTextures: [GPUTexture, GPUTexture] = [
@@ -390,6 +415,7 @@ function buildResources(device: GPUDevice, canvas: HTMLCanvasElement, binCapacit
     format,
     uniformBuffer,
     rawBuffer,
+    rawCapacity: Math.max(1, rawCapacity),
     stateTextures,
     stateStorageViews,
     computePipeline,
@@ -399,41 +425,6 @@ function buildResources(device: GPUDevice, canvas: HTMLCanvasElement, binCapacit
     workgroupCount,
     binCapacity,
   };
-}
-
-function resampleUint8Frame(
-  source: Uint8Array,
-  destination: Float32Array,
-  frequencyMin: number,
-  frequencyMax: number,
-) {
-  if (!source.length || !destination.length) {
-    destination.fill(0);
-    return;
-  }
-  const srcMaxIndex = Math.max(0, source.length - 1);
-  if (srcMaxIndex === 0) {
-    const value = (source[0] ?? 0) / 255;
-    for (let i = 0; i < displayBins && i < destination.length; i += 1) {
-      destination[i] = value;
-    }
-    return;
-  }
-  const safeMin = clampBetween(frequencyMin, 0, Math.min(1, frequencyMax - FREQUENCY_GAP));
-  const safeMax = clampBetween(frequencyMax, safeMin + FREQUENCY_GAP, 1);
-  const minPos = safeMin * srcMaxIndex;
-  const maxPos = safeMax * srcMaxIndex;
-  const count = destination.length;
-  for (let i = 0; i < count; i += 1) {
-    const ratio = count === 1 ? 0.5 : (i / (count - 1));
-    const position = minPos + ratio * (maxPos - minPos);
-    const lower = Math.floor(position);
-    const upper = Math.min(srcMaxIndex, lower + 1);
-    const t = position - lower;
-    const lowerValue = (source[lower] ?? 0) / 255;
-    const upperValue = (source[upper] ?? 0) / 255;
-    destination[i] = lowerValue + (upperValue - lowerValue) * t;
-  }
 }
 
 export default function AudioFFTWindow({
@@ -450,6 +441,7 @@ export default function AudioFFTWindow({
   peakDecay = 0.05,
   rawFftDataRef,
   rawFrameVersion,
+  rawBinCount = 0,
   attackWeight = 0.6,
   releaseWeight = 0.2,
   blurSigma = 0,
@@ -466,6 +458,7 @@ export default function AudioFFTWindow({
     height: Math.max(1, heightUnits) * unitSizePx,
   });
   const [binCapacity, setBinCapacity] = React.useState<number>(() => Math.max(1, Math.ceil(Math.max(1, Math.floor(maxBins)) / WORKGROUP_SIZE) * WORKGROUP_SIZE));
+  const [rawCapacity, setRawCapacity] = React.useState<number>(() => Math.max(1, rawBinCount || 1));
 
   const playbackRatioRef = React.useRef<number>(Math.max(0, Math.min(1, playbackRatio)));
   const blurSigmaRef = React.useRef<number>(Math.max(0, blurSigma));
@@ -530,6 +523,11 @@ export default function AudioFFTWindow({
     const aligned = Math.max(1, Math.ceil(maxBinCountRef.current / WORKGROUP_SIZE) * WORKGROUP_SIZE);
     setBinCapacity((prev) => (prev === aligned ? prev : aligned));
   }, [maxBins]);
+
+  React.useEffect(() => {
+    if (!rawBinCount || rawBinCount <= 0) return;
+    setRawCapacity((prev) => (rawBinCount > prev ? Math.max(rawBinCount, prev) : prev));
+  }, [rawBinCount]);
 
   React.useEffect(() => {
     rawUploadPendingRef.current = true;
@@ -642,7 +640,7 @@ export default function AudioFFTWindow({
       }
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const resources = buildResources(root.device, canvas, binCapacity);
+      const resources = buildResources(root.device, canvas, binCapacity, rawCapacity);
       if (!resources) {
         setSupportsWebGPU(false);
         return;
@@ -680,6 +678,7 @@ export default function AudioFFTWindow({
         const binStep = effectiveBinCount > 1 ? 1 / (effectiveBinCount - 1) : 1;
 
         const uniformArray = uniformArrayRef.current;
+        const uniformRawCount = Math.max(1, rawBinCount || 0);
         uniformArray[0] = effectiveBinCount;
         uniformArray[1] = playbackRatioRef.current;
         uniformArray[2] = blurSigmaRef.current;
@@ -699,23 +698,27 @@ export default function AudioFFTWindow({
         uniformArray[16] = peakDecayRef.current;
         uniformArray[17] = HOLD_SECONDS;
         uniformArray[18] = discreteModeRef.current;
-        uniformArray[19] = 0;
+        uniformArray[19] = uniformRawCount;
+        uniformArray[20] = freqMinRef.current;
+        uniformArray[21] = freqMaxRef.current;
+        uniformArray[22] = 0;
+        uniformArray[23] = 0;
         queue.writeBuffer(currentResources.uniformBuffer, 0, uniformArray.buffer, uniformArray.byteOffset, uniformArray.byteLength);
 
         if (rawUploadPendingRef.current && rawFftDataRef?.current) {
           const data = rawFftDataRef.current;
-          const destLength = currentResources.binCapacity;
+          const destLength = currentResources.rawCapacity;
           if (!normalizedFftRef.current || normalizedFftRef.current.length !== destLength) {
             normalizedFftRef.current = new Float32Array(destLength);
           }
           const normalized = normalizedFftRef.current;
-          normalized.fill(0);
-          resampleUint8Frame(
-            data,
-            normalized,
-            freqMinRef.current,
-            freqMaxRef.current,
-          );
+          const copyCount = Math.min(destLength, data.length);
+          for (let i = 0; i < copyCount; i += 1) {
+            normalized[i] = data[i] / 255;
+          }
+          for (let i = copyCount; i < destLength; i += 1) {
+            normalized[i] = 0;
+          }
           queue.writeBuffer(
             currentResources.rawBuffer,
             0,
@@ -767,7 +770,7 @@ export default function AudioFFTWindow({
       disposeResources(resourcesRef.current);
       resourcesRef.current = null;
     };
-  }, [supportsWebGPU, size.width, size.height, binCapacity, rawFftDataRef]);
+  }, [supportsWebGPU, size.width, size.height, binCapacity, rawCapacity, rawFftDataRef, rawBinCount]);
 
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth ?? "100%";
   const widthPx = Math.round(size.width);

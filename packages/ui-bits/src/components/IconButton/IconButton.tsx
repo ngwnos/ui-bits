@@ -1,6 +1,7 @@
 import React from "react";
 
 export type IconButtonBorderStyle = "a" | "b" | "none";
+export type IconButtonBorderMask = Partial<Record<"top" | "right" | "bottom" | "left", boolean>>;
 export type IconButtonBehavior = "momentary" | "toggle" | "cycle";
 
 export interface IconButtonCycleOption {
@@ -19,6 +20,7 @@ export interface IconButtonProps
   colorA?: string;
   colorB?: string;
   borderStyle?: IconButtonBorderStyle;
+  borderMask?: IconButtonBorderMask;
   behavior?: IconButtonBehavior;
   toggled?: boolean;
   defaultToggled?: boolean;
@@ -31,6 +33,14 @@ export interface IconButtonProps
 
 const FALLBACK_COLOR_A = "#2f2f2f";
 const FALLBACK_COLOR_B = "#f0f0f0";
+const SLIDER_LINE_HEIGHT = 1;
+const SLIDER_PAD_Y_EM = 0.35;
+const SLIDER_BORDER_WIDTH = 1;
+
+function computeButtonSize(fontSize: number) {
+  const contentHeight = fontSize * (SLIDER_LINE_HEIGHT + SLIDER_PAD_Y_EM * 2);
+  return Math.round(contentHeight + SLIDER_BORDER_WIDTH * 2);
+}
 
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, ref) => {
   const {
@@ -38,6 +48,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     colorA = FALLBACK_COLOR_A,
     colorB = FALLBACK_COLOR_B,
     borderStyle = "none",
+    borderMask,
     behavior,
     toggled,
     defaultToggled = false,
@@ -89,15 +100,22 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     ? (activeOption?.borderStyle ?? borderStyle)
     : borderStyle;
   const resolvedFontSize = fontSize ?? 12;
-  const resolvedSize = Math.round(resolvedFontSize * 1.6);
+  const resolvedSize = computeButtonSize(resolvedFontSize);
   const resolvedRadius = Math.max(2, Math.round(resolvedFontSize * 0.25));
-  const padding = Math.max(2, Math.round(resolvedFontSize * 0.2));
+  const padding = Math.max(1, Math.round(resolvedFontSize * 0.1));
   const resolvedIconSize = Math.max(12, Math.round(resolvedFontSize));
+  const resolvedBorderMask = {
+    top: borderMask?.top ?? true,
+    right: borderMask?.right ?? true,
+    bottom: borderMask?.bottom ?? true,
+    left: borderMask?.left ?? true,
+  };
   const resolvedBorderColor = resolvedBorderStyle === "a"
     ? resolvedColorA
     : resolvedBorderStyle === "b"
       ? resolvedColorB
       : "transparent";
+  const maskedBorderColor = resolvedColorB;
   const baseStyle = {
     "--icon-btn-a": resolvedColorA,
     "--icon-btn-b": resolvedColorB,
@@ -107,6 +125,10 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     borderStyle: "solid",
     borderWidth: 1,
     borderColor: resolvedBorderColor,
+    borderTopColor: resolvedBorderMask.top ? resolvedBorderColor : maskedBorderColor,
+    borderRightColor: resolvedBorderMask.right ? resolvedBorderColor : maskedBorderColor,
+    borderBottomColor: resolvedBorderMask.bottom ? resolvedBorderColor : maskedBorderColor,
+    borderLeftColor: resolvedBorderMask.left ? resolvedBorderColor : maskedBorderColor,
     boxSizing: "border-box",
     display: "inline-flex",
     alignItems: "center",

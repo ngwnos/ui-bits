@@ -7,7 +7,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { LFOSlider, flexoki, useFrame, useSliderActions } from "ui-bits";
+import { IconButton, LFOSlider, flexoki, useFrame, useSliderActions } from "ui-bits";
 import AudioFFTWindow from "../AudioFFTWindow/AudioFFTWindow";
 
 export type AudioControlsBorder = 'a' | 'b' | 'none';
@@ -156,7 +156,10 @@ export default function AudioControls({
       ? safeB
       : safeA;
   const textColor = safeA;
-  const actionButtonSize = Math.max(MIN_SLIDER_UNIT_PX, sliderUnitPx - 8);
+  const actionButtonSize = Math.max(
+    MIN_SLIDER_UNIT_PX,
+    Math.round(fontSize * (1 + 0.35 * 2) + 2),
+  );
   const playPauseLabel = isPlaying ? "Pause audio analysis" : "Play audio analysis";
   const muteLabel = isMuted ? "Unmute audio output" : "Mute audio output";
   const interpolationLabel = useDiscreteBins ? "Show interpolated FFT bins" : "Show discrete FFT bins";
@@ -234,62 +237,34 @@ export default function AudioControls({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: actionButtonSize + 6 }}>
-            <button
-              type="button"
-              onClick={() => setIsPlaying((prev) => !prev)}
-              aria-pressed={isPlaying}
+            <IconButton
+              behavior="toggle"
+              toggled={isPlaying}
+              onToggle={setIsPlaying}
+              borderStyle="none"
+              fontSize={fontSize}
+              colorA={safeA}
+              colorB={safeB}
               aria-label={playPauseLabel}
               title={playPauseLabel}
-              style={{
-                width: actionButtonSize,
-                height: actionButtonSize,
-                borderRadius: 3,
-                border: `1px solid ${safeA}`,
-                background: isPlaying ? safeA : safeB,
-                color: isPlaying ? safeB : safeA,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                cursor: 'pointer',
-                transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
-              }}
             >
-              {isPlaying ? (
-                <Pause size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
-              ) : (
-                <Play size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
-              )}
-            </button>
+              {isPlaying ? <Pause strokeWidth={1.6} /> : <Play strokeWidth={1.6} />}
+            </IconButton>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: actionButtonSize + 6, marginLeft: 2 }}>
-            <button
-              type="button"
-              onClick={() => setUseDiscreteBins((prev) => !prev)}
-              aria-pressed={!useDiscreteBins}
+            <IconButton
+              behavior="toggle"
+              toggled={useDiscreteBins}
+              onToggle={setUseDiscreteBins}
+              borderStyle="none"
+              fontSize={fontSize}
+              colorA={safeA}
+              colorB={safeB}
               aria-label={interpolationLabel}
               title={interpolationLabel}
-              style={{
-                width: actionButtonSize,
-                height: actionButtonSize,
-                borderRadius: 3,
-                border: `1px solid ${safeA}`,
-                background: useDiscreteBins ? safeA : safeB,
-                color: useDiscreteBins ? safeB : safeA,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                cursor: 'pointer',
-                transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
-              }}
             >
-              {useDiscreteBins ? (
-                <ChartColumnIncreasing size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
-              ) : (
-                <ChartSpline size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
-              )}
-            </button>
+              {useDiscreteBins ? <ChartColumnIncreasing strokeWidth={1.6} /> : <ChartSpline strokeWidth={1.6} />}
+            </IconButton>
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0, padding: '0 0.5rem 0 0', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
@@ -411,33 +386,19 @@ export default function AudioControls({
             width: actionButtonSize + 6,
           }}
         >
-          <button
-            type="button"
-            onClick={() => setIsMuted((prev) => !prev)}
-            aria-pressed={!isMuted}
+          <IconButton
+            behavior="toggle"
+            toggled={!isMuted}
+            onToggle={(next) => setIsMuted(!next)}
+            borderStyle="none"
+            fontSize={fontSize}
+            colorA={safeA}
+            colorB={safeB}
             aria-label={muteLabel}
             title={muteLabel}
-            style={{
-              width: actionButtonSize,
-              height: actionButtonSize,
-              borderRadius: 3,
-              border: `1px solid ${safeA}`,
-              background: isMuted ? safeB : safeA,
-              color: isMuted ? safeA : safeB,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 0,
-              cursor: 'pointer',
-              transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
-            }}
           >
-            {isMuted ? (
-              <VolumeX size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
-            ) : (
-              <Volume2 size={Math.max(14, actionButtonSize - 10)} strokeWidth={1.6} />
-            )}
-          </button>
+            {isMuted ? <VolumeX strokeWidth={1.6} /> : <Volume2 strokeWidth={1.6} />}
+          </IconButton>
         </div>
         <div
           style={{

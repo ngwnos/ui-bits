@@ -50,6 +50,7 @@ export {
   type IconButtonProps,
   type IconButtonBehavior,
   type IconButtonBorderStyle,
+  type IconButtonBorderMask,
   type IconButtonCycleOption,
 } from "./components/IconButton";
 export * from "./sliderStore";

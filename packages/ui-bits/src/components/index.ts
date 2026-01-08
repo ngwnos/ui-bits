@@ -10,6 +10,7 @@ export {
   type IconButtonProps,
   type IconButtonBehavior,
   type IconButtonBorderStyle,
+  type IconButtonBorderMask,
   type IconButtonCycleOption,
 } from "./IconButton";
 export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";

@@ -5,7 +5,13 @@ export {
   type SliderBorder,
 } from "./LFOSlider";
 export { FrameLoopProvider, useFrame, useStoreMirror, type MirrorFn } from "./LFOSlider";
-export { default as IconButton, type IconButtonProps } from "./IconButton";
+export {
+  default as IconButton,
+  type IconButtonProps,
+  type IconButtonBehavior,
+  type IconButtonBorderStyle,
+  type IconButtonCycleOption,
+} from "./IconButton";
 export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./Dropdown";
 export {

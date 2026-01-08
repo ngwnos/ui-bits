@@ -561,6 +561,8 @@ function EditableRectPOC() {
   const [sliderFontSize, setSliderFontSize] = React.useState<number>(12);
   const [audioPreviewValue, setAudioPreviewValue] = React.useState<number>(42);
   const [audioBorderStyle, setAudioBorderStyle] = React.useState<AudioControlsBorder>('a');
+  const [iconToggleOn, setIconToggleOn] = React.useState(false);
+  const [iconCycleValue, setIconCycleValue] = React.useState<string>('play');
   const CONTROL_FONT_SIZE = 12;
   const columnGap = 5;
   const MAX_COLUMN_WIDTH = 440;
@@ -641,6 +643,27 @@ const tabs = [
   const iconButtonFontSizes = [10, 12, 14, 16];
   const iconButtonColorA = buttonForeground;
   const iconButtonColorB = buttonBackground;
+  const iconCycleOptions = [
+    {
+      value: 'play',
+      icon: <Play strokeWidth={1.6} />,
+      ariaLabel: 'Play',
+    },
+    {
+      value: 'pause',
+      icon: <Pause strokeWidth={1.6} />,
+      colorA: previewDarkMode ? flexoki.base['50'] : flexoki.base['900'],
+      colorB: previewDarkMode ? flexoki.blue['600'] : flexoki.blue['200'],
+      ariaLabel: 'Pause',
+    },
+    {
+      value: 'wave',
+      icon: <AudioWaveform strokeWidth={1.6} />,
+      colorA: previewDarkMode ? flexoki.base['50'] : flexoki.base['900'],
+      colorB: previewDarkMode ? flexoki.orange['600'] : flexoki.orange['200'],
+      ariaLabel: 'Waveform',
+    },
+  ];
   const selectionPreviewMode = selectionGridState.previewMode;
   const selectionPreviewModeIndex = SELECTION_PREVIEW_MODE_SEQUENCE.indexOf(selectionPreviewMode);
   const safeSelectionPreviewModeIndex = selectionPreviewModeIndex >= 0 ? selectionPreviewModeIndex : 0;
@@ -999,8 +1022,10 @@ const tabs = [
               }}
             >
               <p style={{ margin: 0, fontSize: CONTROL_FONT_SIZE }}>
-                Icon Button keeps the two-color palette and supports solid, soft, outline, and ghost treatments.
+                Icon Button sticks to the two-color palette with A/B/none borders and supports momentary, toggle, and cycle behavior.
               </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.8 }}>Momentary</span>
               <div
                 style={{
                   display: 'grid',
@@ -1041,6 +1066,45 @@ const tabs = [
                     </div>
                   </div>
                 ))}
+              </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.8 }}>Toggle</span>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <IconButton
+                    behavior="toggle"
+                    borderStyle="a"
+                    fontSize={CONTROL_FONT_SIZE}
+                    colorA={iconButtonColorA}
+                    colorB={iconButtonColorB}
+                    toggled={iconToggleOn}
+                    onToggle={setIconToggleOn}
+                    aria-label="Toggle action"
+                  >
+                    <ArrowLeftRight strokeWidth={1.6} />
+                  </IconButton>
+                  <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.7 }}>
+                    {iconToggleOn ? 'On' : 'Off'}
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.8 }}>Cycle</span>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <IconButton
+                    behavior="cycle"
+                    borderStyle="a"
+                    fontSize={CONTROL_FONT_SIZE}
+                    colorA={iconButtonColorA}
+                    colorB={iconButtonColorB}
+                    options={iconCycleOptions}
+                    value={iconCycleValue}
+                    onChange={(next) => setIconCycleValue(next)}
+                  />
+                  <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.7 }}>
+                    {iconCycleValue}
+                  </span>
+                </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={{ fontSize: CONTROL_FONT_SIZE, opacity: 0.8 }}>Sizes</span>
@@ -1377,7 +1441,7 @@ const tabs = [
           <Tabs.Content value="typegpu-test" style={tabBodyStyle}>
             <TypeGPUTest />
           </Tabs.Content>
-          <Tabs.Content value="audio-controls" style={tabBodyStyle} forceMount>
+          <Tabs.Content value="audio-controls" style={tabBodyStyle}>
             <div
               style={{
                 width: '100%',

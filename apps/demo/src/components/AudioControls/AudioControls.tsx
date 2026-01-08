@@ -274,6 +274,7 @@ export default function AudioControls({
             min={0}
             max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
             step={1}
+            barStyle="continuous"
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
@@ -292,6 +293,7 @@ export default function AudioControls({
             min={MIN_FREQ_HZ_GAP}
             max={Math.max(MIN_FREQ_HZ_GAP, nyquistHz)}
             step={1}
+            barStyle="continuous"
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
@@ -425,6 +427,7 @@ export default function AudioControls({
             min={1}
             max={1024}
             step={1}
+            barStyle="continuous"
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
@@ -452,6 +455,7 @@ export default function AudioControls({
             min={0}
             max={1}
             step={0.1}
+            barStyle="continuous"
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
@@ -470,6 +474,7 @@ export default function AudioControls({
             min={0}
             max={1}
             step={0.1}
+            barStyle="continuous"
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
@@ -488,6 +493,7 @@ export default function AudioControls({
             min={0}
             max={1}
             step={0.1}
+            barStyle="continuous"
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
@@ -506,6 +512,7 @@ export default function AudioControls({
             min={0}
             max={3}
             step={0.1}
+            barStyle="continuous"
             width="100%"
             border="left"
             borderMask={{ top: false, bottom: false, right: true, left: true }}

@@ -45,5 +45,11 @@ export {
   type SegmentBarOption,
   type SegmentBarBorderStyle,
 } from "./components/SegmentBar";
-export { default as IconButton, type IconButtonProps } from "./components/IconButton";
+export {
+  default as IconButton,
+  type IconButtonProps,
+  type IconButtonBehavior,
+  type IconButtonBorderStyle,
+  type IconButtonCycleOption,
+} from "./components/IconButton";
 export * from "./sliderStore";

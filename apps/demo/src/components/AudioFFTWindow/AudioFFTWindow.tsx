@@ -792,7 +792,7 @@ export default function AudioFFTWindow({
           height: `${heightPx}px`,
           position: "relative",
           overflow: "hidden",
-          background: "linear-gradient(180deg, #0a0a0a, #1a1a1a)",
+          background: "transparent",
         }}
       >
         {supportsWebGPU ? (

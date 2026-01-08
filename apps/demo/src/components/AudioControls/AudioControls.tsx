@@ -39,6 +39,20 @@ const roundSigma = (value: number) => Math.round(clampBetween(value, 0, 3) * 10)
 const DEFAULT_SAMPLE_RATE = 44100;
 const DEFAULT_NYQUIST = DEFAULT_SAMPLE_RATE / 2;
 const MIN_FREQ_HZ_GAP = 10;
+const MIN_SLIDER_UNIT_PX = 18;
+
+function computeSliderUnitPx(fontSize?: number) {
+  const previewFontSize = fontSize || 16;
+  const previewPaddingEm = 0.35;
+  const previewPaddingPx = previewFontSize * previewPaddingEm;
+  const previewLineHeight = 1;
+  const baseLabelHeight = previewFontSize * previewLineHeight;
+  return Math.max(
+    Math.round(baseLabelHeight + previewPaddingPx * 2 + 2),
+    Math.round(previewFontSize + previewPaddingPx * 1.5),
+    MIN_SLIDER_UNIT_PX,
+  );
+}
 
 function safeCloseAudioContext(context: AudioContext | null) {
   if (!context || context.state === "closed") return;
@@ -113,17 +127,26 @@ export default function AudioControls({
   const handleSampleRateChange = React.useCallback((sampleRate: number) => {
     setNyquistHz(Math.max(1, sampleRate / 2));
   }, []);
-  const sliderUnitPx = React.useMemo(() => {
-    const previewFontSize = fontSize || 16;
-    const previewPaddingEm = 0.35;
-    const previewPaddingPx = previewFontSize * previewPaddingEm;
-    const previewLineHeight = 1;
-    const baseLabelHeight = previewFontSize * previewLineHeight;
-    return Math.max(
-      Math.round(baseLabelHeight + previewPaddingPx * 2 + 2),
-      Math.round(previewFontSize + previewPaddingPx * 1.5),
-    );
+  const [sliderUnitPx, setSliderUnitPx] = React.useState<number>(() => computeSliderUnitPx(fontSize));
+  const sliderMeasureRef = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    const fallback = computeSliderUnitPx(fontSize);
+    setSliderUnitPx((prev) => (Math.abs(prev - fallback) < 0.5 ? prev : fallback));
   }, [fontSize]);
+  React.useLayoutEffect(() => {
+    const node = sliderMeasureRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return undefined;
+    const update = () => {
+      const rect = node.getBoundingClientRect();
+      if (!rect.height) return;
+      const next = Math.round(rect.height);
+      setSliderUnitPx((prev) => (Math.abs(prev - next) < 0.5 ? prev : next));
+    };
+    update();
+    const observer = new ResizeObserver(() => update());
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   const { safeA, safeB } = resolveColors(colorA, colorB);
   const seamColor = safeA;
   const sideBorderColor = borderStyle === 'none'
@@ -132,7 +155,7 @@ export default function AudioControls({
       ? safeB
       : safeA;
   const textColor = safeA;
-  const actionButtonSize = Math.max(18, sliderUnitPx - 8);
+  const actionButtonSize = Math.max(MIN_SLIDER_UNIT_PX, sliderUnitPx - 8);
   const playPauseLabel = isPlaying ? "Pause audio analysis" : "Play audio analysis";
   const muteLabel = isMuted ? "Unmute audio output" : "Mute audio output";
   const interpolationLabel = useDiscreteBins ? "Show interpolated FFT bins" : "Show discrete FFT bins";
@@ -269,25 +292,27 @@ export default function AudioControls({
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0, padding: '0 0.5rem 0 0', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-          <LFOSlider
-            label="Fmin"
-            min={0}
-            max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
-            step={1}
-            barStyle="continuous"
-            width="100%"
-            border="left"
-            borderMask={{ top: false, bottom: false, right: true, left: true }}
-            colorA={safeA}
-            colorB={safeB}
-            fontSize={fontSize}
-            mode="external"
-            readExternal={() => freqMinHz}
-            onUserChange={handleFreqMinChange}
-            onAnimatedUpdate={handleFreqMinChange}
-            formatDisplayValue={(value) => `${Math.round(value)} Hz`}
-            style={{ gap: 0 }}
-          />
+          <div ref={sliderMeasureRef} style={{ display: 'flex', minWidth: 0 }}>
+            <LFOSlider
+              label="Fmin"
+              min={0}
+              max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
+              step={1}
+              barStyle="continuous"
+              width="100%"
+              border="left"
+              borderMask={{ top: false, bottom: false, right: true, left: true }}
+              colorA={safeA}
+              colorB={safeB}
+              fontSize={fontSize}
+              mode="external"
+              readExternal={() => freqMinHz}
+              onUserChange={handleFreqMinChange}
+              onAnimatedUpdate={handleFreqMinChange}
+              formatDisplayValue={(value) => `${Math.round(value)} Hz`}
+              style={{ gap: 0 }}
+            />
+          </div>
           <LFOSlider
             label="Fmax"
             min={MIN_FREQ_HZ_GAP}
@@ -333,6 +358,7 @@ export default function AudioControls({
           borderRadius: 0,
           borderBottom: `1px solid ${safeB}`,
           overflow: 'hidden',
+          background: 'linear-gradient(180deg, #0a0a0a, #1a1a1a)',
         }}
       >
         <AudioFFTWindow

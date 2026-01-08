@@ -1813,6 +1813,7 @@ function SliderCore({
                 colorA={bgLeft}
                 colorB={bgRight}
                 border="left"
+                borderMask={{ top: false, bottom: false, right: true, left: true }}
                 fontSize={infoFontSize}
                 mode="external"
                 value={frequencySliderValue}
@@ -1832,6 +1833,7 @@ function SliderCore({
                 colorA={bgLeft}
                 colorB={bgRight}
                 border="left"
+                borderMask={{ top: false, bottom: false, right: true, left: true }}
                 fontSize={infoFontSize}
                 mode="external"
                 value={phaseSliderValue}

@@ -149,6 +149,7 @@ export default function AudioControls({
   }, []);
   const { safeA, safeB } = resolveColors(colorA, colorB);
   const seamColor = safeA;
+  const sideBorderWidth = borderStyle === 'none' ? 0 : 1;
   const sideBorderColor = borderStyle === 'none'
     ? "transparent"
     : borderStyle === 'b'
@@ -220,8 +221,8 @@ export default function AudioControls({
           width: '100%',
           minHeight: sliderUnitPx,
           borderTop: `1px solid ${sideBorderColor}`,
-          borderLeft: `1px solid ${sideBorderColor}`,
-          borderRight: `1px solid ${sideBorderColor}`,
+          borderLeft: `${sideBorderWidth}px solid ${sideBorderColor}`,
+          borderRight: `${sideBorderWidth}px solid ${sideBorderColor}`,
           borderBottom: `1px solid ${safeB}`,
           borderTopLeftRadius: 3,
           borderTopRightRadius: 3,
@@ -353,8 +354,8 @@ export default function AudioControls({
       <div
         style={{
           borderTop: `1px solid ${seamColor}`,
-          borderLeft: `1px solid ${sideBorderColor}`,
-          borderRight: `1px solid ${sideBorderColor}`,
+          borderLeft: `${sideBorderWidth}px solid ${sideBorderColor}`,
+          borderRight: `${sideBorderWidth}px solid ${sideBorderColor}`,
           borderRadius: 0,
           borderBottom: `1px solid ${safeB}`,
           overflow: 'hidden',
@@ -389,8 +390,8 @@ export default function AudioControls({
           width: '100%',
           minHeight: sliderUnitPx,
           borderTop: `1px solid ${safeA}`,
-          borderLeft: `1px solid ${sideBorderColor}`,
-          borderRight: `1px solid ${sideBorderColor}`,
+          borderLeft: `${sideBorderWidth}px solid ${sideBorderColor}`,
+          borderRight: `${sideBorderWidth}px solid ${sideBorderColor}`,
           borderBottom: `1px solid ${sideBorderColor}`,
           borderBottomLeftRadius: 3,
           borderBottomRightRadius: 3,

@@ -30,8 +30,6 @@ const FALLBACK_COLOR_B = "#f0f0f0";
 const SLIDER_LINE_HEIGHT = 1;
 const SLIDER_PAD_Y_EM = 0.35;
 const SLIDER_BORDER_WIDTH = 1;
-const DEFAULT_BODY_BLUR = 10;
-const DEFAULT_BODY_OPACITY = 0.5;
 const DEFAULT_SHADOW = "none";
 
 function resolveSize(value?: number | string): string | undefined {
@@ -40,28 +38,6 @@ function resolveSize(value?: number | string): string | undefined {
 }
 
 const clampBetween = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
-function normalizeHex(hex: string): string | null {
-  if (!hex) return null;
-  const cleaned = hex.trim().replace("#", "");
-  if (/^[0-9a-fA-F]{3}$/.test(cleaned)) {
-    return cleaned.split("").map((c) => c + c).join("");
-  }
-  if (/^[0-9a-fA-F]{6}$/.test(cleaned)) {
-    return cleaned;
-  }
-  return null;
-}
-
-function colorWithAlpha(color: string, alpha: number, fallback = "255,255,255"): string {
-  const normalized = normalizeHex(color);
-  if (!normalized) return `rgba(${fallback},${alpha})`;
-  const intVal = parseInt(normalized, 16);
-  const r = (intVal >> 16) & 255;
-  const g = (intVal >> 8) & 255;
-  const b = intVal & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 function computeHeaderHeight(fontSize: number) {
   const contentHeight = fontSize * (SLIDER_LINE_HEIGHT + SLIDER_PAD_Y_EM * 2);
@@ -74,9 +50,6 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     colorA = FALLBACK_COLOR_A,
     colorB = FALLBACK_COLOR_B,
     borderStyle = "a",
-    transparent = false,
-    bodyBlur,
-    bodyOpacity,
     collapsed = false,
     keepMounted = true,
     suspended,
@@ -131,11 +104,8 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       ? colorB
       : "transparent";
   const gap = Math.max(6, Math.round(resolvedFontSize * 0.4));
-  const headerHeight = computeHeaderHeight(resolvedFontSize);
-  const headerBorderWidth = collapsed ? 0 : 1;
-  const headerOuterHeight = headerHeight + headerBorderWidth;
-  const resolvedBodyOpacity = Math.max(0, Math.min(1, bodyOpacity ?? DEFAULT_BODY_OPACITY));
-  const resolvedBodyBlur = Math.max(0, bodyBlur ?? DEFAULT_BODY_BLUR);
+  const headerMinHeight = computeHeaderHeight(resolvedFontSize);
+  const headerBorderWidth = SLIDER_BORDER_WIDTH;
   const renderBody = !collapsed || keepMounted;
   const suspendChildren = Boolean(suspended || (keepMounted && collapsed));
 
@@ -207,8 +177,8 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       style={{
         width: resolveSize(width),
         borderRadius: resolvedRadius,
-        border: `1px solid ${resolvedBorderColor}`,
-        background: transparent ? "transparent" : colorB,
+        border: "none",
+        background: "transparent",
         color: colorA,
         boxShadow: resolvedShadow,
         boxSizing: "border-box",
@@ -227,12 +197,15 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     >
       <div
         style={{
-          minHeight: headerOuterHeight,
-          height: headerOuterHeight,
+          minHeight: headerMinHeight,
           display: "flex",
           alignItems: "center",
           padding: `0 ${resolvedPaddingValue ?? 0}`,
-          borderBottom: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
+          border: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
+          borderTopLeftRadius: resolvedRadius,
+          borderTopRightRadius: resolvedRadius,
+          borderBottomLeftRadius: collapsed ? resolvedRadius : 0,
+          borderBottomRightRadius: collapsed ? resolvedRadius : 0,
           boxSizing: "border-box",
           fontWeight: 600,
           lineHeight: 1,
@@ -256,9 +229,9 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
             display: collapsed ? "none" : "flex",
             flexDirection: "column",
             gap,
-            background: transparent ? colorWithAlpha(colorB, resolvedBodyOpacity) : colorB,
-            backdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
-            WebkitBackdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
+            background: "transparent",
+            backdropFilter: "none",
+            WebkitBackdropFilter: "none",
           }}
           aria-hidden={collapsed}
         >

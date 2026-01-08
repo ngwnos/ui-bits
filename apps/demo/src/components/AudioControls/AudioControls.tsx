@@ -170,9 +170,21 @@ export default function AudioControls({
       ? safeB
       : safeA;
   const textColor = safeA;
-  const playPauseLabel = isPlaying ? "Pause audio analysis" : "Play audio analysis";
-  const muteLabel = isMuted ? "Unmute audio output" : "Mute audio output";
-  const interpolationLabel = useDiscreteBins ? "Show interpolated FFT bins" : "Show discrete FFT bins";
+  const playCycleValue = isPlaying ? "playing" : "paused";
+  const interpolationCycleValue = useDiscreteBins ? "discrete" : "interpolated";
+  const muteCycleValue = isMuted ? "muted" : "unmuted";
+  const playCycleOptions = [
+    { value: "paused", icon: <Play strokeWidth={1.6} />, ariaLabel: "Play audio analysis", title: "Play audio analysis" },
+    { value: "playing", icon: <Pause strokeWidth={1.6} />, ariaLabel: "Pause audio analysis", title: "Pause audio analysis" },
+  ];
+  const interpolationCycleOptions = [
+    { value: "discrete", icon: <ChartColumnIncreasing strokeWidth={1.6} />, ariaLabel: "Show interpolated FFT bins", title: "Show interpolated FFT bins" },
+    { value: "interpolated", icon: <ChartSpline strokeWidth={1.6} />, ariaLabel: "Show discrete FFT bins", title: "Show discrete FFT bins" },
+  ];
+  const muteCycleOptions = [
+    { value: "muted", icon: <VolumeX strokeWidth={1.6} />, ariaLabel: "Unmute audio output", title: "Unmute audio output" },
+    { value: "unmuted", icon: <Volume2 strokeWidth={1.6} />, ariaLabel: "Mute audio output", title: "Mute audio output" },
+  ];
   const attackMsClamped = clampBetween(attackMs, 0, MAX_ENVELOPE_MS);
   const releaseMsClamped = clampBetween(releaseMs, 0, MAX_ENVELOPE_MS);
   const peakDecayRate = Math.max(0.001, weightFromTimeMs(releaseMsClamped, PEAK_DECAY_DT_SEC) * 0.25);
@@ -250,31 +262,25 @@ export default function AudioControls({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: CONTROL_GAP_PX, flexShrink: 0 }}>
           <IconButton
-            behavior="toggle"
-            toggled={isPlaying}
-            onToggle={setIsPlaying}
+            behavior="cycle"
+            value={playCycleValue}
+            options={playCycleOptions}
+            onChange={(nextValue) => setIsPlaying(nextValue === "playing")}
             borderStyle="none"
             fontSize={fontSize}
             colorA={safeA}
             colorB={safeB}
-            aria-label={playPauseLabel}
-            title={playPauseLabel}
-          >
-            {isPlaying ? <Pause strokeWidth={1.6} /> : <Play strokeWidth={1.6} />}
-          </IconButton>
+          />
           <IconButton
-            behavior="toggle"
-            toggled={useDiscreteBins}
-            onToggle={setUseDiscreteBins}
+            behavior="cycle"
+            value={interpolationCycleValue}
+            options={interpolationCycleOptions}
+            onChange={(nextValue) => setUseDiscreteBins(nextValue === "discrete")}
             borderStyle="none"
             fontSize={fontSize}
             colorA={safeA}
             colorB={safeB}
-            aria-label={interpolationLabel}
-            title={interpolationLabel}
-          >
-            {useDiscreteBins ? <ChartColumnIncreasing strokeWidth={1.6} /> : <ChartSpline strokeWidth={1.6} />}
-          </IconButton>
+          />
         </div>
         <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: CONTROL_GAP_PX }}>
           <div ref={sliderMeasureRef} style={{ display: 'flex', minWidth: 0 }}>
@@ -391,18 +397,15 @@ export default function AudioControls({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: CONTROL_GAP_PX, flexShrink: 0 }}>
           <IconButton
-            behavior="toggle"
-            toggled={!isMuted}
-            onToggle={(next) => setIsMuted(!next)}
+            behavior="cycle"
+            value={muteCycleValue}
+            options={muteCycleOptions}
+            onChange={(nextValue) => setIsMuted(nextValue === "muted")}
             borderStyle="none"
             fontSize={fontSize}
             colorA={safeA}
             colorB={safeB}
-            aria-label={muteLabel}
-            title={muteLabel}
-          >
-            {isMuted ? <VolumeX strokeWidth={1.6} /> : <Volume2 strokeWidth={1.6} />}
-          </IconButton>
+          />
         </div>
         <div
           style={{

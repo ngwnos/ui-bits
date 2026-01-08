@@ -18,6 +18,7 @@ export interface AudioControlsProps {
   colorB?: string;
   borderStyle?: AudioControlsBorder;
   audioSrc?: string;
+  heightUnits?: number;
   fftAttack?: number;
   fftRelease?: number;
   fftBlurSigma?: number;
@@ -79,6 +80,7 @@ export default function AudioControls({
   colorB,
   borderStyle = 'a',
   audioSrc = "/audio/credits.mp3",
+  heightUnits = 6,
   fftAttack = DEFAULT_ATTACK_MS,
   fftRelease = DEFAULT_RELEASE_MS,
   fftBlurSigma = 0,
@@ -282,12 +284,12 @@ export default function AudioControls({
             colorB={safeB}
           />
         </div>
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: CONTROL_GAP_PX }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: CONTROL_GAP_PX }}>
           <div ref={sliderMeasureRef} style={{ display: 'flex', minWidth: 0 }}>
             <LFOSlider
-              label="Fmin"
-              min={0}
-              max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
+              label="Bins"
+              min={1}
+              max={1024}
               step={1}
               barStyle="continuous"
               width="100%"
@@ -297,13 +299,41 @@ export default function AudioControls({
               colorB={safeB}
               fontSize={fontSize}
               mode="external"
-              readExternal={() => freqMinHz}
-              onUserChange={handleFreqMinChange}
-              onAnimatedUpdate={handleFreqMinChange}
-              formatDisplayValue={(value) => `${Math.round(value)} Hz`}
+              readExternal={() => binSliderValue}
+              onUserChange={(value: number) => {
+                setBinSliderValue((prev) => {
+                  const next = clampBins(value);
+                  return prev === next ? prev : next;
+                });
+              }}
+              onAnimatedUpdate={(value: number) => {
+                setBinSliderValue((prev) => {
+                  const next = clampBins(value);
+                  return prev === next ? prev : next;
+                });
+              }}
               style={{ gap: 0 }}
             />
           </div>
+          <LFOSlider
+            label="Fmin"
+            min={0}
+            max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
+            step={1}
+            barStyle="continuous"
+            width="100%"
+            border="left"
+            borderMask={{ top: false, bottom: false, right: true, left: true }}
+            colorA={safeA}
+            colorB={safeB}
+            fontSize={fontSize}
+            mode="external"
+            readExternal={() => freqMinHz}
+            onUserChange={handleFreqMinChange}
+            onAnimatedUpdate={handleFreqMinChange}
+            formatDisplayValue={(value) => `${Math.round(value)} Hz`}
+            style={{ gap: 0 }}
+          />
           <LFOSlider
             label="Fmax"
             min={MIN_FREQ_HZ_GAP}
@@ -353,7 +383,7 @@ export default function AudioControls({
         }}
       >
         <AudioFFTWindow
-          heightUnits={8}
+          heightUnits={heightUnits}
           unitSizePx={sliderUnitPx}
           maxWidth="100%"
           maxBins={binSliderValue}
@@ -412,38 +442,10 @@ export default function AudioControls({
             flex: 1,
             minWidth: 0,
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
             gap: CONTROL_GAP_PX,
           }}
         >
-          <LFOSlider
-            label="Bins"
-            min={1}
-            max={1024}
-            step={1}
-            barStyle="continuous"
-            width="100%"
-            border="left"
-            borderMask={{ top: false, bottom: false, right: true, left: true }}
-            colorA={safeA}
-            colorB={safeB}
-            fontSize={fontSize}
-            mode="external"
-            readExternal={() => binSliderValue}
-            onUserChange={(value: number) => {
-              setBinSliderValue((prev) => {
-                const next = clampBins(value);
-                return prev === next ? prev : next;
-              });
-            }}
-            onAnimatedUpdate={(value: number) => {
-              setBinSliderValue((prev) => {
-                const next = clampBins(value);
-                return prev === next ? prev : next;
-              });
-            }}
-            style={{ gap: 0 }}
-          />
           <LFOSlider
             label="Atk"
             min={0}

@@ -560,6 +560,7 @@ function EditableRectPOC() {
 
   const [sliderFontSize, setSliderFontSize] = React.useState<number>(12);
   const [audioControlFontSize, setAudioControlFontSize] = React.useState<number>(12);
+  const [audioControlMaxWidth, setAudioControlMaxWidth] = React.useState<number>(50);
   const [audioPreviewValue, setAudioPreviewValue] = React.useState<number>(42);
   const [audioBorderStyle, setAudioBorderStyle] = React.useState<AudioControlsBorder>('a');
   const [iconToggleOn, setIconToggleOn] = React.useState(false);
@@ -569,6 +570,9 @@ function EditableRectPOC() {
   const MAX_COLUMN_WIDTH = 440;
   const rowGap = '3px';
   const columnButtonSize = 20;
+  const MIN_AUDIO_WIDTH = 20;
+  const MAX_AUDIO_WIDTH = 100;
+  const AUDIO_WIDTH_STEP = 10;
   const layoutGap = '1.25rem';
   const toggleIconSize = Math.max(columnButtonSize - 4, 12);
   const controlIconSize = Math.max(columnButtonSize - 6, 12);
@@ -1475,7 +1479,30 @@ const tabs = [
                   <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
                 </button>
               </div>
-              <div style={{ width: '100%', maxWidth: 'min(720px, 50vw)' }}>
+              <div style={fontSizeControlStyle}>
+                <button
+                  type="button"
+                  aria-label="Decrease audio control width"
+                  title="Decrease audio control width"
+                  style={fontSizeButtonStyle}
+                  onClick={() => setAudioControlMaxWidth((prev) => Math.max(MIN_AUDIO_WIDTH, prev - AUDIO_WIDTH_STEP))}
+                  disabled={audioControlMaxWidth <= MIN_AUDIO_WIDTH}
+                >
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>−</span>
+                </button>
+                <span>Audio width: {audioControlMaxWidth}%</span>
+                <button
+                  type="button"
+                  aria-label="Increase audio control width"
+                  title="Increase audio control width"
+                  style={fontSizeButtonStyle}
+                  onClick={() => setAudioControlMaxWidth((prev) => Math.min(MAX_AUDIO_WIDTH, prev + AUDIO_WIDTH_STEP))}
+                  disabled={audioControlMaxWidth >= MAX_AUDIO_WIDTH}
+                >
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
+                </button>
+              </div>
+              <div style={{ width: '100%', maxWidth: `min(720px, ${audioControlMaxWidth}vw)` }}>
                 <AudioControls
                   fontSize={audioControlFontSize}
                   colorA={flexoki.red['600']}
@@ -1483,7 +1510,7 @@ const tabs = [
                   borderStyle={audioBorderStyle}
                 />
               </div>
-              <div style={{ width: '100%', maxWidth: 'min(720px, 50vw)', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+              <div style={{ width: '100%', maxWidth: `min(720px, ${audioControlMaxWidth}vw)`, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
                 <button
                   type="button"
                   onClick={cycleAudioBorderStyle}

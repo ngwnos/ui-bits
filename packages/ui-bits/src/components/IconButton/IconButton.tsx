@@ -103,7 +103,8 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
   const resolvedSize = computeButtonSize(resolvedFontSize);
   const resolvedRadius = Math.max(2, Math.round(resolvedFontSize * 0.25));
   const padding = Math.max(1, Math.round(resolvedFontSize * 0.1));
-  const resolvedIconSize = Math.max(12, Math.round(resolvedFontSize));
+  const innerSize = Math.max(0, resolvedSize - SLIDER_BORDER_WIDTH * 2 - padding * 2);
+  const resolvedIconSize = Math.max(10, Math.floor(innerSize));
   const resolvedBorderMask = {
     top: borderMask?.top ?? true,
     right: borderMask?.right ?? true,

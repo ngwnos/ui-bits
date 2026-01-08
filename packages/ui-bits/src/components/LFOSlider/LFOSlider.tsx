@@ -233,6 +233,10 @@ function SliderCore({
   const resolvedAudioFrequencyStep = audioFrequencyStep ?? AUDIO_FREQUENCY_STEP;
   const precInit = precisionFrom(min, max, step);
   const isBasic = variant === 'basic';
+  const resolvedBarStyle = isBasic ? 'continuous' : barStyle;
+  const resolvedBarSegmentCount = resolvedBarStyle === 'discrete' && Number.isFinite(barSegmentCount)
+    ? Math.floor(barSegmentCount)
+    : 0;
   const initialNumeric = typeof value === 'number' && Number.isFinite(value)
     ? value
     : (defaultValue !== undefined ? defaultValue : 0);
@@ -695,10 +699,6 @@ function SliderCore({
     ? clamp((split - handleLeftRatio) / Math.max(handleSpanRatio, Number.EPSILON), 0, 1)
     : 0;
   const handleSplitPct = (handleSplitLocal * 100).toFixed(3);
-  const resolvedBarStyle = isBasic ? 'continuous' : barStyle;
-  const resolvedBarSegmentCount = resolvedBarStyle === 'discrete' && Number.isFinite(barSegmentCount)
-    ? Math.floor(barSegmentCount)
-    : 0;
   const quantizeSplitRatio = useCallback((ratio: number) => {
     if (resolvedBarSegmentCount <= 1) return ratio;
     const clamped = clamp(ratio, 0, 1);
@@ -729,21 +729,29 @@ function SliderCore({
     return formatValueForDisplay(activeDrawerValue, raw, 'drawer');
   }, [activeDrawerValue, formatValueForDisplay, precision]);
   const displayValue = formattedDrawerValue ?? (focused ? text : displayValueRef.current);
+  const quantizeDrawerRatio = useCallback((ratio: number) => {
+    if (resolvedBarSegmentCount <= 1) return clamp(ratio, 0, 1);
+    const clamped = clamp(ratio, 0, 1);
+    const snapped = Math.round(clamped * resolvedBarSegmentCount) / resolvedBarSegmentCount;
+    return clamp(snapped, 0, 1);
+  }, [resolvedBarSegmentCount]);
   const setDrawerLineRatio = useCallback((index: number, ratio: number) => {
+    const quantized = quantizeDrawerRatio(ratio);
     setDrawerLineRatios((prev) => {
-      if (Math.abs(prev[index] - ratio) < 1e-6) return prev;
+      if (Math.abs(prev[index] - quantized) < 1e-6) return prev;
       const next = [...prev] as [number, number];
-      next[index] = ratio;
+      next[index] = quantized;
       drawerLineRatiosRef.current = next;
       return next;
     });
-  }, []);
+  }, [quantizeDrawerRatio]);
   const getDrawerRatioFromClientX = useCallback((clientX: number) => {
     if (!drawerRef.current) return null;
     const rect = drawerRef.current.getBoundingClientRect();
     if (!rect.width) return null;
-    return clamp((clientX - rect.left) / rect.width, 0, 1);
-  }, []);
+    const ratio = clamp((clientX - rect.left) / rect.width, 0, 1);
+    return quantizeDrawerRatio(ratio);
+  }, [quantizeDrawerRatio]);
   const handleDrawerLinePointerDown = useCallback((index: number) => (
     e: React.PointerEvent<HTMLSpanElement>,
   ) => {

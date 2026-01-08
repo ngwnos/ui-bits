@@ -12,6 +12,7 @@ import {
 import type { LfoSettings, Waveform } from "../../lfo";
 import { useStoreMirror } from "../../useStoreMirror";
 import type { MirrorFn } from "../../useStoreMirror";
+import IconButton from "../IconButton";
 import {
   applyReplace,
   extendStep,
@@ -501,10 +502,10 @@ function SliderCore({
   );
   const padY = '0.35em';
   const padRight = '0.5em';
+  const actionButtonSize = `calc(1em + ${padY} + ${padY} + 2px)`;
   const infoPaddingY = 1; // px padding around readout text
   const infoPaddingX = 6; // px horizontal padding around readout text
   const infoBorderWidth = 1; // px border width around readout blocks
-  const actionBarPadY = `calc(${padY} - ${(infoPaddingY + infoBorderWidth)}px)`;
   const handleSize = Math.max(10, Math.round(appliedFontSize));
   const handleOffset = drawerHandleActive ? Math.max(3, Math.round(handleSize / 3)) : 0;
   const padLeft = drawerHandleActive ? `${handleOffset + handleSize + handleOffset}px` : '0.5em';
@@ -548,7 +549,6 @@ function SliderCore({
       boxSizing: 'border-box' as const,
       touchAction: 'none' as const,
     };
-  const iconSize = handleSize - 2; // fill button interior minus borders
   const iconStrokeWidth = 18;
   const infoFontSize = (fontSize ?? 16);
   const formatFrequency = (value: number) => value.toFixed(2).padStart(5, ' ');
@@ -1674,7 +1674,7 @@ function SliderCore({
               display: 'flex',
               alignItems: 'center',
               gap: actionGap,
-              padding: `${actionBarPadY} ${padRight} ${actionBarPadY} ${actionGap}`,
+              padding: `0 ${padRight} 0 ${actionGap}`,
               background: bgRight,
               borderTop: `1px solid ${bgLeft}`,
               borderBottomLeftRadius: 3,
@@ -1704,32 +1704,29 @@ function SliderCore({
                 });
               };
               return (
-                <button
+                <IconButton
                   key={`drawer-action-${icon.waveform}`}
-                  type="button"
+                  behavior="toggle"
+                  toggled={isActive}
+                  onToggle={toggleWaveform}
+                  borderStyle="none"
+                  fontSize={appliedFontSize}
+                  colorA={bgLeft}
+                  colorB={bgRight}
                   aria-label={`${icon.label} waveform`}
-                  aria-pressed={isActive}
+                  title={`${icon.label} waveform`}
                   style={{
-                    width: handleSize,
-                    height: handleSize,
-                    borderRadius: 3,
-                    border: `1px solid ${bgLeft}`,
-                    background: isActive ? bgLeft : bgRight,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0,
-                    color: isActive ? bgRight : bgLeft,
+                    width: actionButtonSize,
+                    height: actionButtonSize,
+                    padding: padY,
                   }}
-                  onClick={toggleWaveform}
                 >
                   <svg
                     aria-hidden
                     viewBox="0 0 100 75"
                     preserveAspectRatio="xMidYMid meet"
                     role="img"
-                    style={{ width: iconSize, height: iconSize, display: 'block' }}
+                    style={{ width: '100%', height: '100%', display: 'block' }}
                   >
                     <path
                       d={icon.path}
@@ -1740,7 +1737,7 @@ function SliderCore({
                       strokeLinejoin={icon.lineJoin}
                     />
                   </svg>
-                </button>
+                </IconButton>
               );
             })}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: actionGapWide }}>

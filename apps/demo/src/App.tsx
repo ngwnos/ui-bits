@@ -21,6 +21,8 @@ import {
 import {
   DEFAULT_SELECTION_GRID_ID,
   AudioAnalysisProvider,
+  AudioControls,
+  type AudioControlsBorder,
   Dropdown,
   Folder,
   FrameLoopProvider,
@@ -48,7 +50,6 @@ import {
   type SliderRuntimeState,
   type SliderId,
 } from "ui-bits";
-import AudioControls, { type AudioControlsBorder } from "./components/AudioControls/AudioControls";
 import CustomColorPopover from "./components/CustomColorPopover";
 import TypeGPUTest from "./components/TypeGPUTest";
 
@@ -1239,6 +1240,7 @@ function EditableRectPOC() {
                   colorA={floatingPanelColorA}
                   colorB={floatingPanelColorB}
                   borderStyle="a"
+                  audioSrc="/audio/credits.mp3"
                 />
               </div>
               <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
@@ -1674,6 +1676,7 @@ function EditableRectPOC() {
                   colorA={flexoki.red['600']}
                   colorB={flexoki.red['100']}
                   borderStyle={audioBorderStyle}
+                  audioSrc="/audio/credits.mp3"
                 />
               </div>
               <div style={{ width: '100%', maxWidth: `min(720px, ${audioControlMaxWidth}vw)`, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>

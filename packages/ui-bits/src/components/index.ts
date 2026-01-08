@@ -6,6 +6,13 @@ export {
 } from "./LFOSlider";
 export { FrameLoopProvider, useFrame, useStoreMirror, type MirrorFn } from "./LFOSlider";
 export {
+  AudioControls,
+  AudioFFTWindow,
+  type AudioControlsProps,
+  type AudioControlsBorder,
+  type AudioFFTWindowProps,
+} from "./AudioControls";
+export {
   default as IconButton,
   type IconButtonProps,
   type IconButtonBehavior,

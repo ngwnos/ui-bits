@@ -7,17 +7,21 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { IconButton, LFOSlider, flexoki, useAudioAnalysisActions, useFrame } from "ui-bits";
-import AudioFFTWindow from "../AudioFFTWindow/AudioFFTWindow";
+import { useAudioAnalysisActions } from "../../audioAnalysis";
+import { useFrame } from "../../frameLoop";
+import { flexoki } from "../../flexoki";
+import IconButton from "../IconButton";
+import LFOSlider from "../LFOSlider";
+import AudioFFTWindow from "./AudioFFTWindow";
 
 export type AudioControlsBorder = 'a' | 'b' | 'none';
 
 export interface AudioControlsProps {
-  fontSize: number;
+  fontSize?: number;
   colorA?: string;
   colorB?: string;
   borderStyle?: AudioControlsBorder;
-  audioSrc?: string;
+  audioSrc: string;
   heightUnits?: number;
   fftAttack?: number;
   fftRelease?: number;
@@ -75,11 +79,11 @@ function safeCloseAudioContext(context: AudioContext | null) {
 }
 
 export default function AudioControls({
-  fontSize,
+  fontSize = 12,
   colorA,
   colorB,
   borderStyle = 'a',
-  audioSrc = "/audio/credits.mp3",
+  audioSrc,
   heightUnits = 6,
   fftAttack = DEFAULT_ATTACK_MS,
   fftRelease = DEFAULT_RELEASE_MS,

@@ -45,6 +45,13 @@ export {
 export { DEFAULT_SELECTION_GRID_ID } from "./selectionGridIds";
 export { loadHeightTexture, type HeightTextureEntry } from "./utils/loadHeightTexture";
 
+export {
+  AudioControls,
+  AudioFFTWindow,
+  type AudioControlsProps,
+  type AudioControlsBorder,
+  type AudioFFTWindowProps,
+} from "./components/AudioControls";
 export { default as SelectionGrid, type SelectionGridProps } from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";
 export {

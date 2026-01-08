@@ -68,7 +68,8 @@ The hooks are optional – leaving `mode="manual"`, `mirrorToStore={undefined}`,
 
 When the active waveform is `audio`, the slider samples FFT bins to drive its value. You can either pass
 `audioBins`/`audioBinCount`/`audioMaxMagnitude` directly, or wrap your UI in `AudioAnalysisProvider` and push
-updates with `useAudioAnalysisActions` so nested sliders pick up the same analysis stream.
+updates with `useAudioAnalysisActions` so nested sliders pick up the same analysis stream. The `AudioControls`
+component ships a full playback + FFT UI that feeds this provider for you.
 
 ## Styling
 

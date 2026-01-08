@@ -559,6 +559,7 @@ function EditableRectPOC() {
   }, [customDefinition.width]);
 
   const [sliderFontSize, setSliderFontSize] = React.useState<number>(12);
+  const [audioControlFontSize, setAudioControlFontSize] = React.useState<number>(12);
   const [audioPreviewValue, setAudioPreviewValue] = React.useState<number>(42);
   const [audioBorderStyle, setAudioBorderStyle] = React.useState<AudioControlsBorder>('a');
   const [iconToggleOn, setIconToggleOn] = React.useState(false);
@@ -1451,9 +1452,32 @@ const tabs = [
                 alignItems: 'center',
               }}
             >
+              <div style={fontSizeControlStyle}>
+                <button
+                  type="button"
+                  aria-label="Decrease audio control font size"
+                  title="Decrease audio control font size"
+                  style={fontSizeButtonStyle}
+                  onClick={() => setAudioControlFontSize((prev) => Math.max(MIN_FONT_SIZE, prev - 1))}
+                  disabled={audioControlFontSize <= MIN_FONT_SIZE}
+                >
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>−</span>
+                </button>
+                <span>Audio font size: {audioControlFontSize}</span>
+                <button
+                  type="button"
+                  aria-label="Increase audio control font size"
+                  title="Increase audio control font size"
+                  style={fontSizeButtonStyle}
+                  onClick={() => setAudioControlFontSize((prev) => Math.min(MAX_FONT_SIZE, prev + 1))}
+                  disabled={audioControlFontSize >= MAX_FONT_SIZE}
+                >
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
+                </button>
+              </div>
               <div style={{ width: '100%', maxWidth: 'min(720px, 50vw)' }}>
                 <AudioControls
-                  fontSize={sliderFontSize}
+                  fontSize={audioControlFontSize}
                   colorA={flexoki.red['600']}
                   colorB={flexoki.red['100']}
                   borderStyle={audioBorderStyle}

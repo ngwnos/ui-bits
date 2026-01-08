@@ -34,12 +34,26 @@ function resolveColors(colorA?: string, colorB?: string) {
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const clampBetween = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-const roundUnit = (value: number) => Math.round(clamp01(value) * 10) / 10;
-const roundSigma = (value: number) => Math.round(clampBetween(value, 0, 3) * 10) / 10;
 const DEFAULT_SAMPLE_RATE = 44100;
 const DEFAULT_NYQUIST = DEFAULT_SAMPLE_RATE / 2;
 const MIN_FREQ_HZ_GAP = 10;
 const MIN_SLIDER_UNIT_PX = 18;
+const CONTROL_GAP_PX = 8;
+const ENVELOPE_STEP_MS = 10;
+const MAX_ENVELOPE_MS = 500;
+const DEFAULT_ATTACK_MS = 20;
+const DEFAULT_RELEASE_MS = 80;
+const PEAK_DECAY_DT_SEC = 1 / 60;
+const roundUnit = (value: number) => Math.round(clamp01(value) * 10) / 10;
+const roundSigma = (value: number) => Math.round(clampBetween(value, 0, 3) * 10) / 10;
+const roundMs = (value: number) => Math.round(clampBetween(value, 0, MAX_ENVELOPE_MS) / ENVELOPE_STEP_MS) * ENVELOPE_STEP_MS;
+const weightFromTimeMs = (ms: number, dtSec: number) => {
+  if (ms <= 0) return 1;
+  const tau = ms / 1000;
+  const dt = Math.max(0, dtSec);
+  if (!Number.isFinite(tau) || tau <= 0) return 1;
+  return clamp01(1 - Math.exp(-dt / tau));
+};
 
 function computeSliderUnitPx(fontSize?: number) {
   const previewFontSize = fontSize || 16;
@@ -65,8 +79,8 @@ export default function AudioControls({
   colorB,
   borderStyle = 'a',
   audioSrc = "/audio/credits.mp3",
-  fftAttack = 0.6,
-  fftRelease = 0.2,
+  fftAttack = DEFAULT_ATTACK_MS,
+  fftRelease = DEFAULT_RELEASE_MS,
   fftBlurSigma = 0,
   analyserSmoothing = 0.8,
 }: AudioControlsProps) {
@@ -79,8 +93,8 @@ export default function AudioControls({
   const seekTokenRef = React.useRef<number>(0);
   const [binSliderValue, setBinSliderValue] = React.useState<number>(256);
   const [smoothingValue, setSmoothingValue] = React.useState<number>(() => roundUnit(analyserSmoothingDefault));
-  const [attackValue, setAttackValue] = React.useState<number>(() => roundUnit(fftAttack));
-  const [releaseValue, setReleaseValue] = React.useState<number>(() => roundUnit(fftRelease));
+  const [attackMs, setAttackMs] = React.useState<number>(() => roundMs(fftAttack));
+  const [releaseMs, setReleaseMs] = React.useState<number>(() => roundMs(fftRelease));
   const [blurValue, setBlurValue] = React.useState<number>(() => roundSigma(fftBlurSigma ?? 0));
   const [useDiscreteBins, setUseDiscreteBins] = React.useState<boolean>(true);
   const [nyquistHz, setNyquistHz] = React.useState<number>(DEFAULT_NYQUIST);
@@ -156,16 +170,12 @@ export default function AudioControls({
       ? safeB
       : safeA;
   const textColor = safeA;
-  const actionButtonSize = Math.max(
-    MIN_SLIDER_UNIT_PX,
-    Math.round(fontSize * (1 + 0.35 * 2) + 2),
-  );
   const playPauseLabel = isPlaying ? "Pause audio analysis" : "Play audio analysis";
   const muteLabel = isMuted ? "Unmute audio output" : "Mute audio output";
   const interpolationLabel = useDiscreteBins ? "Show interpolated FFT bins" : "Show discrete FFT bins";
-  const attackWeight = clamp01(attackValue);
-  const releaseWeight = clamp01(releaseValue);
-  const peakDecayRate = Math.max(0.001, releaseWeight * 0.25);
+  const attackMsClamped = clampBetween(attackMs, 0, MAX_ENVELOPE_MS);
+  const releaseMsClamped = clampBetween(releaseMs, 0, MAX_ENVELOPE_MS);
+  const peakDecayRate = Math.max(0.001, weightFromTimeMs(releaseMsClamped, PEAK_DECAY_DT_SEC) * 0.25);
 
   const issueSeek = React.useCallback((ratio: number) => {
     const clamped = clamp01(ratio);
@@ -233,41 +243,40 @@ export default function AudioControls({
           display: 'flex',
           alignItems: 'center',
           overflow: 'hidden',
+          gap: CONTROL_GAP_PX,
+          padding: `0 ${CONTROL_GAP_PX}px`,
+          boxSizing: 'border-box',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: actionButtonSize + 6 }}>
-            <IconButton
-              behavior="toggle"
-              toggled={isPlaying}
-              onToggle={setIsPlaying}
-              borderStyle="none"
-              fontSize={fontSize}
-              colorA={safeA}
-              colorB={safeB}
-              aria-label={playPauseLabel}
-              title={playPauseLabel}
-            >
-              {isPlaying ? <Pause strokeWidth={1.6} /> : <Play strokeWidth={1.6} />}
-            </IconButton>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: actionButtonSize + 6, marginLeft: 2 }}>
-            <IconButton
-              behavior="toggle"
-              toggled={useDiscreteBins}
-              onToggle={setUseDiscreteBins}
-              borderStyle="none"
-              fontSize={fontSize}
-              colorA={safeA}
-              colorB={safeB}
-              aria-label={interpolationLabel}
-              title={interpolationLabel}
-            >
-              {useDiscreteBins ? <ChartColumnIncreasing strokeWidth={1.6} /> : <ChartSpline strokeWidth={1.6} />}
-            </IconButton>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: CONTROL_GAP_PX, flexShrink: 0 }}>
+          <IconButton
+            behavior="toggle"
+            toggled={isPlaying}
+            onToggle={setIsPlaying}
+            borderStyle="none"
+            fontSize={fontSize}
+            colorA={safeA}
+            colorB={safeB}
+            aria-label={playPauseLabel}
+            title={playPauseLabel}
+          >
+            {isPlaying ? <Pause strokeWidth={1.6} /> : <Play strokeWidth={1.6} />}
+          </IconButton>
+          <IconButton
+            behavior="toggle"
+            toggled={useDiscreteBins}
+            onToggle={setUseDiscreteBins}
+            borderStyle="none"
+            fontSize={fontSize}
+            colorA={safeA}
+            colorB={safeB}
+            aria-label={interpolationLabel}
+            title={interpolationLabel}
+          >
+            {useDiscreteBins ? <ChartColumnIncreasing strokeWidth={1.6} /> : <ChartSpline strokeWidth={1.6} />}
+          </IconButton>
         </div>
-        <div style={{ flex: 1, minWidth: 0, padding: '0 0.5rem 0 0', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: CONTROL_GAP_PX }}>
           <div ref={sliderMeasureRef} style={{ display: 'flex', minWidth: 0 }}>
             <LFOSlider
               label="Fmin"
@@ -316,8 +325,8 @@ export default function AudioControls({
         onProgress={handleProgress}
         seekTarget={seekCommand}
         analyserSmoothing={smoothingValue}
-        attackWeight={attackWeight}
-        releaseWeight={releaseWeight}
+        attackMs={attackMsClamped}
+        releaseMs={releaseMsClamped}
         blurSigma={blurValue}
         targetBins={clampBins(binSliderValue)}
         onRawFftFrame={handleRawFftData}
@@ -352,8 +361,8 @@ export default function AudioControls({
           rawFftDataRef={rawFftRef}
           rawFrameVersion={rawFftMeta.version}
           rawBinCount={rawFftMeta.binCount}
-          attackWeight={attackWeight}
-          releaseWeight={releaseWeight}
+          attackMs={attackMsClamped}
+          releaseMs={releaseMsClamped}
           blurSigma={blurValue}
           discreteBins={useDiscreteBins}
           frequencyMin={freqMinRatioClamped}
@@ -375,17 +384,12 @@ export default function AudioControls({
           display: 'flex',
           alignItems: 'center',
           overflow: 'hidden',
+          gap: CONTROL_GAP_PX,
+          padding: `0 ${CONTROL_GAP_PX}px`,
+          boxSizing: 'border-box',
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            width: actionButtonSize + 6,
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: CONTROL_GAP_PX, flexShrink: 0 }}>
           <IconButton
             behavior="toggle"
             toggled={!isMuted}
@@ -406,8 +410,7 @@ export default function AudioControls({
             minWidth: 0,
             display: 'grid',
             gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-            gap: 8,
-            padding: '0 0.5rem 0 0',
+            gap: CONTROL_GAP_PX,
           }}
         >
           <LFOSlider
@@ -441,8 +444,8 @@ export default function AudioControls({
           <LFOSlider
             label="Atk"
             min={0}
-            max={1}
-            step={0.1}
+            max={MAX_ENVELOPE_MS}
+            step={ENVELOPE_STEP_MS}
             barStyle="continuous"
             width="100%"
             border="left"
@@ -451,17 +454,17 @@ export default function AudioControls({
             colorB={safeB}
             fontSize={fontSize}
             mode="external"
-            readExternal={() => attackValue}
-            onUserChange={(value: number) => setAttackValue(roundUnit(value))}
-            onAnimatedUpdate={(value: number) => setAttackValue(roundUnit(value))}
-            formatDisplayValue={(value) => value.toFixed(1)}
+            readExternal={() => attackMsClamped}
+            onUserChange={(value: number) => setAttackMs(roundMs(value))}
+            onAnimatedUpdate={(value: number) => setAttackMs(roundMs(value))}
+            formatDisplayValue={(value) => `${Math.round(value)} ms`}
             style={{ gap: 0 }}
           />
           <LFOSlider
             label="Rel"
             min={0}
-            max={1}
-            step={0.1}
+            max={MAX_ENVELOPE_MS}
+            step={ENVELOPE_STEP_MS}
             barStyle="continuous"
             width="100%"
             border="left"
@@ -470,10 +473,10 @@ export default function AudioControls({
             colorB={safeB}
             fontSize={fontSize}
             mode="external"
-            readExternal={() => releaseValue}
-            onUserChange={(value: number) => setReleaseValue(roundUnit(value))}
-            onAnimatedUpdate={(value: number) => setReleaseValue(roundUnit(value))}
-            formatDisplayValue={(value) => value.toFixed(1)}
+            readExternal={() => releaseMsClamped}
+            onUserChange={(value: number) => setReleaseMs(roundMs(value))}
+            onAnimatedUpdate={(value: number) => setReleaseMs(roundMs(value))}
+            formatDisplayValue={(value) => `${Math.round(value)} ms`}
             style={{ gap: 0 }}
           />
           <LFOSlider
@@ -526,8 +529,8 @@ interface AudioPlaybackEngineProps {
   seekTarget?: { ratio: number; token: number } | null;
   onProgress?: (ratio: number) => void;
   analyserSmoothing?: number;
-  attackWeight?: number;
-  releaseWeight?: number;
+  attackMs?: number;
+  releaseMs?: number;
   blurSigma?: number;
   targetBins?: number;
   onRawFftFrame?: (data: Uint8Array) => void;
@@ -543,8 +546,8 @@ function AudioPlaybackEngine({
   seekTarget,
   onProgress,
   analyserSmoothing = 0.8,
-  attackWeight = 0.6,
-  releaseWeight = 0.2,
+  attackMs = DEFAULT_ATTACK_MS,
+  releaseMs = DEFAULT_RELEASE_MS,
   blurSigma = 0,
   targetBins = 1024,
   onRawFftFrame,
@@ -560,7 +563,7 @@ function AudioPlaybackEngine({
   } = useSliderActions();
   const audioContextRef = React.useRef<AudioContext | null>(null);
   const analyserRef = React.useRef<AnalyserNode | null>(null);
-const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
   const sourceRef = React.useRef<AudioBufferSourceNode | null>(null);
   const silentGainRef = React.useRef<GainNode | null>(null);
   const audioBufferRef = React.useRef<AudioBuffer | null>(null);
@@ -758,7 +761,7 @@ const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
     }
   }, [getDuration, playing, seekTarget, startPlayback, wrapOffset]);
 
-  useFrame(() => {
+  useFrame((_, dtSec) => {
     const analyser = analyserRef.current;
     const data = bufferRef.current;
     if (analyser && data) {
@@ -769,8 +772,9 @@ const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
       const processed = processBinsFromBytes(
         data,
         {
-          attackWeight: clamp01(attackWeight),
-          releaseWeight: clamp01(releaseWeight),
+          attackMs: clampBetween(attackMs, 0, MAX_ENVELOPE_MS),
+          releaseMs: clampBetween(releaseMs, 0, MAX_ENVELOPE_MS),
+          dtSec,
           blurSigma: Math.max(0, blurSigma || 0),
           targetBins: clampBetween(Math.round(targetBins || data.length), 1, data.length),
           frequencyMin,
@@ -799,8 +803,9 @@ const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
 }
 
 interface ProcessBinsOptions {
-  attackWeight: number;
-  releaseWeight: number;
+  attackMs: number;
+  releaseMs: number;
+  dtSec: number;
   blurSigma: number;
   targetBins: number;
   frequencyMin: number;
@@ -843,8 +848,9 @@ function processBinsFromBytes(
   const prev = prevBuffer ?? new Float32Array(length);
   const next = scratchBuffer ?? new Float32Array(length);
   const useHistory = smoothingState.hasHistory && prevBuffer !== null;
-  const attackWeight = clamp01(options.attackWeight);
-  const releaseWeight = clamp01(options.releaseWeight);
+  const dt = Math.max(0, options.dtSec);
+  const attackWeight = weightFromTimeMs(options.attackMs, dt);
+  const releaseWeight = weightFromTimeMs(options.releaseMs, dt);
   for (let i = 0; i < length; i += 1) {
     const current = source[i] / 255;
     const prevValue = useHistory ? prev[i] : current;

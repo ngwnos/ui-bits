@@ -17,8 +17,8 @@ export interface AudioFFTWindowProps {
   rawFftDataRef?: React.RefObject<Uint8Array | null>;
   rawFrameVersion?: number;
   rawBinCount?: number;
-  attackWeight?: number;
-  releaseWeight?: number;
+  attackMs?: number;
+  releaseMs?: number;
   blurSigma?: number;
   discreteBins?: boolean;
   frequencyMin?: number;
@@ -38,8 +38,17 @@ const HOLD_SECONDS = 0.2;
 const PEAK_GRAVITY = 4;
 const MAX_GAUSSIAN_RADIUS = 12;
 const FREQUENCY_GAP = 0.01;
+const DEFAULT_ATTACK_MS = 20;
+const DEFAULT_RELEASE_MS = 80;
 
 const clampBetween = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const weightFromTimeMs = (ms: number, dtSec: number) => {
+  if (ms <= 0) return 1;
+  const tau = ms / 1000;
+  const dt = Math.max(0, dtSec);
+  if (!Number.isFinite(tau) || tau <= 0) return 1;
+  return Math.max(0, Math.min(1, 1 - Math.exp(-dt / tau)));
+};
 
 interface FftGpuResources {
   context: GPUCanvasContext;
@@ -442,8 +451,8 @@ export default function AudioFFTWindow({
   rawFftDataRef,
   rawFrameVersion,
   rawBinCount = 0,
-  attackWeight = 0.6,
-  releaseWeight = 0.2,
+  attackMs = DEFAULT_ATTACK_MS,
+  releaseMs = DEFAULT_RELEASE_MS,
   blurSigma = 0,
   discreteBins = true,
   frequencyMin = 0,
@@ -462,8 +471,8 @@ export default function AudioFFTWindow({
 
   const playbackRatioRef = React.useRef<number>(Math.max(0, Math.min(1, playbackRatio)));
   const blurSigmaRef = React.useRef<number>(Math.max(0, blurSigma));
-  const attackWeightRef = React.useRef<number>(Math.max(0, Math.min(1, attackWeight)));
-  const releaseWeightRef = React.useRef<number>(Math.max(0, Math.min(1, releaseWeight)));
+  const attackMsRef = React.useRef<number>(Math.max(0, attackMs));
+  const releaseMsRef = React.useRef<number>(Math.max(0, releaseMs));
   const peakDecayRef = React.useRef<number>(Math.max(0.0005, peakDecay));
   const discreteModeRef = React.useRef<number>(discreteBins ? 1 : 0);
   const freqMinRef = React.useRef<number>(Math.max(0, Math.min(1, frequencyMin)));
@@ -491,12 +500,12 @@ export default function AudioFFTWindow({
   }, [blurSigma]);
 
   React.useEffect(() => {
-    attackWeightRef.current = Math.max(0, Math.min(1, attackWeight));
-  }, [attackWeight]);
+    attackMsRef.current = Math.max(0, attackMs);
+  }, [attackMs]);
 
   React.useEffect(() => {
-    releaseWeightRef.current = Math.max(0, Math.min(1, releaseWeight));
-  }, [releaseWeight]);
+    releaseMsRef.current = Math.max(0, releaseMs);
+  }, [releaseMs]);
 
   React.useEffect(() => {
     peakDecayRef.current = Math.max(0.0005, peakDecay);
@@ -691,8 +700,8 @@ export default function AudioFFTWindow({
         uniformArray[9] = inactiveColorRef.current[1];
         uniformArray[10] = inactiveColorRef.current[2];
         uniformArray[11] = 1;
-        uniformArray[12] = attackWeightRef.current;
-        uniformArray[13] = releaseWeightRef.current;
+        uniformArray[12] = weightFromTimeMs(attackMsRef.current, deltaSeconds);
+        uniformArray[13] = weightFromTimeMs(releaseMsRef.current, deltaSeconds);
         uniformArray[14] = deltaSeconds;
         uniformArray[15] = PEAK_GRAVITY;
         uniformArray[16] = peakDecayRef.current;

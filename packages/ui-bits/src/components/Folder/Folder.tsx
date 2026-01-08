@@ -1,4 +1,5 @@
 import React from "react";
+import { AnimationSuspensionProvider } from "../../animationSuspension";
 import IconButton from "../IconButton";
 
 export type FolderBorderStyle = "a" | "b" | "none";
@@ -12,6 +13,8 @@ export interface FolderProps extends React.HTMLAttributes<HTMLDivElement> {
   padding?: number | string;
   collapsed?: boolean;
   defaultCollapsed?: boolean;
+  keepMounted?: boolean;
+  suspended?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
 }
 
@@ -41,6 +44,8 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
     padding = 0,
     collapsed,
     defaultCollapsed = false,
+    keepMounted = true,
+    suspended,
     onCollapseChange,
     style,
     className,
@@ -63,6 +68,8 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const headerOuterHeight = headerHeight + headerBorderWidth;
   const bodyGap = Math.max(6, Math.round(fontSize * 0.4));
   const bodyPaddingY = `${bodyGap}px`;
+  const renderBody = !isCollapsed || keepMounted;
+  const suspendChildren = Boolean(suspended || (keepMounted && isCollapsed));
   const toggleValue = isCollapsed ? "collapsed" : "expanded";
   const toggleOptions = [
     { value: "collapsed", ariaLabel: "Expand section", title: "Expand section" },
@@ -169,20 +176,23 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
         <span style={{ textAlign: "center" }}>{label}</span>
         <div />
       </div>
-      {!isCollapsed && (
+      {renderBody && (
         <div
           style={{
             paddingLeft: resolveSize(padding),
             paddingRight: resolveSize(padding),
             paddingTop: bodyPaddingY,
             paddingBottom: 0,
-            display: "flex",
+            display: isCollapsed ? "none" : "flex",
             flexDirection: "column",
             gap: bodyGap,
             background: headerTextColor,
           }}
+          aria-hidden={isCollapsed}
         >
-          {children}
+          <AnimationSuspensionProvider suspended={suspendChildren}>
+            {children}
+          </AnimationSuspensionProvider>
         </div>
       )}
     </div>

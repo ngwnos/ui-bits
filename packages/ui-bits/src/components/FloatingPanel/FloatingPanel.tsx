@@ -1,4 +1,5 @@
 import React from "react";
+import { AnimationSuspensionProvider } from "../../animationSuspension";
 
 export type FloatingPanelBorderStyle = "a" | "b" | "none";
 
@@ -11,6 +12,8 @@ export interface FloatingPanelProps extends React.HTMLAttributes<HTMLDivElement>
   bodyBlur?: number;
   bodyOpacity?: number;
   collapsed?: boolean;
+  keepMounted?: boolean;
+  suspended?: boolean;
   draggable?: boolean;
   position?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
@@ -75,6 +78,8 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     bodyBlur,
     bodyOpacity,
     collapsed = false,
+    keepMounted = true,
+    suspended,
     draggable = false,
     position,
     onPositionChange,
@@ -131,6 +136,8 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const headerOuterHeight = headerHeight + headerBorderWidth;
   const resolvedBodyOpacity = Math.max(0, Math.min(1, bodyOpacity ?? DEFAULT_BODY_OPACITY));
   const resolvedBodyBlur = Math.max(0, bodyBlur ?? DEFAULT_BODY_BLUR);
+  const renderBody = !collapsed || keepMounted;
+  const suspendChildren = Boolean(suspended || (keepMounted && collapsed));
 
   const resolvedPosition = position ?? dragPosition;
   const isFloating = Boolean(draggable && resolvedPosition);
@@ -242,19 +249,22 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       >
         {header}
       </div>
-      {!collapsed && (
+      {renderBody && (
         <div
           style={{
             padding: resolvedPaddingValue,
-            display: "flex",
+            display: collapsed ? "none" : "flex",
             flexDirection: "column",
             gap,
             background: transparent ? colorWithAlpha(colorB, resolvedBodyOpacity) : colorB,
             backdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
             WebkitBackdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
           }}
+          aria-hidden={collapsed}
         >
-          {children}
+          <AnimationSuspensionProvider suspended={suspendChildren}>
+            {children}
+          </AnimationSuspensionProvider>
         </div>
       )}
     </div>

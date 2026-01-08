@@ -6,6 +6,11 @@ export {
 } from "./LFOSlider";
 export { FrameLoopProvider, useFrame, useStoreMirror, type MirrorFn } from "./LFOSlider";
 export {
+  AnimationSuspensionProvider,
+  useAnimationSuspended,
+  type AnimationSuspensionProviderProps,
+} from "../animationSuspension";
+export {
   AudioControls,
   AudioFFTWindow,
   type AudioControlsProps,

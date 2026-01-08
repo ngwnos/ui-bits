@@ -51,6 +51,7 @@ const Example = () => {
 | `onDrawerOpenChange`, `onDrawerLinesChange` | Callbacks for synchronising drawer state with your store. |
 | `onWaveformChange`, `onFrequencyChange`, `onPhaseChange`, `onLfoEnabledChange` | Hooks for mirroring LFO controls (running state toggles when the active waveform button is clicked again). |
 | `audioBins`, `audioBinCount`, `audioMaxMagnitude` | FFT data used when the waveform is set to `audio`. These may also be supplied via `AudioAnalysisProvider`. |
+| `suspended` | Pause frame-loop updates while keeping state mounted (also picked up from `AnimationSuspensionProvider`). |
 | `className`, `style` | `string`, `React.CSSProperties` | Optional overrides applied to the root wrapper. |
 
 Refer to `LFOSliderProps` for the full list of optional callbacks and configuration flags.
@@ -70,6 +71,11 @@ When the active waveform is `audio`, the slider samples FFT bins to drive its va
 `audioBins`/`audioBinCount`/`audioMaxMagnitude` directly, or wrap your UI in `AudioAnalysisProvider` and push
 updates with `useAudioAnalysisActions` so nested sliders pick up the same analysis stream. The `AudioControls`
 component ships a full playback + FFT UI that feeds this provider for you.
+
+## Suspension
+
+When `suspended` is true, the slider stops `useFrame` updates but keeps its state. `Folder` and `FloatingPanel`
+set an `AnimationSuspensionProvider` while collapsed so nested sliders pause automatically.
 
 ## Styling
 

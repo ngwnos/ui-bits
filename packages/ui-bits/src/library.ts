@@ -18,6 +18,11 @@ export {
 export { FrameLoopProvider, useFrame } from "./frameLoop";
 export { useStoreMirror, type MirrorFn } from "./useStoreMirror";
 export {
+  AnimationSuspensionProvider,
+  useAnimationSuspended,
+  type AnimationSuspensionProviderProps,
+} from "./animationSuspension";
+export {
   AudioAnalysisProvider,
   useAudioAnalysisActions,
   useAudioAnalysisState,

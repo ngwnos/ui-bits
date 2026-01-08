@@ -7,6 +7,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { AnimationSuspensionProvider, useAnimationSuspended } from "../../animationSuspension";
 import { useAudioAnalysisActions } from "../../audioAnalysis";
 import { useFrame } from "../../frameLoop";
 import { flexoki } from "../../flexoki";
@@ -27,6 +28,7 @@ export interface AudioControlsProps {
   fftRelease?: number;
   fftBlurSigma?: number;
   analyserSmoothing?: number;
+  suspended?: boolean;
 }
 
 function resolveColors(colorA?: string, colorB?: string) {
@@ -89,7 +91,9 @@ export default function AudioControls({
   fftRelease = DEFAULT_RELEASE_MS,
   fftBlurSigma = 0,
   analyserSmoothing = 0.8,
+  suspended,
 }: AudioControlsProps) {
+  const isSuspended = useAnimationSuspended(suspended);
   const analyserSmoothingDefault = clamp01(analyserSmoothing ?? 0.8);
   const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
   const [isMuted, setIsMuted] = React.useState<boolean>(true);
@@ -246,54 +250,84 @@ export default function AudioControls({
   }, [fftBlurSigma]);
 
   return (
-    <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
-      <div
-        style={{
-          width: '100%',
-          minHeight: sliderUnitPx,
-          borderTop: `1px solid ${sideBorderColor}`,
-          borderLeft: `${sideBorderWidth}px solid ${sideBorderColor}`,
-          borderRight: `${sideBorderWidth}px solid ${sideBorderColor}`,
-          borderBottom: `1px solid ${safeB}`,
-          borderTopLeftRadius: 3,
-          borderTopRightRadius: 3,
-          background: safeB,
-          display: 'flex',
-          alignItems: 'center',
-          overflow: 'hidden',
-          gap: CONTROL_GAP_PX,
-          padding: `0 ${CONTROL_GAP_PX}px`,
-          boxSizing: 'border-box',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: CONTROL_GAP_PX, flexShrink: 0 }}>
-          <IconButton
-            behavior="cycle"
-            value={playCycleValue}
-            options={playCycleOptions}
-            onChange={(nextValue) => setIsPlaying(nextValue === "playing")}
-            borderStyle="none"
-            fontSize={fontSize}
-            colorA={safeA}
-            colorB={safeB}
-          />
-          <IconButton
-            behavior="cycle"
-            value={interpolationCycleValue}
-            options={interpolationCycleOptions}
-            onChange={(nextValue) => setUseDiscreteBins(nextValue === "discrete")}
-            borderStyle="none"
-            fontSize={fontSize}
-            colorA={safeA}
-            colorB={safeB}
-          />
-        </div>
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: CONTROL_GAP_PX }}>
-          <div ref={sliderMeasureRef} style={{ display: 'flex', minWidth: 0 }}>
+    <AnimationSuspensionProvider suspended={isSuspended}>
+      <div style={{ width: '100%', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
+        <div
+          style={{
+            width: '100%',
+            minHeight: sliderUnitPx,
+            borderTop: `1px solid ${sideBorderColor}`,
+            borderLeft: `${sideBorderWidth}px solid ${sideBorderColor}`,
+            borderRight: `${sideBorderWidth}px solid ${sideBorderColor}`,
+            borderBottom: `1px solid ${safeB}`,
+            borderTopLeftRadius: 3,
+            borderTopRightRadius: 3,
+            background: safeB,
+            display: 'flex',
+            alignItems: 'center',
+            overflow: 'hidden',
+            gap: CONTROL_GAP_PX,
+            padding: `0 ${CONTROL_GAP_PX}px`,
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: CONTROL_GAP_PX, flexShrink: 0 }}>
+            <IconButton
+              behavior="cycle"
+              value={playCycleValue}
+              options={playCycleOptions}
+              onChange={(nextValue) => setIsPlaying(nextValue === "playing")}
+              borderStyle="none"
+              fontSize={fontSize}
+              colorA={safeA}
+              colorB={safeB}
+            />
+            <IconButton
+              behavior="cycle"
+              value={interpolationCycleValue}
+              options={interpolationCycleOptions}
+              onChange={(nextValue) => setUseDiscreteBins(nextValue === "discrete")}
+              borderStyle="none"
+              fontSize={fontSize}
+              colorA={safeA}
+              colorB={safeB}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: CONTROL_GAP_PX }}>
+            <div ref={sliderMeasureRef} style={{ display: 'flex', minWidth: 0 }}>
+              <LFOSlider
+                label="Bins"
+                min={1}
+                max={1024}
+                step={1}
+                barStyle="continuous"
+                width="100%"
+                border="left"
+                borderMask={{ top: false, bottom: false, right: true, left: true }}
+                colorA={safeA}
+                colorB={safeB}
+                fontSize={fontSize}
+                mode="external"
+                readExternal={() => binSliderValue}
+                onUserChange={(value: number) => {
+                  setBinSliderValue((prev) => {
+                    const next = clampBins(value);
+                    return prev === next ? prev : next;
+                  });
+                }}
+                onAnimatedUpdate={(value: number) => {
+                  setBinSliderValue((prev) => {
+                    const next = clampBins(value);
+                    return prev === next ? prev : next;
+                  });
+                }}
+                style={{ gap: 0 }}
+              />
+            </div>
             <LFOSlider
-              label="Bins"
-              min={1}
-              max={1024}
+              label="Fmin"
+              min={0}
+              max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
               step={1}
               barStyle="continuous"
               width="100%"
@@ -303,62 +337,33 @@ export default function AudioControls({
               colorB={safeB}
               fontSize={fontSize}
               mode="external"
-              readExternal={() => binSliderValue}
-              onUserChange={(value: number) => {
-                setBinSliderValue((prev) => {
-                  const next = clampBins(value);
-                  return prev === next ? prev : next;
-                });
-              }}
-              onAnimatedUpdate={(value: number) => {
-                setBinSliderValue((prev) => {
-                  const next = clampBins(value);
-                  return prev === next ? prev : next;
-                });
-              }}
+              readExternal={() => freqMinHz}
+              onUserChange={handleFreqMinChange}
+              onAnimatedUpdate={handleFreqMinChange}
+              formatDisplayValue={(value) => `${Math.round(value)}`}
+              style={{ gap: 0 }}
+            />
+            <LFOSlider
+              label="Fmax"
+              min={MIN_FREQ_HZ_GAP}
+              max={Math.max(MIN_FREQ_HZ_GAP, nyquistHz)}
+              step={1}
+              barStyle="continuous"
+              width="100%"
+              border="left"
+              borderMask={{ top: false, bottom: false, right: true, left: true }}
+              colorA={safeA}
+              colorB={safeB}
+              fontSize={fontSize}
+              mode="external"
+              readExternal={() => freqMaxHz}
+              onUserChange={handleFreqMaxChange}
+              onAnimatedUpdate={handleFreqMaxChange}
+              formatDisplayValue={(value) => `${Math.round(value)}`}
               style={{ gap: 0 }}
             />
           </div>
-          <LFOSlider
-            label="Fmin"
-            min={0}
-            max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
-            step={1}
-            barStyle="continuous"
-            width="100%"
-            border="left"
-            borderMask={{ top: false, bottom: false, right: true, left: true }}
-            colorA={safeA}
-            colorB={safeB}
-            fontSize={fontSize}
-            mode="external"
-            readExternal={() => freqMinHz}
-            onUserChange={handleFreqMinChange}
-            onAnimatedUpdate={handleFreqMinChange}
-            formatDisplayValue={(value) => `${Math.round(value)}`}
-            style={{ gap: 0 }}
-          />
-          <LFOSlider
-            label="Fmax"
-            min={MIN_FREQ_HZ_GAP}
-            max={Math.max(MIN_FREQ_HZ_GAP, nyquistHz)}
-            step={1}
-            barStyle="continuous"
-            width="100%"
-            border="left"
-            borderMask={{ top: false, bottom: false, right: true, left: true }}
-            colorA={safeA}
-            colorB={safeB}
-            fontSize={fontSize}
-            mode="external"
-            readExternal={() => freqMaxHz}
-            onUserChange={handleFreqMaxChange}
-            onAnimatedUpdate={handleFreqMaxChange}
-            formatDisplayValue={(value) => `${Math.round(value)}`}
-            style={{ gap: 0 }}
-          />
         </div>
-      </div>
       <AudioPlaybackEngine
         src={audioSrc}
         playing={isPlaying}
@@ -374,6 +379,7 @@ export default function AudioControls({
         frequencyMax={freqMaxRatioClamped}
         onSampleRateChange={handleSampleRateChange}
         muted={isMuted}
+        suspended={isSuspended}
       />
       <div
         style={{
@@ -407,6 +413,7 @@ export default function AudioControls({
           discreteBins={useDiscreteBins}
           frequencyMin={freqMinRatioClamped}
           frequencyMax={freqMaxRatioClamped}
+          suspended={isSuspended}
         />
       </div>
       <div
@@ -529,6 +536,7 @@ export default function AudioControls({
         </div>
       </div>
     </div>
+    </AnimationSuspensionProvider>
   );
 }
 
@@ -547,6 +555,7 @@ interface AudioPlaybackEngineProps {
   frequencyMax?: number;
   onSampleRateChange?: (sampleRate: number) => void;
   muted?: boolean;
+  suspended?: boolean;
 }
 
 function AudioPlaybackEngine({
@@ -564,7 +573,9 @@ function AudioPlaybackEngine({
   frequencyMax = 1,
   onSampleRateChange,
   muted = true,
+  suspended,
 }: AudioPlaybackEngineProps) {
+  const isSuspended = useAnimationSuspended(suspended);
   const {
     setAudioBins,
     setAudioBinCount,
@@ -770,7 +781,7 @@ function AudioPlaybackEngine({
     }
   }, [getDuration, playing, seekTarget, startPlayback, wrapOffset]);
 
-  useFrame((_, dtSec) => {
+  useFrame(isSuspended ? null : (_, dtSec) => {
     const analyser = analyserRef.current;
     const data = bufferRef.current;
     if (analyser && data) {

@@ -1,5 +1,6 @@
 import React from "react";
 import tgpu from "typegpu";
+import { useAnimationSuspended } from "../../animationSuspension";
 import "./audio-fft-window.css";
 
 export interface AudioFFTWindowProps {
@@ -23,6 +24,7 @@ export interface AudioFFTWindowProps {
   discreteBins?: boolean;
   frequencyMin?: number;
   frequencyMax?: number;
+  suspended?: boolean;
 }
 
 type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
@@ -457,6 +459,7 @@ export default function AudioFFTWindow({
   discreteBins = true,
   frequencyMin = 0,
   frequencyMax = 1,
+  suspended,
 }: AudioFFTWindowProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
@@ -484,12 +487,29 @@ export default function AudioFFTWindow({
   const resourcesRef = React.useRef<FftGpuResources | null>(null);
   const stateIndexRef = React.useRef<0 | 1>(0);
   const normalizedFftRef = React.useRef<Float32Array | null>(null);
+  const animationFrameRef = React.useRef<number | null>(null);
+  const resumeRef = React.useRef<(() => void) | null>(null);
+  const isSuspended = useAnimationSuspended(suspended);
+  const suspendedRef = React.useRef<boolean>(isSuspended);
 
   const pointerStateRef = React.useRef<{ active: boolean; pointerId: number | null }>({ active: false, pointerId: null });
   const activeColorVec = React.useMemo(() => parseHexColor(activeColor, DEFAULT_ACTIVE_COLOR), [activeColor]);
   const inactiveColorVec = React.useMemo(() => parseHexColor(inactiveColor, DEFAULT_INACTIVE_COLOR), [inactiveColor]);
   const activeColorRef = React.useRef<[number, number, number]>(activeColorVec);
   const inactiveColorRef = React.useRef<[number, number, number]>(inactiveColorVec);
+
+  React.useEffect(() => {
+    suspendedRef.current = isSuspended;
+    if (isSuspended) {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      lastTimestampRef.current = typeof performance !== "undefined" ? performance.now() : Date.now();
+      return;
+    }
+    resumeRef.current?.();
+  }, [isSuspended]);
 
   React.useEffect(() => {
     playbackRatioRef.current = Math.max(0, Math.min(1, playbackRatio));
@@ -639,7 +659,6 @@ export default function AudioFFTWindow({
   React.useEffect(() => {
     if (!supportsWebGPU) return;
     let cancelled = false;
-    let animationFrame: number | null = null;
 
     async function boot() {
       const root = await getSharedRoot();
@@ -660,6 +679,11 @@ export default function AudioFFTWindow({
 
       const frame = (timestamp: number) => {
         if (cancelled) return;
+        if (suspendedRef.current) {
+          animationFrameRef.current = null;
+          lastTimestampRef.current = timestamp;
+          return;
+        }
         const device = root.device;
         const queue = device.queue;
         const currentResources = resourcesRef.current;
@@ -765,17 +789,29 @@ export default function AudioFFTWindow({
         renderPass.end();
 
         queue.submit([commandEncoder.finish()]);
-        animationFrame = requestAnimationFrame(frame);
+        animationFrameRef.current = requestAnimationFrame(frame);
       };
 
-      animationFrame = requestAnimationFrame(frame);
+      resumeRef.current = () => {
+        if (cancelled || animationFrameRef.current !== null) return;
+        lastTimestampRef.current = typeof performance !== "undefined" ? performance.now() : Date.now();
+        animationFrameRef.current = requestAnimationFrame(frame);
+      };
+
+      if (!suspendedRef.current) {
+        resumeRef.current();
+      }
     }
 
     boot();
 
     return () => {
       cancelled = true;
-      if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      resumeRef.current = null;
       disposeResources(resourcesRef.current);
       resourcesRef.current = null;
     };

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useAnimationSuspended } from "../../animationSuspension";
 import { useFrame } from "../../frameLoop";
 import { useAudioAnalysisStore } from "../../audioAnalysis";
 import {
@@ -162,6 +163,7 @@ export interface LFOSliderProps {
   initialAudioSamplePosition?: number;
   onAudioSamplePositionChange?: (value: number) => void;
   borderMask?: Partial<Record<'top' | 'right' | 'bottom' | 'left', boolean>>;
+  suspended?: boolean;
 };
 
 function SliderCore({
@@ -221,7 +223,9 @@ function SliderCore({
   initialAudioSamplePosition,
   onAudioSamplePositionChange,
   borderMask,
+  suspended,
 }: LFOSliderProps) {
+  const isSuspended = useAnimationSuspended(suspended);
   const resolvedLfoFrequencyMin = lfoFrequencyMin ?? LFO_FREQUENCY_MIN_DEFAULT;
   const resolvedLfoFrequencyMax = lfoFrequencyMax ?? LFO_FREQUENCY_MAX_DEFAULT;
   const resolvedLfoFrequencyStep = lfoFrequencyStep ?? LFO_FREQUENCY_STEP_DEFAULT;
@@ -912,7 +916,7 @@ function SliderCore({
     if (nextVal === undefined) return;
     applyWaveValue(nextVal, nowSec);
   }, [activeWaveform, applyWaveValue, audioSampleValue, drawerValueMax, drawerValueMin, isAudioWaveform, lfoFrequencyValue, lfoEnabled, lfoSettings, mode, phaseDial, readExternal, sampleAudioBinValue]);
-  useFrame(frameFn);
+  useFrame(isSuspended ? null : frameFn);
   const readLiveValue = useCallback(
     () => valueFromSplit(splitRef.current, min, max, step),
     [max, min, step],

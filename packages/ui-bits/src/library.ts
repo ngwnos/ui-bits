@@ -53,4 +53,5 @@ export {
   type IconButtonBorderMask,
   type IconButtonCycleOption,
 } from "./components/IconButton";
+export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./components/FloatingPanel";
 export * from "./sliderStore";

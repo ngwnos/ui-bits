@@ -21,6 +21,7 @@ import {
   DEFAULT_SELECTION_GRID_ID,
   Dropdown,
   FrameLoopProvider,
+  FloatingPanel,
   IconButton,
   LFOSlider,
   SelectionGrid,
@@ -565,6 +566,9 @@ function EditableRectPOC() {
   const [audioBorderStyle, setAudioBorderStyle] = React.useState<AudioControlsBorder>('a');
   const [iconToggleOn, setIconToggleOn] = React.useState(false);
   const [iconCycleValue, setIconCycleValue] = React.useState<string>('play');
+  const [floatingPanelValue, setFloatingPanelValue] = React.useState<number>(42);
+  const [floatingPanelOpacity, setFloatingPanelOpacity] = React.useState<number>(0.5);
+  const [floatingPanelBlur, setFloatingPanelBlur] = React.useState<number>(20);
   const CONTROL_FONT_SIZE = 12;
   const columnGap = 5;
   const MAX_COLUMN_WIDTH = 440;
@@ -577,9 +581,10 @@ function EditableRectPOC() {
   const toggleIconSize = Math.max(columnButtonSize - 4, 12);
   const controlIconSize = Math.max(columnButtonSize - 6, 12);
   const horizontalPadding = Math.max(columnGap * 2, 16);
-const tabs = [
+  const tabs = [
     { value: 'lfo-slider', label: 'LFO Slider' },
     { value: 'icon-button', label: 'Icon Button' },
+    { value: 'floating-panel', label: 'Floating Panel' },
     { value: 'segment-bar', label: 'Segment Bar' },
     { value: 'dropdown', label: 'Dropdown' },
     { value: 'selection-grid', label: 'Selection Grid' },
@@ -648,6 +653,8 @@ const tabs = [
   const iconButtonFontSizes = [10, 12, 14, 16];
   const iconButtonColorA = buttonForeground;
   const iconButtonColorB = buttonBackground;
+  const floatingPanelColorA = flexoki.red['600'];
+  const floatingPanelColorB = flexoki.red['100'];
   const iconCycleOptions = [
     {
       value: 'play',
@@ -1139,6 +1146,82 @@ const tabs = [
                 </div>
               </div>
             </div>
+          </Tabs.Content>
+          <Tabs.Content value="floating-panel" style={tabBodyStyle}>
+            <FloatingPanel
+              width={360}
+              fontSize={CONTROL_FONT_SIZE}
+              colorA={floatingPanelColorA}
+              colorB={floatingPanelColorB}
+              borderStyle="a"
+              header="Floating Panel"
+              transparent
+              draggable
+              bodyOpacity={floatingPanelOpacity}
+              bodyBlur={floatingPanelBlur}
+            >
+              <span style={{ opacity: 0.8 }}>
+                A lightweight container for grouping controls or status readouts.
+              </span>
+              <LFOSlider
+                label="Opacity"
+                min={0.1}
+                max={1}
+                step={0.05}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelOpacity}
+                onUserChange={setFloatingPanelOpacity}
+                onAnimatedUpdate={setFloatingPanelOpacity}
+                formatDisplayValue={(value) => value.toFixed(2)}
+              />
+              <LFOSlider
+                label="Blur"
+                min={0}
+                max={40}
+                step={1}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelBlur}
+                onUserChange={setFloatingPanelBlur}
+                onAnimatedUpdate={setFloatingPanelBlur}
+                formatDisplayValue={(value) => `${Math.round(value)} px`}
+              />
+              <LFOSlider
+                label="Level"
+                min={0}
+                max={100}
+                step={1}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelValue}
+                onUserChange={setFloatingPanelValue}
+                onAnimatedUpdate={setFloatingPanelValue}
+              />
+              <div
+                style={{
+                  width: '100%',
+                  height: 1,
+                  background: previewDarkMode ? flexoki.base['700'] : flexoki.base['200'],
+                  opacity: 0.5,
+                }}
+              />
+              <span style={{ fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', opacity: 0.6 }}>
+                Demo content
+              </span>
+            </FloatingPanel>
           </Tabs.Content>
           <Tabs.Content value="segment-bar" style={tabBodyStyle}>
             <div

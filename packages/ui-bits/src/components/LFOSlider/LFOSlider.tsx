@@ -806,7 +806,7 @@ function SliderCore({
   }, [finishDrawerDrag]);
 
   // Helpers
-  const allowTextEditing = !isBasic;
+  const allowTextEditing = true;
   const hasSelection = allowTextEditing && selStart !== selEnd;
   const caret = selEnd;
   const setSelection = (a: number, b: number) => {

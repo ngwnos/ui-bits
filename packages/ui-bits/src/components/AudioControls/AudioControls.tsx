@@ -297,6 +297,7 @@ export default function AudioControls({
             <div ref={sliderMeasureRef} style={{ display: 'flex', minWidth: 0 }}>
               <LFOSlider
                 label="Bins"
+                variant="basic"
                 min={1}
                 max={1024}
                 step={1}
@@ -326,6 +327,7 @@ export default function AudioControls({
             </div>
             <LFOSlider
               label="Fmin"
+              variant="basic"
               min={0}
               max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
               step={1}
@@ -345,6 +347,7 @@ export default function AudioControls({
             />
             <LFOSlider
               label="Fmax"
+              variant="basic"
               min={MIN_FREQ_HZ_GAP}
               max={Math.max(MIN_FREQ_HZ_GAP, nyquistHz)}
               step={1}
@@ -459,6 +462,7 @@ export default function AudioControls({
         >
           <LFOSlider
             label="Atk"
+            variant="basic"
             min={0}
             max={MAX_ENVELOPE_MS}
             step={ENVELOPE_STEP_MS}
@@ -478,6 +482,7 @@ export default function AudioControls({
           />
           <LFOSlider
             label="Rel"
+            variant="basic"
             min={0}
             max={MAX_ENVELOPE_MS}
             step={ENVELOPE_STEP_MS}
@@ -497,6 +502,7 @@ export default function AudioControls({
           />
           <LFOSlider
             label="Sm"
+            variant="basic"
             min={0}
             max={1}
             step={0.1}
@@ -516,6 +522,7 @@ export default function AudioControls({
           />
           <LFOSlider
             label="σ"
+            variant="basic"
             min={0}
             max={3}
             step={0.1}

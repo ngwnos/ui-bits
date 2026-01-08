@@ -1231,9 +1231,6 @@ function EditableRectPOC() {
               position={floatingPanelPosition ?? undefined}
               onPositionChange={setFloatingPanelPosition}
             >
-              <span style={{ opacity: 0.8 }}>
-                A lightweight container for grouping controls or status readouts.
-              </span>
               <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
                 <AudioControls
                   fontSize={CONTROL_FONT_SIZE}

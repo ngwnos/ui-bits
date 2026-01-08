@@ -7,6 +7,7 @@ import {
   ListChevronsDownUp,
   ListChevronsUpDown,
   Minus,
+  Plus,
   Mountain,
   MountainSnow,
   Moon,
@@ -569,6 +570,9 @@ function EditableRectPOC() {
   const [floatingPanelValue, setFloatingPanelValue] = React.useState<number>(42);
   const [floatingPanelOpacity, setFloatingPanelOpacity] = React.useState<number>(0.5);
   const [floatingPanelBlur, setFloatingPanelBlur] = React.useState<number>(20);
+  const [floatingPanelCollapsed, setFloatingPanelCollapsed] = React.useState(false);
+  const [floatingPanelPosition, setFloatingPanelPosition] = React.useState<{ x: number; y: number } | null>(null);
+  const floatingPanelRef = React.useRef<HTMLDivElement | null>(null);
   const CONTROL_FONT_SIZE = 12;
   const columnGap = 5;
   const MAX_COLUMN_WIDTH = 440;
@@ -581,6 +585,7 @@ function EditableRectPOC() {
   const toggleIconSize = Math.max(columnButtonSize - 4, 12);
   const controlIconSize = Math.max(columnButtonSize - 6, 12);
   const horizontalPadding = Math.max(columnGap * 2, 16);
+  const floatingPanelPadding = Math.round(CONTROL_FONT_SIZE * 0.75);
   const tabs = [
     { value: 'lfo-slider', label: 'LFO Slider' },
     { value: 'icon-button', label: 'Icon Button' },
@@ -655,6 +660,24 @@ function EditableRectPOC() {
   const iconButtonColorB = buttonBackground;
   const floatingPanelColorA = flexoki.red['600'];
   const floatingPanelColorB = flexoki.red['100'];
+  const floatingPanelCollapseValue = floatingPanelCollapsed ? "collapsed" : "expanded";
+  const floatingPanelCollapseOptions = [
+    { value: "collapsed", icon: <Plus strokeWidth={1.6} />, ariaLabel: "Expand panel", title: "Expand panel" },
+    { value: "expanded", icon: <Minus strokeWidth={1.6} />, ariaLabel: "Collapse panel", title: "Collapse panel" },
+  ];
+  const handleDockFloatingPanel = () => {
+    const panelNode = floatingPanelRef.current;
+    if (!panelNode || typeof window === "undefined") return;
+    const rect = panelNode.getBoundingClientRect();
+    const margin = 6;
+    const dockX = Math.max(0, window.innerWidth - rect.width - margin);
+    const maxY = Math.max(0, window.innerHeight - rect.height - margin);
+    const dockY = Math.max(0, Math.min(margin, maxY));
+    setFloatingPanelPosition({
+      x: dockX,
+      y: dockY,
+    });
+  };
   const iconCycleOptions = [
     {
       value: 'play',
@@ -1149,67 +1172,119 @@ function EditableRectPOC() {
           </Tabs.Content>
           <Tabs.Content value="floating-panel" style={tabBodyStyle}>
             <FloatingPanel
+              ref={floatingPanelRef}
               width={360}
               fontSize={CONTROL_FONT_SIZE}
               colorA={floatingPanelColorA}
               colorB={floatingPanelColorB}
               borderStyle="a"
-              header="Floating Panel"
+              header={(
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <IconButton
+                      behavior="cycle"
+                      value={floatingPanelCollapseValue}
+                      options={floatingPanelCollapseOptions}
+                      onChange={(nextValue) => setFloatingPanelCollapsed(nextValue === "collapsed")}
+                      borderStyle="none"
+                      fontSize={CONTROL_FONT_SIZE}
+                      colorA={floatingPanelColorA}
+                      colorB={floatingPanelColorB}
+                      aria-label="Toggle panel collapse"
+                      title="Toggle panel collapse"
+                    />
+                    <span>Floating Panel</span>
+                  </div>
+                  <IconButton
+                    borderStyle="none"
+                    fontSize={CONTROL_FONT_SIZE}
+                    colorA={floatingPanelColorA}
+                    colorB={floatingPanelColorB}
+                    aria-label="Dock panel"
+                    title="Dock panel"
+                    onClick={handleDockFloatingPanel}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="100%"
+                      height="100%"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M7 7h10v10" />
+                      <path d="M7 17 17 7" />
+                    </svg>
+                  </IconButton>
+                </div>
+              )}
               transparent
               draggable
               bodyOpacity={floatingPanelOpacity}
               bodyBlur={floatingPanelBlur}
+              collapsed={floatingPanelCollapsed}
+              position={floatingPanelPosition ?? undefined}
+              onPositionChange={setFloatingPanelPosition}
             >
               <span style={{ opacity: 0.8 }}>
                 A lightweight container for grouping controls or status readouts.
               </span>
-              <LFOSlider
-                label="Opacity"
-                min={0.1}
-                max={1}
-                step={0.05}
-                width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
-                border="left"
-                fontSize={CONTROL_FONT_SIZE}
-                mode="external"
-                readExternal={() => floatingPanelOpacity}
-                onUserChange={setFloatingPanelOpacity}
-                onAnimatedUpdate={setFloatingPanelOpacity}
-                formatDisplayValue={(value) => value.toFixed(2)}
-              />
-              <LFOSlider
-                label="Blur"
-                min={0}
-                max={40}
-                step={1}
-                width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
-                border="left"
-                fontSize={CONTROL_FONT_SIZE}
-                mode="external"
-                readExternal={() => floatingPanelBlur}
-                onUserChange={setFloatingPanelBlur}
-                onAnimatedUpdate={setFloatingPanelBlur}
-                formatDisplayValue={(value) => `${Math.round(value)} px`}
-              />
-              <LFOSlider
-                label="Level"
-                min={0}
-                max={100}
-                step={1}
-                width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
-                border="left"
-                fontSize={CONTROL_FONT_SIZE}
-                mode="external"
-                readExternal={() => floatingPanelValue}
-                onUserChange={setFloatingPanelValue}
-                onAnimatedUpdate={setFloatingPanelValue}
-              />
+              <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+                <LFOSlider
+                  label="Opacity"
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  width="100%"
+                  colorA={floatingPanelColorA}
+                  colorB={floatingPanelColorB}
+                  border="left"
+                  fontSize={CONTROL_FONT_SIZE}
+                  mode="external"
+                  readExternal={() => floatingPanelOpacity}
+                  onUserChange={setFloatingPanelOpacity}
+                  onAnimatedUpdate={setFloatingPanelOpacity}
+                  formatDisplayValue={(value) => value.toFixed(2)}
+                />
+              </div>
+              <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+                <LFOSlider
+                  label="Blur"
+                  min={0}
+                  max={40}
+                  step={1}
+                  width="100%"
+                  colorA={floatingPanelColorA}
+                  colorB={floatingPanelColorB}
+                  border="left"
+                  fontSize={CONTROL_FONT_SIZE}
+                  mode="external"
+                  readExternal={() => floatingPanelBlur}
+                  onUserChange={setFloatingPanelBlur}
+                  onAnimatedUpdate={setFloatingPanelBlur}
+                  formatDisplayValue={(value) => `${Math.round(value)} px`}
+                />
+              </div>
+              <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+                <LFOSlider
+                  label="Level"
+                  min={0}
+                  max={100}
+                  step={1}
+                  width="100%"
+                  colorA={floatingPanelColorA}
+                  colorB={floatingPanelColorB}
+                  border="left"
+                  fontSize={CONTROL_FONT_SIZE}
+                  mode="external"
+                  readExternal={() => floatingPanelValue}
+                  onUserChange={setFloatingPanelValue}
+                  onAnimatedUpdate={setFloatingPanelValue}
+                />
+              </div>
               <div
                 style={{
                   width: '100%',

@@ -10,7 +10,10 @@ export interface FloatingPanelProps extends React.HTMLAttributes<HTMLDivElement>
   transparent?: boolean;
   bodyBlur?: number;
   bodyOpacity?: number;
+  collapsed?: boolean;
   draggable?: boolean;
+  position?: { x: number; y: number };
+  onPositionChange?: (position: { x: number; y: number }) => void;
   defaultPosition?: { x: number; y: number };
   width?: number | string;
   padding?: number | string;
@@ -26,6 +29,7 @@ const SLIDER_PAD_Y_EM = 0.35;
 const SLIDER_BORDER_WIDTH = 1;
 const DEFAULT_BODY_BLUR = 10;
 const DEFAULT_BODY_OPACITY = 0.5;
+const DEFAULT_SHADOW = "none";
 
 function resolveSize(value?: number | string): string | undefined {
   if (value == null) return undefined;
@@ -70,7 +74,10 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     transparent = false,
     bodyBlur,
     bodyOpacity,
+    collapsed = false,
     draggable = false,
+    position,
+    onPositionChange,
     defaultPosition,
     width,
     padding,
@@ -90,6 +97,10 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     defaultPosition ? { x: defaultPosition.x, y: defaultPosition.y } : null
   ));
   React.useEffect(() => {
+    if (position) {
+      setDragPosition({ x: position.x, y: position.y });
+      return;
+    }
     if (!defaultPosition) return;
     if (typeof window === "undefined") {
       setDragPosition({ x: defaultPosition.x, y: defaultPosition.y });
@@ -103,12 +114,12 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       x: clampBetween(defaultPosition.x, 0, maxX),
       y: clampBetween(defaultPosition.y, 0, maxY),
     });
-  }, [defaultPosition?.x, defaultPosition?.y]);
+  }, [defaultPosition?.x, defaultPosition?.y, position?.x, position?.y]);
   const resolvedFontSize = fontSize ?? 12;
   const resolvedPadding = padding ?? Math.round(resolvedFontSize * 0.75);
   const resolvedPaddingValue = resolveSize(resolvedPadding);
   const resolvedRadius = radius ?? Math.max(4, Math.round(resolvedFontSize * 0.4));
-  const resolvedShadow = shadow ?? "0 12px 24px rgba(0, 0, 0, 0.18)";
+  const resolvedShadow = shadow ?? DEFAULT_SHADOW;
   const resolvedBorderColor = borderStyle === "a"
     ? colorA
     : borderStyle === "b"
@@ -116,10 +127,12 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       : "transparent";
   const gap = Math.max(6, Math.round(resolvedFontSize * 0.4));
   const headerHeight = computeHeaderHeight(resolvedFontSize);
+  const headerBorderWidth = collapsed ? 0 : 1;
+  const headerOuterHeight = headerHeight + headerBorderWidth;
   const resolvedBodyOpacity = Math.max(0, Math.min(1, bodyOpacity ?? DEFAULT_BODY_OPACITY));
   const resolvedBodyBlur = Math.max(0, bodyBlur ?? DEFAULT_BODY_BLUR);
 
-  const resolvedPosition = dragPosition;
+  const resolvedPosition = position ?? dragPosition;
   const isFloating = Boolean(draggable && resolvedPosition);
   const setRefs = (node: HTMLDivElement | null) => {
     panelRef.current = node;
@@ -132,6 +145,10 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   };
   const handlePointerDown: React.PointerEventHandler<HTMLDivElement> = (event) => {
     if (!draggable || event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button, [data-floating-panel-ignore-drag], input, select, textarea, a")) {
+      return;
+    }
     const panelNode = panelRef.current;
     if (!panelNode) return;
     const rect = panelNode.getBoundingClientRect();
@@ -158,7 +175,12 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     const maxY = Math.max(0, window.innerHeight - height);
     const nextX = clampBetween(event.clientX - offset.x, 0, maxX);
     const nextY = clampBetween(event.clientY - offset.y, 0, maxY);
-    setDragPosition({ x: nextX, y: nextY });
+    const nextPosition = { x: nextX, y: nextY };
+    if (position && onPositionChange) {
+      onPositionChange(nextPosition);
+    } else {
+      setDragPosition(nextPosition);
+    }
   };
   const handlePointerUp: React.PointerEventHandler<HTMLDivElement> = (event) => {
     if (pointerIdRef.current !== event.pointerId) return;
@@ -198,12 +220,12 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     >
       <div
         style={{
-          minHeight: headerHeight,
-          height: headerHeight,
+          minHeight: headerOuterHeight,
+          height: headerOuterHeight,
           display: "flex",
           alignItems: "center",
           padding: `0 ${resolvedPaddingValue ?? 0}`,
-          borderBottom: `1px solid ${resolvedBorderColor}`,
+          borderBottom: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
           boxSizing: "border-box",
           fontWeight: 600,
           lineHeight: 1,
@@ -220,19 +242,21 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       >
         {header}
       </div>
-      <div
-        style={{
-          padding: resolvedPaddingValue,
-          display: "flex",
-          flexDirection: "column",
-          gap,
-          background: transparent ? colorWithAlpha(colorB, resolvedBodyOpacity) : colorB,
-          backdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
-          WebkitBackdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
-        }}
-      >
-        {children}
-      </div>
+      {!collapsed && (
+        <div
+          style={{
+            padding: resolvedPaddingValue,
+            display: "flex",
+            flexDirection: "column",
+            gap,
+            background: transparent ? colorWithAlpha(colorB, resolvedBodyOpacity) : colorB,
+            backdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
+            WebkitBackdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
+          }}
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 });

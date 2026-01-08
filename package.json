@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "bun --cwd apps/demo dev",
-    "build": "bun --cwd packages/ui-bits build",
+    "build": "bun --cwd packages/ui-bits build && bun --cwd apps/demo build",
     "build:demo": "bun --cwd apps/demo build",
     "lint": "bun --cwd packages/ui-bits lint && bun --cwd apps/demo lint",
     "preview": "bun --cwd apps/demo build && bun --cwd apps/demo preview"

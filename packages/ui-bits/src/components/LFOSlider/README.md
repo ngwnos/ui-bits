@@ -50,6 +50,7 @@ const Example = () => {
 | `onAnimatedUpdate` | `(value: number) => void` | Fired for automated updates (frame loop, external source). |
 | `onDrawerOpenChange`, `onDrawerLinesChange` | Callbacks for synchronising drawer state with your store. |
 | `onWaveformChange`, `onFrequencyChange`, `onPhaseChange`, `onLfoEnabledChange` | Hooks for mirroring LFO controls (running state toggles when the active waveform button is clicked again). |
+| `audioBins`, `audioBinCount`, `audioMaxMagnitude` | FFT data used when the waveform is set to `audio`. These may also be supplied via `AudioAnalysisProvider`. |
 | `className`, `style` | `string`, `React.CSSProperties` | Optional overrides applied to the root wrapper. |
 
 Refer to `LFOSliderProps` for the full list of optional callbacks and configuration flags.
@@ -62,6 +63,12 @@ The component uses the local `frameLoop` and `useStoreMirror` helpers from this 
 2. Replace the hook implementations with equivalents that fit your environment.
 
 The hooks are optional – leaving `mode="manual"`, `mirrorToStore={undefined}`, and `readExternal={undefined}` disables the extra animation/mirroring features.
+
+## Audio LFO Input
+
+When the active waveform is `audio`, the slider samples FFT bins to drive its value. You can either pass
+`audioBins`/`audioBinCount`/`audioMaxMagnitude` directly, or wrap your UI in `AudioAnalysisProvider` and push
+updates with `useAudioAnalysisActions` so nested sliders pick up the same analysis stream.
 
 ## Styling
 

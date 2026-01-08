@@ -13,6 +13,7 @@ export {
   type IconButtonBorderMask,
   type IconButtonCycleOption,
 } from "./IconButton";
+export { default as Folder, type FolderProps, type FolderBorderStyle } from "./Folder";
 export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./FloatingPanel";
 export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./Dropdown";

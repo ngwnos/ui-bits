@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "../../frameLoop";
+import { useAudioAnalysisStore } from "../../audioAnalysis";
 import {
   clamp,
   lfoValue,
@@ -275,20 +276,19 @@ function SliderCore({
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const draggingDrawerLineRef = useRef<number | null>(null);
   const drawerPointerCaptureRef = useRef<{ id: number; node: Element | null }>({ id: -1, node: null });
-  const controlledRange = lfoRange ?? drawerLines;
+  const rangeProp = lfoRange ?? drawerLines;
+  const isDrawerControlled = Boolean(rangeProp && onDrawerLinesChange);
+  const initialDrawerRange = rangeProp ?? [min, max];
   const [drawerLineValues, setDrawerLineValues] = useState<[number, number]>(() => (
-    controlledRange ? [...controlledRange] as [number, number] : [
-      valueFromSplit(Math.random(), min, max, step),
-      valueFromSplit(Math.random(), min, max, step),
-    ]
+    [...initialDrawerRange] as [number, number]
   ));
   const [drawerLineRatios, setDrawerLineRatios] = useState<[number, number]>(() => ([
-    splitFromValue(drawerLines?.[0] ?? drawerLineValues[0], min, max),
-    splitFromValue(drawerLines?.[1] ?? drawerLineValues[1], min, max),
+    splitFromValue(initialDrawerRange[0], min, max),
+    splitFromValue(initialDrawerRange[1], min, max),
   ]));
   const drawerLineRatiosRef = useRef<[number, number]>([
-    splitFromValue(drawerLines?.[0] ?? drawerLineValues[0], min, max),
-    splitFromValue(drawerLines?.[1] ?? drawerLineValues[1], min, max),
+    splitFromValue(initialDrawerRange[0], min, max),
+    splitFromValue(initialDrawerRange[1], min, max),
   ]);
   const draggingSplitRef = useRef<boolean>(false);
   const extendActiveRef = useRef<boolean>(false);
@@ -307,14 +307,14 @@ function SliderCore({
     });
   }, [min, max, step]);
   useEffect(() => {
-    if (!controlledRange) return;
+    if (!isDrawerControlled || !rangeProp) return;
     setDrawerLineValues((prev) => {
-      if (Math.abs(prev[0] - controlledRange[0]) < 1e-6 && Math.abs(prev[1] - controlledRange[1]) < 1e-6) {
+      if (Math.abs(prev[0] - rangeProp[0]) < 1e-6 && Math.abs(prev[1] - rangeProp[1]) < 1e-6) {
         return prev;
       }
-      return [...controlledRange] as [number, number];
+      return [...rangeProp] as [number, number];
     });
-  }, [controlledRange]);
+  }, [isDrawerControlled, rangeProp?.[0], rangeProp?.[1]]);
   useEffect(() => {
     if (draggingDrawerLineRef.current !== null) return;
     const next: [number, number] = [
@@ -568,6 +568,7 @@ function SliderCore({
     setAudioSamplePosition(clamped);
     onAudioSamplePositionChange?.(clamped);
   }, [onAudioSamplePositionChange, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
+  const audioAnalysisStore = useAudioAnalysisStore();
   const isAudioWaveform = activeWaveform === 'audio';
   const frequencyRange = isAudioWaveform
     ? {
@@ -584,25 +585,22 @@ function SliderCore({
   const lfoFrequencyValue = clamp(knobFrequency, resolvedLfoFrequencyMin, resolvedLfoFrequencyMax);
   const audioSampleValue = clamp(audioSamplePosition, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax);
   const frequencySliderValue = isAudioWaveform ? audioSampleValue : lfoFrequencyValue;
-  const resolvedAudioBins = audioBins ?? EMPTY_AUDIO_BINS;
-  const availableAudioBins = resolvedAudioBins.length;
-  const rawAudioBinCount = Number(audioBinCount);
-  const requestedAudioBinCount = Number.isFinite(rawAudioBinCount)
-    ? Math.floor(rawAudioBinCount)
-    : availableAudioBins;
-  const effectiveAudioBinCount = Math.min(
-    availableAudioBins,
-    Math.max(0, requestedAudioBinCount ?? availableAudioBins),
-  );
-  const rawAudioMaxMagnitude = Number(audioMaxMagnitude);
-  const effectiveAudioMaxMagnitude = Number.isFinite(rawAudioMaxMagnitude) && rawAudioMaxMagnitude > 0
-    ? rawAudioMaxMagnitude
-    : 1;
-  const audioDriveEnabled = isAudioWaveform
-    && lfoEnabled
-    && availableAudioBins > 0
-    && effectiveAudioBinCount > 0
-    && effectiveAudioMaxMagnitude > 0;
+  const getAudioAnalysisInput = useCallback(() => {
+    if (audioBins !== undefined) {
+      return {
+        bins: audioBins,
+        binCount: audioBinCount ?? audioBins.length,
+        maxMagnitude: audioMaxMagnitude ?? 1,
+      };
+    }
+    if (!audioAnalysisStore) return null;
+    const snapshot = audioAnalysisStore.getSnapshot();
+    return {
+      bins: snapshot.bins ?? EMPTY_AUDIO_BINS,
+      binCount: audioBinCount ?? snapshot.binCount,
+      maxMagnitude: audioMaxMagnitude ?? snapshot.maxMagnitude,
+    };
+  }, [audioAnalysisStore, audioBinCount, audioBins, audioMaxMagnitude]);
   const PHASE_MIN = 0;
   const PHASE_MAX = Math.PI * 2;
   const PHASE_STEP = Math.PI / 100;
@@ -621,7 +619,25 @@ function SliderCore({
   const handlePhaseSliderChange = isAudioWaveform ? handleAudioResponseChange : handlePhaseChange;
   const handleFrequencySliderChange = isAudioWaveform ? handleAudioSampleChange : handleFrequencyChange;
   const sampleAudioBinValue = useCallback((position: number): number | null => {
-    if (!audioDriveEnabled || effectiveAudioBinCount <= 0 || !Number.isFinite(drawerValueMin) || !Number.isFinite(drawerValueMax)) {
+    const analysis = getAudioAnalysisInput();
+    if (!analysis || !Number.isFinite(drawerValueMin) || !Number.isFinite(drawerValueMax)) {
+      return null;
+    }
+    const resolvedAudioBins = analysis.bins ?? EMPTY_AUDIO_BINS;
+    const availableAudioBins = resolvedAudioBins.length;
+    const rawAudioBinCount = Number(analysis.binCount);
+    const requestedAudioBinCount = Number.isFinite(rawAudioBinCount)
+      ? Math.floor(rawAudioBinCount)
+      : availableAudioBins;
+    const effectiveAudioBinCount = Math.min(
+      availableAudioBins,
+      Math.max(0, requestedAudioBinCount ?? availableAudioBins),
+    );
+    const rawAudioMaxMagnitude = Number(analysis.maxMagnitude);
+    const effectiveAudioMaxMagnitude = Number.isFinite(rawAudioMaxMagnitude) && rawAudioMaxMagnitude > 0
+      ? rawAudioMaxMagnitude
+      : 1;
+    if (availableAudioBins <= 0 || effectiveAudioBinCount <= 0 || effectiveAudioMaxMagnitude <= 0) {
       return null;
     }
     const ratio = clamp(position, 0, 1);
@@ -641,7 +657,7 @@ function SliderCore({
     const lo = Math.min(drawerValueMin, drawerValueMax);
     const hi = Math.max(drawerValueMin, drawerValueMax);
     return clamp(mapped, lo, hi);
-  }, [audioDriveEnabled, drawerValueMax, drawerValueMin, effectiveAudioBinCount, effectiveAudioMaxMagnitude, phaseSliderValue, resolvedAudioBins]);
+  }, [drawerValueMax, drawerValueMin, getAudioAnalysisInput, phaseSliderValue]);
   const [measuredWidth, setMeasuredWidth] = useState<number>(() => (
     typeof width === 'number' ? width : Number(width) || 0
   ));
@@ -872,7 +888,7 @@ function SliderCore({
     if (draggingSplitRef.current || editingRef.current) return;
     let nextVal: number | undefined;
     if (activeMode === 'lfo' && lfoEnabled) {
-      if (audioDriveEnabled) {
+      if (isAudioWaveform) {
         const sampled = sampleAudioBinValue(audioSampleValue);
         if (sampled !== null) {
           applyWaveValue(sampled, nowSec);
@@ -895,7 +911,7 @@ function SliderCore({
     }
     if (nextVal === undefined) return;
     applyWaveValue(nextVal, nowSec);
-  }, [activeWaveform, applyWaveValue, audioDriveEnabled, audioSampleValue, drawerValueMax, drawerValueMin, lfoFrequencyValue, lfoEnabled, lfoSettings, mode, phaseDial, readExternal, sampleAudioBinValue]);
+  }, [activeWaveform, applyWaveValue, audioSampleValue, drawerValueMax, drawerValueMin, isAudioWaveform, lfoFrequencyValue, lfoEnabled, lfoSettings, mode, phaseDial, readExternal, sampleAudioBinValue]);
   useFrame(frameFn);
   const readLiveValue = useCallback(
     () => valueFromSplit(splitRef.current, min, max, step),

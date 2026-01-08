@@ -17,6 +17,14 @@ export {
 
 export { FrameLoopProvider, useFrame } from "./frameLoop";
 export { useStoreMirror, type MirrorFn } from "./useStoreMirror";
+export {
+  AudioAnalysisProvider,
+  useAudioAnalysisActions,
+  useAudioAnalysisState,
+  useAudioAnalysisStore,
+  type AudioAnalysisActions,
+  type AudioAnalysisState,
+} from "./audioAnalysis";
 
 export type { LfoSettings, Waveform } from "./lfo";
 export {
@@ -53,5 +61,6 @@ export {
   type IconButtonBorderMask,
   type IconButtonCycleOption,
 } from "./components/IconButton";
+export { default as Folder, type FolderProps, type FolderBorderStyle } from "./components/Folder";
 export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./components/FloatingPanel";
 export * from "./sliderStore";

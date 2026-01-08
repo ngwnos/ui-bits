@@ -7,7 +7,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { IconButton, LFOSlider, flexoki, useFrame, useSliderActions } from "ui-bits";
+import { IconButton, LFOSlider, flexoki, useAudioAnalysisActions, useFrame } from "ui-bits";
 import AudioFFTWindow from "../AudioFFTWindow/AudioFFTWindow";
 
 export type AudioControlsBorder = 'a' | 'b' | 'none';
@@ -331,7 +331,7 @@ export default function AudioControls({
             readExternal={() => freqMinHz}
             onUserChange={handleFreqMinChange}
             onAnimatedUpdate={handleFreqMinChange}
-            formatDisplayValue={(value) => `${Math.round(value)} Hz`}
+            formatDisplayValue={(value) => `${Math.round(value)}`}
             style={{ gap: 0 }}
           />
           <LFOSlider
@@ -350,7 +350,7 @@ export default function AudioControls({
             readExternal={() => freqMaxHz}
             onUserChange={handleFreqMaxChange}
             onAnimatedUpdate={handleFreqMaxChange}
-            formatDisplayValue={(value) => `${Math.round(value)} Hz`}
+            formatDisplayValue={(value) => `${Math.round(value)}`}
             style={{ gap: 0 }}
           />
         </div>
@@ -462,7 +462,7 @@ export default function AudioControls({
             readExternal={() => attackMsClamped}
             onUserChange={(value: number) => setAttackMs(roundMs(value))}
             onAnimatedUpdate={(value: number) => setAttackMs(roundMs(value))}
-            formatDisplayValue={(value) => `${Math.round(value)} ms`}
+            formatDisplayValue={(value) => `${Math.round(value)}`}
             style={{ gap: 0 }}
           />
           <LFOSlider
@@ -481,11 +481,11 @@ export default function AudioControls({
             readExternal={() => releaseMsClamped}
             onUserChange={(value: number) => setReleaseMs(roundMs(value))}
             onAnimatedUpdate={(value: number) => setReleaseMs(roundMs(value))}
-            formatDisplayValue={(value) => `${Math.round(value)} ms`}
+            formatDisplayValue={(value) => `${Math.round(value)}`}
             style={{ gap: 0 }}
           />
           <LFOSlider
-            label="Smooth"
+            label="Sm"
             min={0}
             max={1}
             step={0.1}
@@ -565,7 +565,7 @@ function AudioPlaybackEngine({
     setAudioBins,
     setAudioBinCount,
     setAudioMaxMagnitude,
-  } = useSliderActions();
+  } = useAudioAnalysisActions();
   const audioContextRef = React.useRef<AudioContext | null>(null);
   const analyserRef = React.useRef<AnalyserNode | null>(null);
   const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);

@@ -20,7 +20,9 @@ import {
 } from "lucide-react";
 import {
   DEFAULT_SELECTION_GRID_ID,
+  AudioAnalysisProvider,
   Dropdown,
+  Folder,
   FrameLoopProvider,
   FloatingPanel,
   IconButton,
@@ -402,7 +404,6 @@ function ConnectedSlider({
   const definition = useSliderDefinition(sliderId);
   const state = useSliderState(sliderId);
   const actions = useSliderActions();
-  const { audioBins, audioBinCount, audioMaxMagnitude } = useSliderStoreState();
   const resolvedWidth = widthOverride ?? definition.width;
 
   return (
@@ -436,9 +437,6 @@ function ConnectedSlider({
       onPhaseChange={(phase: number) => actions.setSliderPhase(sliderId, phase)}
       onAudioResponseChange={(value: number) => actions.setSliderAudioResponse(sliderId, value)}
       onAudioSamplePositionChange={(value: number) => actions.setSliderAudioSamplePosition(sliderId, value)}
-      audioBins={audioBins}
-      audioBinCount={audioBinCount}
-      audioMaxMagnitude={audioMaxMagnitude}
       style={isFullWidth ? { width: '100%' } : undefined}
     />
   );
@@ -660,6 +658,8 @@ function EditableRectPOC() {
   const iconButtonColorB = buttonBackground;
   const floatingPanelColorA = flexoki.red['600'];
   const floatingPanelColorB = flexoki.red['100'];
+  const floatingPanelLevelColorA = flexoki.blue['600'];
+  const floatingPanelLevelColorB = flexoki.blue['100'];
   const floatingPanelCollapseValue = floatingPanelCollapsed ? "collapsed" : "expanded";
   const floatingPanelCollapseOptions = [
     { value: "collapsed", icon: <Plus strokeWidth={1.6} />, ariaLabel: "Expand panel", title: "Expand panel" },
@@ -790,25 +790,26 @@ function EditableRectPOC() {
 
   return (
     <FrameLoopProvider>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: layoutGap,
-          width: '100%',
-          minHeight: '100vh',
-          paddingTop: `calc(2rem + env(safe-area-inset-top, 0px))`,
-          paddingLeft: `calc(${horizontalPadding}px + env(safe-area-inset-left, 0px))`,
-          paddingRight: `calc(${horizontalPadding}px + env(safe-area-inset-right, 0px))`,
-          paddingBottom: `calc(4rem + env(safe-area-inset-bottom, 0px))`,
-          boxSizing: 'border-box',
-          background: previewDarkMode ? '#1C1B1A' : flexoki.paper,
-          color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'],
-          transition: 'none',
-        }}
-      >
-        <Tabs.Root value={activeTab} onValueChange={setActiveTab} style={tabsRootStyle}>
+      <AudioAnalysisProvider>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: layoutGap,
+            width: '100%',
+            minHeight: '100vh',
+            paddingTop: `calc(2rem + env(safe-area-inset-top, 0px))`,
+            paddingLeft: `calc(${horizontalPadding}px + env(safe-area-inset-left, 0px))`,
+            paddingRight: `calc(${horizontalPadding}px + env(safe-area-inset-right, 0px))`,
+            paddingBottom: `calc(4rem + env(safe-area-inset-bottom, 0px))`,
+            boxSizing: 'border-box',
+            background: previewDarkMode ? '#1C1B1A' : flexoki.paper,
+            color: previewDarkMode ? '#FFFCF0' : flexoki.base['700'],
+            transition: 'none',
+          }}
+        >
+          <Tabs.Root value={activeTab} onValueChange={setActiveTab} style={tabsRootStyle}>
           <Tabs.List style={tabsListStyle} aria-label="UI components">
             {tabs.map((tab) => (
               <Tabs.Trigger key={tab.value} value={tab.value} style={getTabTriggerStyle(tab.value)}>
@@ -1233,6 +1234,14 @@ function EditableRectPOC() {
                 A lightweight container for grouping controls or status readouts.
               </span>
               <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+                <AudioControls
+                  fontSize={CONTROL_FONT_SIZE}
+                  colorA={floatingPanelColorA}
+                  colorB={floatingPanelColorB}
+                  borderStyle="a"
+                />
+              </div>
+              <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
                 <LFOSlider
                   label="Opacity"
                   min={0.1}
@@ -1269,33 +1278,32 @@ function EditableRectPOC() {
                 />
               </div>
               <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
-                <LFOSlider
+                <Folder
                   label="Level"
-                  min={0}
-                  max={100}
-                  step={1}
-                  width="100%"
-                  colorA={floatingPanelColorA}
-                  colorB={floatingPanelColorB}
-                  border="left"
+                  colorA={floatingPanelLevelColorA}
+                  colorB={floatingPanelLevelColorB}
                   fontSize={CONTROL_FONT_SIZE}
-                  mode="external"
-                  readExternal={() => floatingPanelValue}
-                  onUserChange={setFloatingPanelValue}
-                  onAnimatedUpdate={setFloatingPanelValue}
-                />
+                  padding={floatingPanelPadding}
+                >
+                  <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+                    <LFOSlider
+                      label="Level"
+                      min={0}
+                      max={100}
+                      step={1}
+                      width="100%"
+                      colorA={floatingPanelLevelColorA}
+                      colorB={floatingPanelLevelColorB}
+                      border="left"
+                      fontSize={CONTROL_FONT_SIZE}
+                      showLfoControls
+                      readExternal={() => floatingPanelValue}
+                      onUserChange={setFloatingPanelValue}
+                      onAnimatedUpdate={setFloatingPanelValue}
+                    />
+                  </div>
+                </Folder>
               </div>
-              <div
-                style={{
-                  width: '100%',
-                  height: 1,
-                  background: previewDarkMode ? flexoki.base['700'] : flexoki.base['200'],
-                  opacity: 0.5,
-                }}
-              />
-              <span style={{ fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', opacity: 0.6 }}>
-                Demo content
-              </span>
             </FloatingPanel>
           </Tabs.Content>
           <Tabs.Content value="segment-bar" style={tabBodyStyle}>
@@ -1697,8 +1705,9 @@ function EditableRectPOC() {
               </div>
             </div>
           </Tabs.Content>
-        </Tabs.Root>
-      </div>
+          </Tabs.Root>
+        </div>
+      </AudioAnalysisProvider>
     </FrameLoopProvider>
   );
 }

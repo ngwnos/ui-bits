@@ -97,7 +97,7 @@ const DRAWER_ICON_DEFS: Array<{
 
 export type LFOSliderMode = 'auto' | 'manual' | 'lfo' | 'external';
 export type SliderVariant = 'full' | 'basic';
-export type SliderBarStyle = 'continuous' | 'discrete';
+export type SliderBarStyle = 'continuous' | 'discrete' | 'step-aligned';
 
 export interface LFOSliderProps {
   label: string;
@@ -699,12 +699,28 @@ function SliderCore({
     ? clamp((split - handleLeftRatio) / Math.max(handleSpanRatio, Number.EPSILON), 0, 1)
     : 0;
   const handleSplitPct = (handleSplitLocal * 100).toFixed(3);
-  const quantizeSplitRatio = useCallback((ratio: number) => {
-    if (resolvedBarSegmentCount <= 1) return ratio;
+  const quantizeRatioToStep = useCallback((ratio: number) => {
+    if (!Number.isFinite(step) || step <= 0 || !Number.isFinite(max - min) || max === min) {
+      return clamp(ratio, 0, 1);
+    }
+    const snappedValue = valueFromSplit(ratio, min, max, step);
+    return clamp(splitFromValue(snappedValue, min, max), 0, 1);
+  }, [max, min, step]);
+  const quantizeBarRatio = useCallback((ratio: number) => {
     const clamped = clamp(ratio, 0, 1);
-    const snapped = Math.round(clamped * resolvedBarSegmentCount) / resolvedBarSegmentCount;
-    return clamp(snapped, 0, 1);
-  }, [resolvedBarSegmentCount]);
+    if (resolvedBarStyle === 'discrete') {
+      if (resolvedBarSegmentCount <= 1) return clamped;
+      const snapped = Math.round(clamped * resolvedBarSegmentCount) / resolvedBarSegmentCount;
+      return clamp(snapped, 0, 1);
+    }
+    if (resolvedBarStyle === 'step-aligned') {
+      return quantizeRatioToStep(clamped);
+    }
+    return clamped;
+  }, [quantizeRatioToStep, resolvedBarSegmentCount, resolvedBarStyle]);
+  const quantizeSplitRatio = useCallback((ratio: number) => {
+    return quantizeBarRatio(ratio);
+  }, [quantizeBarRatio]);
   const writeSplitVars = useCallback((ratio: number) => {
     const host = containerRef.current;
     if (!host) return;
@@ -729,14 +745,8 @@ function SliderCore({
     return formatValueForDisplay(activeDrawerValue, raw, 'drawer');
   }, [activeDrawerValue, formatValueForDisplay, precision]);
   const displayValue = formattedDrawerValue ?? (focused ? text : displayValueRef.current);
-  const quantizeDrawerRatio = useCallback((ratio: number) => {
-    if (resolvedBarSegmentCount <= 1) return clamp(ratio, 0, 1);
-    const clamped = clamp(ratio, 0, 1);
-    const snapped = Math.round(clamped * resolvedBarSegmentCount) / resolvedBarSegmentCount;
-    return clamp(snapped, 0, 1);
-  }, [resolvedBarSegmentCount]);
   const setDrawerLineRatio = useCallback((index: number, ratio: number) => {
-    const quantized = quantizeDrawerRatio(ratio);
+    const quantized = quantizeBarRatio(ratio);
     setDrawerLineRatios((prev) => {
       if (Math.abs(prev[index] - quantized) < 1e-6) return prev;
       const next = [...prev] as [number, number];
@@ -744,14 +754,14 @@ function SliderCore({
       drawerLineRatiosRef.current = next;
       return next;
     });
-  }, [quantizeDrawerRatio]);
+  }, [quantizeBarRatio]);
   const getDrawerRatioFromClientX = useCallback((clientX: number) => {
     if (!drawerRef.current) return null;
     const rect = drawerRef.current.getBoundingClientRect();
     if (!rect.width) return null;
     const ratio = clamp((clientX - rect.left) / rect.width, 0, 1);
-    return quantizeDrawerRatio(ratio);
-  }, [quantizeDrawerRatio]);
+    return quantizeBarRatio(ratio);
+  }, [quantizeBarRatio]);
   const handleDrawerLinePointerDown = useCallback((index: number) => (
     e: React.PointerEvent<HTMLSpanElement>,
   ) => {

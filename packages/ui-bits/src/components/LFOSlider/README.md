@@ -41,7 +41,7 @@ const Example = () => {
 | `showLabel` | `boolean` | Toggle the visible label while keeping the component accessible. Defaults to `true`. |
 | `min`, `max`, `step` | `number` | Range and quantisation of the numeric value. Defaults to `0 → 100` with step `1`. |
 | `variant` | `'full' \| 'basic'` | `basic` disables text editing + LFO drawer controls to create a minimal slider for nested usage. |
-| `barStyle` | `'continuous' \| 'discrete'` | Controls how the bar fill renders; discrete snaps the fill without changing the numeric value step. |
+| `barStyle` | `'continuous' \| 'discrete' \| 'step-aligned'` | Controls how the bar fill renders; `discrete` snaps to `barSegmentCount`, `step-aligned` snaps to the slider step. |
 | `barSegmentCount` | `number` | Visual segment count used when `barStyle="discrete"`. |
 | `defaultValue` | `number` | Initial numerical value; the component keeps its own local text buffer. |
 | `value` | `number` | Controlled value used for external mode; overrides `defaultValue` for initial display. |

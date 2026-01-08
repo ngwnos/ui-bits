@@ -36,20 +36,23 @@ const Example = () => {
 
 | Prop | Type | Description |
 | --- | --- | --- |
-| `label` | `string` | Accessible label and on-screen caption. |
+| `label` | `string` | On-screen caption; use `ariaLabel` when you want accessibility text without rendering a label. |
+| `ariaLabel` | `string` | Optional aria-label for screen readers, useful when `showLabel={false}`. |
+| `showLabel` | `boolean` | Toggle the visible label while keeping the component accessible. Defaults to `true`. |
 | `min`, `max`, `step` | `number` | Range and quantisation of the numeric value. Defaults to `0 → 100` with step `1`. |
 | `variant` | `'full' \| 'basic'` | `basic` disables text editing + LFO drawer controls to create a minimal slider for nested usage. |
 | `barStyle` | `'continuous' \| 'discrete'` | Controls how the bar fill renders; discrete snaps the fill without changing the numeric value step. |
 | `barSegmentCount` | `number` | Visual segment count used when `barStyle="discrete"`. |
 | `defaultValue` | `number` | Initial numerical value; the component keeps its own local text buffer. |
+| `value` | `number` | Controlled value used for external mode; overrides `defaultValue` for initial display. |
 | `lfoRange` | `[number, number]` | Optional min/max markers shown in the drawer track. Falls back to randomised handles when omitted. |
 | `colorA`, `colorB` | `string` | Hex colours for the segmented background. When omitted the slider falls back to neutral grey/white. |
 | `showLfoControls` | `boolean` | Enables the drawer UI (waveform toggles + min/max handles). |
-| `initialWaveform`, `initialFrequency`, `initialPhase` | Numbers describing the starting LFO. |
+| `initialWaveform`, `initialFrequency`, `initialPhase` | Numbers describing the starting LFO (phase uses 0-1 to represent a full cycle). |
 | `onUserChange` | `(value: number) => void` | Fired for direct user edits (dragging, typing). |
 | `onAnimatedUpdate` | `(value: number) => void` | Fired for automated updates (frame loop, external source). |
 | `onDrawerOpenChange`, `onDrawerLinesChange` | Callbacks for synchronising drawer state with your store. |
-| `onWaveformChange`, `onFrequencyChange`, `onPhaseChange`, `onLfoEnabledChange` | Hooks for mirroring LFO controls (running state toggles when the active waveform button is clicked again). |
+| `onWaveformChange`, `onFrequencyChange`, `onPhaseChange`, `onLfoEnabledChange` | Hooks for mirroring LFO controls (phase values are normalized 0-1; running state toggles when the active waveform button is clicked again). |
 | `audioBins`, `audioBinCount`, `audioMaxMagnitude` | FFT data used when the waveform is set to `audio`. These may also be supplied via `AudioAnalysisProvider`. |
 | `suspended` | Pause frame-loop updates while keeping state mounted (also picked up from `AnimationSuspensionProvider`). |
 | `className`, `style` | `string`, `React.CSSProperties` | Optional overrides applied to the root wrapper. |
@@ -63,7 +66,7 @@ The component uses the local `frameLoop` and `useStoreMirror` helpers from this 
 1. Reuse the same helpers (copy `frameLoop.tsx` and `useStoreMirror.ts`), or
 2. Replace the hook implementations with equivalents that fit your environment.
 
-The hooks are optional – leaving `mode="manual"`, `mirrorToStore={undefined}`, and `readExternal={undefined}` disables the extra animation/mirroring features.
+The hooks are optional – leaving `mode="manual"`, `mirrorToStore={undefined}`, and `readExternal={undefined}` (or `value={undefined}`) disables the extra animation/mirroring features.
 
 ## Audio LFO Input
 

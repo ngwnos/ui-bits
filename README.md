@@ -29,14 +29,14 @@ const sliderProps: LFOSliderProps = {
   border: 'left', // 'left' | 'right' | 'none'
   fontSize: 16,
   showLfoControls: true,
-  phase: 0,
+  phase: 0, // 0-1 maps a full cycle
   mode: 'auto', // 'auto' | 'manual' | 'lfo' | 'external'
   lfo: {
     enabled: true, // initial running state
     frequency: 0.5,
     depth: 1,
     offset: 0.5,
-    phase: 0,
+    phase: 0, // 0-1 maps a full cycle
     waveform: 'sine', // 'sine' | 'triangle' | 'saw' | 'square'
     invert: false,
   },

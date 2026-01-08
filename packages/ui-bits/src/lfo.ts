@@ -5,6 +5,7 @@ export interface LfoSettings {
   frequency: number;
   depth: number;
   offset?: number;
+  // Fraction of a full cycle (0-1).
   phase?: number;
   waveform: Waveform;
   invert?: boolean;
@@ -56,7 +57,8 @@ export function lfoValue(settings: LfoSettings, tSec: number, min: number, max: 
   const span = max - min;
   const center = offset != null ? min + offset * span : min + span / 2;
   const amp = (span / 2) * clamp(depth, 0, 1);
-  const base = evalWaveform(waveform, phase + tSec * frequency * Math.PI * 2);
+  const phaseRad = (phase + tSec * frequency) * Math.PI * 2;
+  const base = evalWaveform(waveform, phaseRad);
   const shaped = invert ? -base : base;
   const v = center + amp * shaped;
   return clamp(v, min, max);
@@ -67,5 +69,5 @@ export function phaseCaptureForTriangle(current: number, min: number, max: numbe
   const center = min + span * centerBias;
   const x = clamp((current - center) / (span / 2), -1, 1);
   const tNorm = x <= 0 ? (x + 1) / 4 : (3 - x) / 4;
-  return tNorm * Math.PI * 2;
+  return tNorm;
 }

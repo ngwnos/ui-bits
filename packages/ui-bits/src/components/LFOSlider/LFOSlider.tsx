@@ -34,18 +34,6 @@ import "./lfoslider.css";
 
 export type SliderBorder = 'left' | 'right' | 'none';
 
-const visuallyHiddenStyle: React.CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
-};
-
 const EMPTY_AUDIO_BINS: readonly number[] = [];
 const AUDIO_RESPONSE_MIN = -1;
 const AUDIO_RESPONSE_MAX = 1;
@@ -56,6 +44,10 @@ const AUDIO_FREQUENCY_STEP = 0.01;
 const LFO_FREQUENCY_MIN_DEFAULT = 0.1;
 const LFO_FREQUENCY_MAX_DEFAULT = 2;
 const LFO_FREQUENCY_STEP_DEFAULT = 0.01;
+const normalizePhaseFraction = (value: number) => {
+  if (!Number.isFinite(value)) return 0;
+  return clamp(value, 0, 1);
+};
 
 const DRAWER_ICON_DEFS: Array<{
   waveform: Waveform;
@@ -109,6 +101,8 @@ export type SliderBarStyle = 'continuous' | 'discrete';
 
 export interface LFOSliderProps {
   label: string;
+  ariaLabel?: string;
+  showLabel?: boolean;
   min?: number;
   max?: number;
   step?: number;
@@ -116,6 +110,7 @@ export interface LFOSliderProps {
   barStyle?: SliderBarStyle;
   barSegmentCount?: number;
   defaultValue?: number;
+  value?: number;
   width?: number | string;
   drawerLines?: [number, number];
   lfoRange?: [number, number];
@@ -169,6 +164,8 @@ export interface LFOSliderProps {
 
 function SliderCore({
   label,
+  ariaLabel,
+  showLabel: showLabelProp,
   min = 0,
   max = 100,
   step = 1,
@@ -176,6 +173,7 @@ function SliderCore({
   barStyle = 'discrete',
   barSegmentCount = 32,
   defaultValue,
+  value,
   width,
   drawerLines,
   lfoRange,
@@ -235,7 +233,10 @@ function SliderCore({
   const resolvedAudioFrequencyStep = audioFrequencyStep ?? AUDIO_FREQUENCY_STEP;
   const precInit = precisionFrom(min, max, step);
   const isBasic = variant === 'basic';
-  const [text, setText] = useState<string>(() => (defaultValue !== undefined ? Number(defaultValue).toFixed(precInit) : '0'));
+  const initialNumeric = typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : (defaultValue !== undefined ? defaultValue : 0);
+  const [text, setText] = useState<string>(() => Number(initialNumeric).toFixed(precInit));
   const lfoSettings = useMemo<LfoSettings>(() => {
     const defaults: LfoSettings = {
       enabled: true,
@@ -243,10 +244,12 @@ function SliderCore({
       depth: 1,
       offset: 0.5,
       waveform: initialWaveform ?? 'sine',
-      phase,
+      phase: normalizePhaseFraction(phase),
       invert: false,
     };
-    return { ...defaults, ...(lfoProp ?? {}) };
+    const merged = { ...defaults, ...(lfoProp ?? {}) };
+    const resolvedPhase = normalizePhaseFraction(merged.phase ?? defaults.phase ?? 0);
+    return { ...merged, phase: resolvedPhase };
   }, [initialFrequency, initialWaveform, lfoProp, phase]);
   const defaultWaveform = initialWaveform ?? lfoSettings.waveform ?? 'sine';
   const resolvedShowLfoControls = !isBasic && showLfoControls;
@@ -270,7 +273,9 @@ function SliderCore({
     resolvedLfoFrequencyMin,
     resolvedLfoFrequencyMax,
   ));
-  const [phaseDial, setPhaseDial] = useState<number>(initialPhase ?? lfoSettings.phase ?? 0);
+  const [phaseDial, setPhaseDial] = useState<number>(() => (
+    normalizePhaseFraction(initialPhase ?? lfoSettings.phase ?? 0)
+  ));
 
   useEffect(() => {
     if (!drawerHandleActive && drawerOpen) {
@@ -334,7 +339,7 @@ function SliderCore({
   }, [drawerLineValues, min, max]);
 
   // Divider position (0..1) linked to numeric value
-  const [split, setSplit] = useState<number>(() => splitFromValue(Number(defaultValue ?? text), min, max));
+  const [split, setSplit] = useState<number>(() => splitFromValue(initialNumeric, min, max));
   const splitRef = useRef(split);
 
   // Refs
@@ -503,15 +508,11 @@ function SliderCore({
   const padY = '0.35em';
   const padRight = '0.5em';
   const actionButtonSize = `calc(1em + ${padY} + ${padY} + 2px)`;
-  const infoPaddingY = 1; // px padding around readout text
-  const infoPaddingX = 6; // px horizontal padding around readout text
-  const infoBorderWidth = 1; // px border width around readout blocks
   const handleSize = Math.max(10, Math.round(appliedFontSize));
   const handleOffset = drawerHandleActive ? Math.max(3, Math.round(handleSize / 3)) : 0;
   const padLeft = drawerHandleActive ? `${handleOffset + handleSize + handleOffset}px` : '0.5em';
-  const actionGapValuePx = drawerHandleActive ? handleOffset : 8;
+  const actionGapValuePx = 8;
   const actionGap = `${actionGapValuePx}px`;
-  const actionGapWide = `${actionGapValuePx * 2}px`;
   const sliderBorderRadius = drawerHandleActive && drawerOpen ? '3px 3px 0 0' : '3px';
   const showBorder = border !== 'none';
   const outerBorderColor = border === 'right' ? bgRight : bgLeft;
@@ -552,15 +553,16 @@ function SliderCore({
   const iconStrokeWidth = 18;
   const infoFontSize = (fontSize ?? 16);
   const formatFrequency = (value: number) => value.toFixed(2).padStart(5, ' ');
-  const formatPhase = (value: number) => `${(value / Math.PI).toFixed(2).padStart(5, ' ')}π`;
+  const formatPhase = (value: number) => value.toFixed(2).padStart(5, ' ');
   const handleFrequencyChange = useCallback((next: number) => {
     const clamped = clamp(next, resolvedLfoFrequencyMin, resolvedLfoFrequencyMax);
     setKnobFrequency(clamped);
     onFrequencyChange?.(clamped);
   }, [onFrequencyChange, resolvedLfoFrequencyMax, resolvedLfoFrequencyMin]);
   const handlePhaseChange = useCallback((next: number) => {
-    setPhaseDial(next);
-    onPhaseChange?.(next);
+    const normalized = normalizePhaseFraction(next);
+    setPhaseDial(normalized);
+    onPhaseChange?.(normalized);
   }, [onPhaseChange]);
   const handleAudioResponseChange = useCallback((next: number) => {
     const clamped = clamp(next, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX);
@@ -585,7 +587,6 @@ function SliderCore({
       max: resolvedLfoFrequencyMax,
       step: resolvedLfoFrequencyStep,
     };
-  const frequencySuffix = isAudioWaveform ? undefined : 'Hz';
   const lfoFrequencyValue = clamp(knobFrequency, resolvedLfoFrequencyMin, resolvedLfoFrequencyMax);
   const audioSampleValue = clamp(audioSamplePosition, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax);
   const frequencySliderValue = isAudioWaveform ? audioSampleValue : lfoFrequencyValue;
@@ -606,20 +607,25 @@ function SliderCore({
     };
   }, [audioAnalysisStore, audioBinCount, audioBins, audioMaxMagnitude]);
   const PHASE_MIN = 0;
-  const PHASE_MAX = Math.PI * 2;
-  const PHASE_STEP = Math.PI / 100;
-  const frequencyLabel = isAudioWaveform ? 'Freq' : '';
-  const phaseLabel = isAudioWaveform ? 'Bias' : '';
+  const PHASE_MAX = 1;
+  const PHASE_STEP = 0.01;
+  const frequencyLabelText = 'Freq';
+  const phaseLabelText = 'Phase';
+  const showFrequencyLabel = true;
+  const showPhaseLabel = true;
+  const frequencyAriaLabel = 'Frequency';
+  const phaseAriaLabel = 'Phase';
   const phaseSliderValue = isAudioWaveform
     ? clamp(audioResponse, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX)
-    : phaseDial;
+    : normalizePhaseFraction(phaseDial);
   const phaseSliderMin = isAudioWaveform ? AUDIO_RESPONSE_MIN : PHASE_MIN;
   const phaseSliderMax = isAudioWaveform ? AUDIO_RESPONSE_MAX : PHASE_MAX;
   const phaseSliderStep = isAudioWaveform ? AUDIO_RESPONSE_STEP : PHASE_STEP;
-  const phaseSliderSuffix = isAudioWaveform ? undefined : 'rad';
   const formatPhaseSliderValue = isAudioWaveform
     ? (value: number) => value.toFixed(2).padStart(5, ' ')
     : formatPhase;
+  const frequencyDisplayFormat = (value: number) => formatFrequency(value);
+  const phaseDisplayFormat = (value: number) => formatPhaseSliderValue(value);
   const handlePhaseSliderChange = isAudioWaveform ? handleAudioResponseChange : handlePhaseChange;
   const handleFrequencySliderChange = isAudioWaveform ? handleAudioSampleChange : handleFrequencyChange;
   const sampleAudioBinValue = useCallback((position: number): number | null => {
@@ -807,6 +813,9 @@ function SliderCore({
 
   // Helpers
   const allowTextEditing = true;
+  const labelText = label.trim();
+  const showLabel = (showLabelProp ?? true) && labelText.length > 0;
+  const accessibleLabel = (ariaLabel ?? label).trim();
   const hasSelection = allowTextEditing && selStart !== selEnd;
   const caret = selEnd;
   const setSelection = (a: number, b: number) => {
@@ -883,11 +892,13 @@ function SliderCore({
     }
   }, [drawerValueMin, drawerValueMax, focused, max, min, onAnimatedUpdate, precision, reflectValueToDom, step, writeSplitVars]);
 
+  const hasExternalValue = typeof value === 'number' && Number.isFinite(value);
+  const hasExternalSource = hasExternalValue || Boolean(readExternal);
   const frameFn = useCallback((nowSec: number) => {
     lastNowSecRef.current = nowSec;
     if (!Number.isFinite(drawerValueMin) || !Number.isFinite(drawerValueMax)) return;
     const activeMode = mode === 'auto'
-      ? (lfoEnabled ? 'lfo' : (readExternal ? 'external' : 'manual'))
+      ? (lfoEnabled ? 'lfo' : (hasExternalSource ? 'external' : 'manual'))
       : (mode === 'lfo' && !lfoEnabled ? 'manual' : mode);
     if (draggingSplitRef.current || editingRef.current) return;
     let nextVal: number | undefined;
@@ -899,7 +910,7 @@ function SliderCore({
         }
         return;
       }
-      const phaseBase = phaseDial + phaseOffsetRef.current;
+      const phaseBase = normalizePhaseFraction(phaseDial) + phaseOffsetRef.current;
       const withPhase: LfoSettings = {
         ...lfoSettings,
         phase: phaseBase,
@@ -907,15 +918,32 @@ function SliderCore({
         frequency: lfoFrequencyValue,
       };
       nextVal = lfoValue(withPhase, nowSec, drawerValueMin, drawerValueMax);
-    } else if (activeMode === 'external' && readExternal) {
-      const external = readExternal();
-      if (typeof external === 'number') {
+    } else if (activeMode === 'external') {
+      const external = hasExternalValue ? value : readExternal?.();
+      if (typeof external === 'number' && Number.isFinite(external)) {
         nextVal = clamp(external, drawerValueMin, drawerValueMax);
       }
     }
     if (nextVal === undefined) return;
     applyWaveValue(nextVal, nowSec);
-  }, [activeWaveform, applyWaveValue, audioSampleValue, drawerValueMax, drawerValueMin, isAudioWaveform, lfoFrequencyValue, lfoEnabled, lfoSettings, mode, phaseDial, readExternal, sampleAudioBinValue]);
+  }, [
+    activeWaveform,
+    applyWaveValue,
+    audioSampleValue,
+    drawerValueMax,
+    drawerValueMin,
+    hasExternalSource,
+    hasExternalValue,
+    isAudioWaveform,
+    lfoFrequencyValue,
+    lfoEnabled,
+    lfoSettings,
+    mode,
+    phaseDial,
+    readExternal,
+    sampleAudioBinValue,
+    value,
+  ]);
   useFrame(isSuspended ? null : frameFn);
   const readLiveValue = useCallback(
     () => valueFromSplit(splitRef.current, min, max, step),
@@ -968,7 +996,7 @@ function SliderCore({
   }, [isAudioWaveform, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
 
   useEffect(() => {
-    setPhaseDial(initialPhase ?? lfoSettings.phase ?? 0);
+    setPhaseDial(normalizePhaseFraction(initialPhase ?? lfoSettings.phase ?? 0));
   }, [initialPhase, lfoSettings.phase]);
   useEffect(() => {
     if (isBasic || lfoRunning === undefined) return;
@@ -1406,7 +1434,7 @@ function SliderCore({
       <div
         ref={containerRef}
         role="textbox"
-        aria-label={label}
+        aria-label={accessibleLabel || undefined}
         aria-multiline={false}
         tabIndex={allowTextEditing ? 0 : -1}
         onKeyDown={onKeyDown}
@@ -1441,7 +1469,7 @@ function SliderCore({
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleDrawer(); }}
             role="button"
             aria-pressed={drawerOpen}
-            aria-label={`${label} drawer toggle`}
+            aria-label={accessibleLabel ? `${accessibleLabel} drawer toggle` : undefined}
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === ' ' || e.key === 'Enter') {
@@ -1488,7 +1516,9 @@ function SliderCore({
             className="absolute inset-0"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `${padY} ${padRight} ${padY} ${padLeft}`, lineHeight: '1' }}
           >
-            <span style={{ color: textLeft, marginRight: '0.5em', flexShrink: 0 }}>{label}</span>
+            {showLabel ? (
+              <span style={{ color: textLeft, marginRight: '0.5em', flexShrink: 0 }}>{labelText}</span>
+            ) : null}
             <span
               style={{ color: textLeft, whiteSpace: 'pre', textAlign: 'right', flex: '1 1 auto', display: 'flex', justifyContent: 'flex-end' }}
             >
@@ -1509,7 +1539,9 @@ function SliderCore({
             className="absolute inset-0"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `${padY} ${padRight} ${padY} ${padLeft}`, lineHeight: '1' }}
           >
-            <span style={{ color: textRight, marginRight: '0.5em', flexShrink: 0 }}>{label}</span>
+            {showLabel ? (
+              <span style={{ color: textRight, marginRight: '0.5em', flexShrink: 0 }}>{labelText}</span>
+            ) : null}
             <span
               style={{ color: textRight, whiteSpace: 'pre', textAlign: 'right', flex: '1 1 auto', display: 'flex', justifyContent: 'flex-end' }}
             >
@@ -1533,7 +1565,7 @@ function SliderCore({
           className="text-transparent z-10"
           style={{ display: 'flex', alignItems: 'center', padding: `${padY} ${padRight} ${padY} ${padLeft}`, lineHeight: '1', width: '100%' }}
         >
-          <span style={{ flexShrink: 0, marginRight: '0.5em' }}>{label}</span>
+          {showLabel ? <span style={{ flexShrink: 0, marginRight: '0.5em' }}>{labelText}</span> : null}
           <span
             className="whitespace-pre"
             style={{ flex: '1 1 auto', display: 'flex', justifyContent: 'flex-end' }}
@@ -1681,342 +1713,118 @@ function SliderCore({
               borderBottomRightRadius: 3,
             }}
           >
-            {DRAWER_ICON_DEFS.map((icon) => {
-              const isSelectedWaveform = activeWaveform === icon.waveform;
-              const isActive = isSelectedWaveform && lfoEnabled;
-              const toggleWaveform = () => {
-                if (isSelectedWaveform) {
+            <div style={{ display: 'flex', alignItems: 'center', gap: actionGap, flexShrink: 0 }}>
+              {DRAWER_ICON_DEFS.map((icon) => {
+                const isSelectedWaveform = activeWaveform === icon.waveform;
+                const isActive = isSelectedWaveform && lfoEnabled;
+                const toggleWaveform = () => {
+                  if (isSelectedWaveform) {
+                    setLfoEnabled((enabled) => {
+                      const next = !enabled;
+                      onLfoEnabledChange?.(next);
+                      return next;
+                    });
+                    return;
+                  }
+                  setActiveWaveform(icon.waveform);
+                  if (activeWaveform !== icon.waveform) {
+                    onWaveformChange?.(icon.waveform);
+                  }
                   setLfoEnabled((enabled) => {
-                    const next = !enabled;
-                    onLfoEnabledChange?.(next);
-                    return next;
+                    if (enabled) return enabled;
+                    onLfoEnabledChange?.(true);
+                    return true;
                   });
-                  return;
-                }
-                setActiveWaveform(icon.waveform);
-                if (activeWaveform !== icon.waveform) {
-                  onWaveformChange?.(icon.waveform);
-                }
-                setLfoEnabled((enabled) => {
-                  if (enabled) return enabled;
-                  onLfoEnabledChange?.(true);
-                  return true;
-                });
-              };
-              return (
-                <IconButton
-                  key={`drawer-action-${icon.waveform}`}
-                  behavior="toggle"
-                  toggled={isActive}
-                  onToggle={toggleWaveform}
-                  borderStyle="none"
-                  fontSize={appliedFontSize}
-                  colorA={bgLeft}
-                  colorB={bgRight}
-                  aria-label={`${icon.label} waveform`}
-                  title={`${icon.label} waveform`}
-                  style={{
-                    width: actionButtonSize,
-                    height: actionButtonSize,
-                    padding: padY,
-                  }}
-                >
-                  <svg
-                    aria-hidden
-                    viewBox="0 0 100 75"
-                    preserveAspectRatio="xMidYMid meet"
-                    role="img"
-                    style={{ width: '100%', height: '100%', display: 'block' }}
+                };
+                return (
+                  <IconButton
+                    key={`drawer-action-${icon.waveform}`}
+                    behavior="toggle"
+                    toggled={isActive}
+                    onToggle={toggleWaveform}
+                    borderStyle="none"
+                    fontSize={appliedFontSize}
+                    colorA={bgLeft}
+                    colorB={bgRight}
+                    aria-label={`${icon.label} waveform`}
+                    title={`${icon.label} waveform`}
+                    style={{
+                      width: actionButtonSize,
+                      height: actionButtonSize,
+                      padding: padY,
+                    }}
                   >
-                    <path
-                      d={icon.path}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={iconStrokeWidth}
-                      strokeLinecap={icon.lineCap}
-                      strokeLinejoin={icon.lineJoin}
-                    />
-                  </svg>
-                </IconButton>
-              );
-            })}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: actionGapWide }}>
-              <MiniReadoutSlider
-                label={frequencyLabel}
-                value={frequencySliderValue}
-                formatValue={formatFrequency}
-                suffix={frequencySuffix}
-                fontSize={infoFontSize}
-                minValueWidthCh={5}
-                paddingX={infoPaddingX}
-                paddingY={infoPaddingY}
-                borderWidth={infoBorderWidth}
-                bgLeft={bgLeft}
-                bgRight={bgRight}
+                    <svg
+                      aria-hidden
+                      viewBox="0 0 100 75"
+                      preserveAspectRatio="xMidYMid meet"
+                      role="img"
+                      style={{ width: '100%', height: '100%', display: 'block' }}
+                    >
+                      <path
+                        d={icon.path}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={iconStrokeWidth}
+                        strokeLinecap={icon.lineCap}
+                        strokeLinejoin={icon.lineJoin}
+                      />
+                    </svg>
+                  </IconButton>
+                );
+              })}
+            </div>
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                gap: actionGap,
+              }}
+            >
+              <LFOSlider
+                label={frequencyLabelText}
+                ariaLabel={frequencyAriaLabel}
+                showLabel={showFrequencyLabel}
+                variant="basic"
                 min={frequencyRange.min}
                 max={frequencyRange.max}
                 step={frequencyRange.step}
-                onChange={handleFrequencySliderChange}
-              />
-              <MiniReadoutSlider
-                label={phaseLabel}
-                value={phaseSliderValue}
-                formatValue={formatPhaseSliderValue}
-                suffix={phaseSliderSuffix}
+                width="100%"
+                colorA={bgLeft}
+                colorB={bgRight}
+                border="left"
                 fontSize={infoFontSize}
-                minValueWidthCh={5}
-                paddingX={infoPaddingX}
-                paddingY={infoPaddingY}
-                borderWidth={infoBorderWidth}
-                bgLeft={bgLeft}
-                bgRight={bgRight}
+                mode="external"
+                value={frequencySliderValue}
+                onUserChange={handleFrequencySliderChange}
+                formatDisplayValue={(value) => frequencyDisplayFormat(value)}
+                style={{ gap: 0 }}
+              />
+              <LFOSlider
+                label={phaseLabelText}
+                ariaLabel={phaseAriaLabel}
+                showLabel={showPhaseLabel}
+                variant="basic"
                 min={phaseSliderMin}
                 max={phaseSliderMax}
                 step={phaseSliderStep}
-                onChange={handlePhaseSliderChange}
+                width="100%"
+                colorA={bgLeft}
+                colorB={bgRight}
+                border="left"
+                fontSize={infoFontSize}
+                mode="external"
+                value={phaseSliderValue}
+                onUserChange={handlePhaseSliderChange}
+                formatDisplayValue={(value) => phaseDisplayFormat(value)}
+                style={{ gap: 0 }}
               />
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-interface MiniReadoutSliderProps {
-  label: string;
-  value: number;
-  formatValue: (value: number) => string;
-  suffix?: string;
-  fontSize: number;
-  minValueWidthCh: number;
-  paddingX: number;
-  paddingY: number;
-  borderWidth: number;
-  bgLeft: string;
-  bgRight: string;
-  gap?: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (value: number) => void;
-}
-
-function MiniReadoutSlider({
-  label,
-  value,
-  formatValue,
-  suffix,
-  fontSize,
-  minValueWidthCh,
-  paddingX,
-  paddingY,
-  borderWidth,
-  bgLeft,
-  bgRight,
-  gap = 4,
-  min,
-  max,
-  step = 0,
-  onChange,
-}: MiniReadoutSliderProps) {
-  const valueToRatio = useCallback((val: number) => {
-    const span = max - min;
-    if (!isFinite(span) || span <= 0) return 0;
-    return clamp((val - min) / span, 0, 1);
-  }, [min, max]);
-
-  const ratioToValue = useCallback((ratio: number) => {
-    const span = max - min;
-    if (!isFinite(span) || span <= 0) return clamp(min, min, max);
-    const unclamped = min + ratio * span;
-    if (!step || step <= 0 || !isFinite(step)) {
-      return clamp(unclamped, min, max);
-    }
-    const steps = Math.round((unclamped - min) / step);
-    const snapped = min + steps * step;
-    const precision = precisionFrom(min, max, step);
-    return clamp(Number(snapped.toFixed(precision)), min, max);
-  }, [min, max, step]);
-
-  const [split, setSplit] = useState(() => valueToRatio(value));
-  const hostRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef(false);
-
-  useEffect(() => {
-    setSplit((prev) => {
-      const normalized = valueToRatio(value);
-      return Math.abs(prev - normalized) < 1e-4 ? prev : normalized;
-    });
-  }, [value, valueToRatio]);
-
-  const updateFromPointer = useCallback((clientX: number) => {
-    const host = hostRef.current;
-    if (!host) return;
-    const rect = host.getBoundingClientRect();
-    const width = rect.width;
-    if (width <= 0) return;
-    const next = clamp((clientX - rect.left) / width, 0, 1);
-    const snappedValue = ratioToValue(next);
-    const snappedRatio = valueToRatio(snappedValue);
-    setSplit(snappedRatio);
-    onChange(snappedValue);
-  }, [ratioToValue, valueToRatio, onChange]);
-
-  const releasePointerCapture = useCallback((pointerId: number) => {
-    const host = hostRef.current;
-    if (host?.hasPointerCapture?.(pointerId)) host.releasePointerCapture(pointerId);
-  }, []);
-
-  const finishInteraction = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    event.preventDefault();
-    event.stopPropagation();
-    draggingRef.current = false;
-    releasePointerCapture(event.pointerId);
-  }, [releasePointerCapture]);
-
-  const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    draggingRef.current = true;
-    hostRef.current?.setPointerCapture?.(event.pointerId);
-    updateFromPointer(event.clientX);
-  }, [updateFromPointer]);
-
-  const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    event.preventDefault();
-    event.stopPropagation();
-    updateFromPointer(event.clientX);
-  }, [updateFromPointer]);
-
-  const clampedSplit = clamp(split, 0, 1);
-  const splitPercent = `${(clampedSplit * 100).toFixed(3)}%`;
-  const leftClip = `inset(0 calc(100% - ${splitPercent}) 0 0)`;
-  const rightClip = `inset(0 0 0 ${splitPercent})`;
-  const seamVisible = clampedSplit > 0 && clampedSplit < 1;
-  const textColorLeft = bgRight;
-  const textColorRight = bgLeft;
-  const display = formatValue(value);
-  const labelText = label.trim();
-  const hiddenLabel = labelText
-    ? `${labelText}: ${display.trim()}${suffix ? ` ${suffix}` : ''}`
-    : `${display.trim()}${suffix ? ` ${suffix}` : ''}`;
-  const cornerRadius = 3;
-  const overlayPadding = `${paddingY}px ${paddingX}px`;
-  const gradient = `linear-gradient(90deg, ${bgLeft} 0%, ${bgLeft} ${splitPercent}, ${bgRight} ${splitPercent}, ${bgRight} 100%)`;
-  const seamWidth = Math.max(borderWidth, 1);
-  const labelStyle: React.CSSProperties = {
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-  };
-
-  const valueStyle: React.CSSProperties = {
-    fontFeatureSettings: '"tnum"',
-    fontSize,
-    minWidth: `${minValueWidthCh}ch`,
-    textAlign: 'right',
-    whiteSpace: 'pre',
-  };
-
-  const suffixStyle: React.CSSProperties = {
-    fontSize: fontSize * 0.8,
-  };
-
-  return (
-    <div
-      ref={hostRef}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={finishInteraction}
-      onPointerCancel={finishInteraction}
-      onPointerLeave={finishInteraction}
-      style={{
-        position: 'relative',
-        border: `${borderWidth}px solid ${bgLeft}`,
-        borderRadius: cornerRadius,
-        backgroundImage: gradient,
-        backgroundRepeat: 'no-repeat',
-        backgroundSize: '100% 100%',
-        backgroundOrigin: 'padding-box',
-        backgroundClip: 'padding-box',
-        overflow: 'hidden',
-        userSelect: 'none',
-        cursor: 'col-resize',
-        touchAction: 'none',
-        lineHeight: 1,
-      }}
-    >
-        <span style={{ ...visuallyHiddenStyle, pointerEvents: 'none' }}>
-        {hiddenLabel}
-      </span>
-      <div
-        aria-hidden
-        style={{
-          visibility: 'hidden',
-          pointerEvents: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          gap,
-          padding: overlayPadding,
-        }}
-      >
-        {labelText ? <span style={labelStyle}>{labelText}</span> : null}
-        <span style={valueStyle}>{display}</span>
-        {suffix ? <span style={suffixStyle}>{suffix}</span> : null}
-      </div>
-      {seamVisible ? (
-        <span
-          aria-hidden
-          style={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            left: splitPercent,
-            width: seamWidth,
-            transform: 'translateX(-50%)',
-            background: bgLeft,
-            pointerEvents: 'none',
-          }}
-        />
-      ) : null}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap,
-          padding: overlayPadding,
-          color: textColorLeft,
-          clipPath: leftClip,
-          pointerEvents: 'none',
-        }}
-      >
-        {labelText ? <span style={labelStyle}>{labelText}</span> : null}
-        <span style={valueStyle}>{display}</span>
-        {suffix ? <span style={suffixStyle}>{suffix}</span> : null}
-      </div>
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap,
-          padding: overlayPadding,
-          color: textColorRight,
-          clipPath: rightClip,
-          pointerEvents: 'none',
-        }}
-      >
-        {labelText ? <span style={labelStyle}>{labelText}</span> : null}
-        <span style={valueStyle}>{display}</span>
-        {suffix ? <span style={suffixStyle}>{suffix}</span> : null}
-      </div>
     </div>
   );
 }

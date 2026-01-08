@@ -208,7 +208,7 @@ function randomFrequency(): number {
 }
 
 function randomPhase(): number {
-  return Math.random() * Math.PI * 2;
+  return Math.random();
 }
 
 const waveformOptions: Waveform[] = ["sine", "triangle", "saw", "square", "audio"];

@@ -1,6 +1,6 @@
 import React from "react";
 import { AnimationSuspensionProvider } from "../../animationSuspension";
-import { useVerticalGap, VerticalGapContext } from "../../panelGap";
+import { usePanelEdgeBorders, useVerticalGap, VerticalGapContext } from "../../panelGap";
 import IconButton from "../IconButton";
 
 export type FolderBorderStyle = "a" | "b" | "none";
@@ -74,6 +74,9 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const bodyPaddingY = `${resolvedVerticalGap}px`;
   const renderBody = !isCollapsed || keepMounted;
   const suspendChildren = Boolean(suspended || (keepMounted && isCollapsed));
+  const panelEdgeBorders = usePanelEdgeBorders();
+  const showLeftBorder = panelEdgeBorders?.left ?? true;
+  const showRightBorder = panelEdgeBorders?.right ?? true;
   const toggleValue = isCollapsed ? "collapsed" : "expanded";
   const toggleOptions = [
     { value: "collapsed", ariaLabel: "Expand section", title: "Expand section" },
@@ -119,8 +122,8 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
           gridTemplateColumns: `${headerHeight}px 1fr ${headerHeight}px`,
           alignItems: "center",
           padding: `0 ${resolvedPadding}`,
-          borderLeft: `1px solid ${resolvedBorderColor}`,
-          borderRight: `1px solid ${resolvedBorderColor}`,
+          borderLeft: showLeftBorder ? `1px solid ${resolvedBorderColor}` : "none",
+          borderRight: showRightBorder ? `1px solid ${resolvedBorderColor}` : "none",
           borderBottom: `1px solid ${resolvedBorderColor}`,
           background: headerBackground,
           color: headerTextColor,

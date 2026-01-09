@@ -559,6 +559,7 @@ function EditableRectPOC() {
     };
   }, [customDefinition.width]);
 
+  const CONTROL_FONT_SIZE = 12;
   const [sliderFontSize, setSliderFontSize] = React.useState<number>(12);
   const [audioControlFontSize, setAudioControlFontSize] = React.useState<number>(12);
   const [audioControlMaxWidth, setAudioControlMaxWidth] = React.useState<number>(50);
@@ -569,15 +570,17 @@ function EditableRectPOC() {
   const [floatingPanelValue, setFloatingPanelValue] = React.useState<number>(42);
   const [floatingPanelOpacity, setFloatingPanelOpacity] = React.useState<number>(0.5);
   const [floatingPanelBlur, setFloatingPanelBlur] = React.useState<number>(20);
-  const [floatingPanelGap, setFloatingPanelGap] = React.useState<number>(8);
+  const [floatingPanelGap, setFloatingPanelGap] = React.useState<number>(3);
   const [floatingPanelBrightness, setFloatingPanelBrightness] = React.useState<number>(75);
+  const [floatingPanelPaddingLeft, setFloatingPanelPaddingLeft] = React.useState<number>(3);
+  const [floatingPanelPaddingRight, setFloatingPanelPaddingRight] = React.useState<number>(3);
+  const [floatingPanelPaddingBottom, setFloatingPanelPaddingBottom] = React.useState<number>(3);
   const [floatingPanelCollapsed, setFloatingPanelCollapsed] = React.useState(false);
   const [floatingPanelPosition, setFloatingPanelPosition] = React.useState<{ x: number; y: number } | null>(() => ({
     x: 48,
     y: 120,
   }));
   const floatingPanelRef = React.useRef<HTMLDivElement | null>(null);
-  const CONTROL_FONT_SIZE = 12;
   const columnGap = 5;
   const MAX_COLUMN_WIDTH = 440;
   const rowGap = '3px';
@@ -589,7 +592,6 @@ function EditableRectPOC() {
   const toggleIconSize = Math.max(columnButtonSize - 4, 12);
   const controlIconSize = Math.max(columnButtonSize - 6, 12);
   const horizontalPadding = Math.max(columnGap * 2, 16);
-  const floatingPanelPadding = Math.round(CONTROL_FONT_SIZE * 0.75);
   const tabs = [
     { value: 'lfo-slider', label: 'LFO Slider' },
     { value: 'icon-button', label: 'Icon Button' },
@@ -1730,11 +1732,14 @@ function EditableRectPOC() {
             bodyOpacity={floatingPanelOpacity}
             bodyBlur={floatingPanelBlur}
             verticalGap={floatingPanelGap}
+            paddingLeft={floatingPanelPaddingLeft}
+            paddingRight={floatingPanelPaddingRight}
+            paddingBottom={floatingPanelPaddingBottom}
             collapsed={floatingPanelCollapsed}
             position={floatingPanelPosition ?? undefined}
             onPositionChange={setFloatingPanelPosition}
           >
-            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+            <div>
               <AudioControls
                 fontSize={CONTROL_FONT_SIZE}
                 colorA={floatingPanelColorA}
@@ -1743,7 +1748,7 @@ function EditableRectPOC() {
                 audioSrc="/audio/credits.mp3"
               />
             </div>
-            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+            <div>
               <LFOSlider
                 label="Opacity"
                 min={0.1}
@@ -1761,7 +1766,7 @@ function EditableRectPOC() {
                 formatDisplayValue={(value) => value.toFixed(2)}
               />
             </div>
-            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+            <div>
               <LFOSlider
                 label="Blur"
                 min={0}
@@ -1780,7 +1785,7 @@ function EditableRectPOC() {
                 valueSuffix=" px"
               />
             </div>
-            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+            <div>
               <LFOSlider
                 label="Gap"
                 min={0}
@@ -1799,15 +1804,71 @@ function EditableRectPOC() {
                 valueSuffix=" px"
               />
             </div>
-            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+            <div>
+              <LFOSlider
+                label="Pad Left"
+                min={0}
+                max={32}
+                step={1}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelPaddingLeft}
+                onUserChange={setFloatingPanelPaddingLeft}
+                onAnimatedUpdate={setFloatingPanelPaddingLeft}
+                formatDisplayValue={(value) => `${Math.round(value)}`}
+                valueSuffix=" px"
+              />
+            </div>
+            <div>
+              <LFOSlider
+                label="Pad Right"
+                min={0}
+                max={32}
+                step={1}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelPaddingRight}
+                onUserChange={setFloatingPanelPaddingRight}
+                onAnimatedUpdate={setFloatingPanelPaddingRight}
+                formatDisplayValue={(value) => `${Math.round(value)}`}
+                valueSuffix=" px"
+              />
+            </div>
+            <div>
+              <LFOSlider
+                label="Pad Bottom"
+                min={0}
+                max={32}
+                step={1}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelPaddingBottom}
+                onUserChange={setFloatingPanelPaddingBottom}
+                onAnimatedUpdate={setFloatingPanelPaddingBottom}
+                formatDisplayValue={(value) => `${Math.round(value)}`}
+                valueSuffix=" px"
+              />
+            </div>
+            <div>
               <Folder
                 label="Level"
                 colorA={floatingPanelLevelColorA}
                 colorB={floatingPanelLevelColorB}
                 fontSize={CONTROL_FONT_SIZE}
-                padding={floatingPanelPadding}
               >
-                <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+                <div>
                   <LFOSlider
                     label="Level"
                     min={0}
@@ -1826,7 +1887,7 @@ function EditableRectPOC() {
                 </div>
               </Folder>
             </div>
-            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+            <div>
               <LFOSlider
                 label="Brightness"
                 min={0}

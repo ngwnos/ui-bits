@@ -22,6 +22,9 @@ export interface FloatingPanelProps extends React.HTMLAttributes<HTMLDivElement>
   defaultPosition?: { x: number; y: number };
   width?: number | string;
   padding?: number | string;
+  paddingLeft?: number | string;
+  paddingRight?: number | string;
+  paddingBottom?: number | string;
   radius?: number;
   shadow?: string;
   fontSize?: number;
@@ -86,9 +89,12 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     position,
     onPositionChange,
     defaultPosition,
-    width,
-    padding,
-    radius,
+  width,
+  padding,
+  paddingLeft,
+  paddingRight,
+  paddingBottom,
+  radius,
     shadow,
     fontSize = 12,
     verticalGap,
@@ -125,7 +131,12 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   }, [defaultPosition?.x, defaultPosition?.y, position?.x, position?.y]);
   const resolvedFontSize = fontSize ?? 12;
   const resolvedPadding = padding ?? Math.round(resolvedFontSize * 0.75);
-  const resolvedPaddingValue = resolveSize(resolvedPadding) ?? "0px";
+  const resolvedPaddingLeft = paddingLeft ?? resolvedPadding;
+  const resolvedPaddingRight = paddingRight ?? resolvedPadding;
+  const resolvedPaddingBottom = paddingBottom ?? 0;
+  const resolvedPaddingLeftValue = resolveSize(resolvedPaddingLeft) ?? "0px";
+  const resolvedPaddingRightValue = resolveSize(resolvedPaddingRight) ?? "0px";
+  const resolvedPaddingBottomValue = resolveSize(resolvedPaddingBottom) ?? "0px";
   const resolvedRadius = radius ?? Math.max(4, Math.round(resolvedFontSize * 0.4));
   const resolvedShadow = shadow ?? DEFAULT_SHADOW;
   const resolvedBorderColor = borderStyle === "a"
@@ -233,7 +244,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
           minHeight: headerMinHeight,
           display: "flex",
           alignItems: "center",
-          padding: `0 ${resolvedPaddingValue ?? 0}`,
+          padding: `0 ${resolvedPaddingRightValue} 0 ${resolvedPaddingLeftValue}`,
           border: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
           borderTopLeftRadius: resolvedRadius,
           borderTopRightRadius: resolvedRadius,
@@ -258,7 +269,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       {renderBody && (
         <div
           style={{
-            padding: `${verticalGapValue} ${resolvedPaddingValue} 0`,
+            padding: `${verticalGapValue} ${resolvedPaddingRightValue} ${resolvedPaddingBottomValue} ${resolvedPaddingLeftValue}`,
             display: collapsed ? "none" : "flex",
             flexDirection: "column",
             gap: resolvedVerticalGap,

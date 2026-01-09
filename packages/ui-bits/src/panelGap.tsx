@@ -4,6 +4,8 @@ export const DEFAULT_VERTICAL_GAP_PX = 8;
 
 export const VerticalGapContext = React.createContext<number | null>(null);
 
+export const PanelEdgeBorderContext = React.createContext<{ left: boolean; right: boolean } | null>(null);
+
 const isFiniteNumber = (value: unknown): value is number => (
   typeof value === "number" && Number.isFinite(value)
 );
@@ -13,4 +15,8 @@ export function useVerticalGap(explicit?: number) {
   if (isFiniteNumber(explicit)) return Math.max(0, explicit);
   if (isFiniteNumber(contextGap)) return Math.max(0, contextGap);
   return DEFAULT_VERTICAL_GAP_PX;
+}
+
+export function usePanelEdgeBorders() {
+  return React.useContext(PanelEdgeBorderContext);
 }

@@ -13,6 +13,7 @@ import type { LfoSettings, Waveform } from "../../lfo";
 import { useStoreMirror } from "../../useStoreMirror";
 import type { MirrorFn } from "../../useStoreMirror";
 import IconButton from "../IconButton";
+import { usePanelEdgeBorders } from "../../panelGap";
 import {
   applyReplace,
   extendStep,
@@ -502,12 +503,17 @@ function SliderCore({
   const fallbackRight = '#f0f0f0';
   const bgLeft = colorA ?? fallbackLeft;
   const bgRight = colorB ?? fallbackRight;
-  const normalizedMask = useMemo(() => ({
-    top: borderMask?.top ?? true,
-    right: borderMask?.right ?? true,
-    bottom: borderMask?.bottom ?? true,
-    left: borderMask?.left ?? true,
-  }), [borderMask]);
+  const panelEdgeBorders = usePanelEdgeBorders();
+  const normalizedMask = useMemo(() => {
+    const defaultLeft = panelEdgeBorders ? panelEdgeBorders.left : true;
+    const defaultRight = panelEdgeBorders ? panelEdgeBorders.right : true;
+    return {
+      top: borderMask?.top ?? true,
+      right: borderMask?.right ?? defaultRight,
+      bottom: borderMask?.bottom ?? true,
+      left: borderMask?.left ?? defaultLeft,
+    };
+  }, [borderMask, panelEdgeBorders]);
   const textLeft = bgRight;
   const textRight = bgLeft;
   const gradient = useMemo(

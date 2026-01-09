@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BasicButton, FloatingPanel, Folder, LFOSlider } from 'ui-bits'
+import { BasicButton, FloatingPanel, Folder, FrameLoopProvider, LFOSlider, flexoki } from 'ui-bits'
 import CodeBlock from './components/CodeBlock'
 import DocsBrandCanvas, { type DocsBrandCanvasProps } from './components/DocsBrandCanvas'
 import './App.css'
@@ -18,29 +18,26 @@ const getRouteFromHash = () => {
 function App() {
   const [activeRouteId, setActiveRouteId] = useState(() => getRouteFromHash().id)
   const [brandDivisions, setBrandDivisions] = useState(12)
-  const [brandDitherWidth, setBrandDitherWidth] = useState(0.18)
-  const [brandDitherStrength, setBrandDitherStrength] = useState(0.65)
-  const [brandSeed, setBrandSeed] = useState(0)
-  const [brandLeftColor] = useState('#1C1B1A')
-  const [brandRightColor] = useState('#282726')
+  const [brandTextWidth, setBrandTextWidth] = useState(1.6)
+  const [brandTextSpacing, setBrandTextSpacing] = useState(0.5)
+  const [brandLeftColor] = useState(flexoki.blue['700'])
+  const [brandRightColor] = useState(flexoki.green['100'])
   const activeRoute = useMemo(
     () => ROUTES.find((route) => route.id === activeRouteId) ?? ROUTES[0],
     [activeRouteId],
   )
   const brandCanvasProps = useMemo<DocsBrandCanvasProps>(() => ({
     divisions: brandDivisions,
-    ditherWidth: brandDitherWidth,
-    ditherStrength: brandDitherStrength,
-    seed: brandSeed,
     leftColor: brandLeftColor,
     rightColor: brandRightColor,
+    textWidth: brandTextWidth,
+    textSpacing: brandTextSpacing,
   }), [
     brandDivisions,
-    brandDitherWidth,
-    brandDitherStrength,
-    brandSeed,
     brandLeftColor,
     brandRightColor,
+    brandTextWidth,
+    brandTextSpacing,
   ])
 
   useEffect(() => {
@@ -59,125 +56,111 @@ function App() {
   }
 
   return (
-    <div className="docs-layout">
-      <aside className="docs-sidebar">
-        <div className="docs-brand">
-          <DocsBrandCanvas {...brandCanvasProps} />
-          <div className="docs-brand-content">
-            <span className="docs-brand-text">ui-bits</span>
+    <FrameLoopProvider>
+      <div className="docs-layout">
+        <aside className="docs-sidebar">
+          <div className="docs-brand">
+            <DocsBrandCanvas {...brandCanvasProps} />
           </div>
-        </div>
-        <Folder
-          className="docs-folder"
-          label="Components"
-          colorA="#AF3029"
-          colorB="#FFCABB"
-          borderStyle="none"
+          <Folder
+            className="docs-folder"
+            label="Components"
+            colorA="#AF3029"
+            colorB="#FFCABB"
+            borderStyle="none"
+            transparent
+            fontSize={16}
+          >
+            {ROUTES.map((route) => (
+              <BasicButton
+                key={route.id}
+                className="docs-button"
+                colorA={route.id === 'icon-button' ? '#F6E2A0' : '#FED3AF'}
+                colorB={route.id === 'icon-button' ? '#AD8301' : '#BC5215'}
+                borderStyle="none"
+                fontSize={16}
+                onClick={() => handleNavClick(route.id)}
+              >
+                {route.label}
+              </BasicButton>
+            ))}
+          </Folder>
+        </aside>
+        <main className="docs-main">
+          <h1 className="docs-title">{activeRoute.title}</h1>
+          <CodeBlock code={activeRoute.code} />
+        </main>
+        <FloatingPanel
+          className="docs-panel"
+          title="Shader"
+          collapsible
+          colorA="#F2F0E5"
+          colorB="#282726"
+          borderStyle="a"
+          fontSize={12}
+          width={240}
+          draggable
           transparent
-          fontSize={16}
+          bodyOpacity={0.85}
+          bodyBlur={6}
+          paddingLeft={0}
+          paddingRight={0}
+          defaultPosition={{ x: 280, y: 24 }}
         >
-          {ROUTES.map((route) => (
-            <BasicButton
-              key={route.id}
-              className="docs-button"
-              colorA={route.id === 'icon-button' ? '#F6E2A0' : '#FED3AF'}
-              colorB={route.id === 'icon-button' ? '#AD8301' : '#BC5215'}
-              borderStyle="none"
-              fontSize={16}
-              onClick={() => handleNavClick(route.id)}
-            >
-              {route.label}
-            </BasicButton>
-          ))}
-        </Folder>
-      </aside>
-      <main className="docs-main">
-        <h1 className="docs-title">{activeRoute.title}</h1>
-        <CodeBlock code={activeRoute.code} />
-      </main>
-      <FloatingPanel
-        className="docs-panel"
-        title="Shader"
-        collapsible
-        colorA="#F2F0E5"
-        colorB="#282726"
-        borderStyle="a"
-        fontSize={12}
-        width={240}
-        draggable
-        transparent
-        bodyOpacity={0.85}
-        bodyBlur={6}
-        paddingLeft={0}
-        paddingRight={0}
-        defaultPosition={{ x: 280, y: 24 }}
-      >
         <LFOSlider
           label="Divisions"
           min={2}
           max={40}
           step={1}
-          width="100%"
-          colorA="#F2F0E5"
-          colorB="#282726"
-          border="left"
-          fontSize={12}
-          mode="external"
-          readExternal={() => brandDivisions}
-          onUserChange={(value) => setBrandDivisions(Math.round(value))}
+            width="100%"
+            colorA="#F2F0E5"
+            colorB="#282726"
+            border="left"
+            fontSize={12}
+            mode="auto"
+            showLfoControls
+            readExternal={() => brandDivisions}
+            onUserChange={(value) => setBrandDivisions(Math.round(value))}
           onAnimatedUpdate={(value) => setBrandDivisions(Math.round(value))}
           formatDisplayValue={(value) => `${Math.round(value)}`}
         />
         <LFOSlider
-          label="Dither"
-          min={0}
-          max={0.5}
+          label="Text Size"
+          min={0.4}
+          max={1.6}
           step={0.01}
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
           border="left"
           fontSize={12}
-          mode="external"
-          readExternal={() => brandDitherWidth}
-          onUserChange={setBrandDitherWidth}
-          onAnimatedUpdate={setBrandDitherWidth}
+          mode="auto"
+          showLfoControls
+          readExternal={() => brandTextWidth}
+          onUserChange={setBrandTextWidth}
+          onAnimatedUpdate={setBrandTextWidth}
           formatDisplayValue={(value) => value.toFixed(2)}
         />
         <LFOSlider
-          label="Strength"
+          label="Text Spacing"
           min={0}
-          max={1}
+          max={0.6}
           step={0.01}
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
           border="left"
           fontSize={12}
-          mode="external"
-          readExternal={() => brandDitherStrength}
-          onUserChange={setBrandDitherStrength}
-          onAnimatedUpdate={setBrandDitherStrength}
+          mode="auto"
+          showLfoControls
+          readExternal={() => brandTextSpacing}
+          onUserChange={setBrandTextSpacing}
+          onAnimatedUpdate={setBrandTextSpacing}
           formatDisplayValue={(value) => value.toFixed(2)}
-        />
-        <LFOSlider
-          label="Seed"
-          min={0}
-          max={10}
-          step={0.1}
-          width="100%"
-          colorA="#F2F0E5"
-          colorB="#282726"
-          border="left"
-          fontSize={12}
-          mode="external"
-          readExternal={() => brandSeed}
-          onUserChange={setBrandSeed}
-          onAnimatedUpdate={setBrandSeed}
-          formatDisplayValue={(value) => value.toFixed(1)}
         />
       </FloatingPanel>
-    </div>
+      </div>
+    </FrameLoopProvider>
   )
 }
 

@@ -35,6 +35,8 @@ const BRAND_TEXT = "ui-bits";
 const MAX_BRAND_CHARS = 8;
 const DEFAULT_TEXT_WIDTH = 1.6;
 const SHIFT_INTERVAL_MS = 350;
+const LIFE_INTERVAL_MS = SHIFT_INTERVAL_MS;
+const OFFSCREEN_ROWS = 5;
 
 export default function DocsBrandCanvas({
   leftColor = "#1C1B1A",
@@ -63,8 +65,10 @@ export default function DocsBrandCanvas({
   const gridRef = useRef<{
     size: number;
     data: Uint8Array<ArrayBuffer>;
+    scratch: Uint8Array<ArrayBuffer>;
     texture: GPUTexture;
-    lastShiftMs: number;
+    nextShiftMs: number;
+    nextLifeMs: number;
   } | null>(null);
   const atlasRef = useRef<{
     texture: GPUTexture;
@@ -249,7 +253,11 @@ fn glyphIndex(i: u32) -> f32 {
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
   let div = max(uniforms.params.x, 1.0);
   let cell = floor(in.uv * div);
-  let cellUv = (cell + vec2<f32>(0.5)) / div;
+  let offscreen = ${OFFSCREEN_ROWS}.0;
+  let cellUv = vec2<f32>(
+    (cell.x + 0.5) / div,
+    (cell.y + 0.5 + offscreen) / (div + offscreen)
+  );
   let cellSample = textureSample(gridAtlas, brandSampler, cellUv);
   let cellOn = step(0.5, cellSample.r);
   let cellActive = cellOn > 0.5;
@@ -314,8 +322,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
       const ensureGrid = (size: number) => {
         const rounded = Math.max(1, Math.round(size));
         if (gridRef.current && gridRef.current.size === rounded) return;
-        const data = new Uint8Array(rounded * rounded * 4);
-        for (let i = 0; i < rounded * rounded; i += 1) {
+        const totalRows = rounded + OFFSCREEN_ROWS;
+        const totalCells = rounded * totalRows;
+        const data = new Uint8Array(totalCells * 4);
+        for (let i = 0; i < totalCells; i += 1) {
           const on = Math.random() > 0.55;
           const base = i * 4;
           data[base] = on ? 255 : 0;
@@ -323,8 +333,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
           data[base + 2] = 0;
           data[base + 3] = 255;
         }
+        const scratch = new Uint8Array(totalCells * 4);
         const texture = device.createTexture({
-          size: { width: rounded, height: rounded },
+          size: { width: rounded, height: totalRows },
           format: "rgba8unorm",
           usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
         });
@@ -332,48 +343,94 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
           { texture },
           data,
           { bytesPerRow: rounded * 4 },
-          { width: rounded, height: rounded },
+          { width: rounded, height: totalRows },
         );
+        const now = performance.now();
         gridRef.current = {
           size: rounded,
           data,
+          scratch,
           texture,
-          lastShiftMs: performance.now(),
+          nextShiftMs: now + SHIFT_INTERVAL_MS,
+          nextLifeMs: now + SHIFT_INTERVAL_MS / 2,
         };
         bindGroupRef.current = null;
         bindGroupTexturesRef.current = null;
       };
 
-      const shiftGrid = (nowMs: number) => {
-        const grid = gridRef.current;
-        if (!grid) return;
-        const elapsed = nowMs - grid.lastShiftMs;
-        if (elapsed < SHIFT_INTERVAL_MS) return;
-        const steps = Math.floor(elapsed / SHIFT_INTERVAL_MS);
-        grid.lastShiftMs += steps * SHIFT_INTERVAL_MS;
+      const stepFall = (grid: NonNullable<typeof gridRef.current>, probability: number) => {
         const rowBytes = grid.size * 4;
-        const { spawnProbability: probability } = paramsRef.current;
-        for (let step = 0; step < steps; step += 1) {
-          for (let y = grid.size - 1; y > 0; y -= 1) {
-            const dst = y * rowBytes;
-            const src = (y - 1) * rowBytes;
-            grid.data.copyWithin(dst, src, src + rowBytes);
-          }
-          for (let x = 0; x < grid.size; x += 1) {
-            const base = x * 4;
-            const on = Math.random() < probability;
-            grid.data[base] = on ? 255 : 0;
-            grid.data[base + 1] = 0;
-            grid.data[base + 2] = 0;
-            grid.data[base + 3] = 255;
+        const totalRows = grid.size + OFFSCREEN_ROWS;
+        for (let y = totalRows - 1; y > 0; y -= 1) {
+          const dst = y * rowBytes;
+          const src = (y - 1) * rowBytes;
+          grid.data.copyWithin(dst, src, src + rowBytes);
+        }
+        for (let x = 0; x < grid.size; x += 1) {
+          const base = x * 4;
+          const on = Math.random() < probability;
+          grid.data[base] = on ? 255 : 0;
+          grid.data[base + 1] = 0;
+          grid.data[base + 2] = 0;
+          grid.data[base + 3] = 255;
+        }
+      };
+
+      const stepLife = (grid: NonNullable<typeof gridRef.current>) => {
+        const { size, data, scratch } = grid;
+        const totalRows = size + OFFSCREEN_ROWS;
+        for (let y = 0; y < totalRows; y += 1) {
+          for (let x = 0; x < size; x += 1) {
+            let count = 0;
+            for (let dy = -1; dy <= 1; dy += 1) {
+              for (let dx = -1; dx <= 1; dx += 1) {
+                if (dx === 0 && dy === 0) continue;
+                const ny = y + dy;
+                if (ny < 0 || ny >= totalRows) continue;
+                const nx = (x + dx + size) % size;
+                const idx = (ny * size + nx) * 4;
+                if (data[idx] > 0) count += 1;
+              }
+            }
+            const idx = (y * size + x) * 4;
+            const alive = data[idx] > 0;
+            const nextAlive = alive ? (count === 2 || count === 3) : count === 3;
+            scratch[idx] = nextAlive ? 255 : 0;
+            scratch[idx + 1] = 0;
+            scratch[idx + 2] = 0;
+            scratch[idx + 3] = 255;
           }
         }
-        device.queue.writeTexture(
-          { texture: grid.texture },
-          grid.data,
-          { bytesPerRow: grid.size * 4 },
-          { width: grid.size, height: grid.size },
-        );
+        grid.data.set(scratch);
+      };
+
+      const updateGrid = (nowMs: number) => {
+        const grid = gridRef.current;
+        if (!grid) return;
+        const { spawnProbability: probability } = paramsRef.current;
+        let updated = false;
+        let guard = 0;
+        while ((nowMs >= grid.nextShiftMs || nowMs >= grid.nextLifeMs) && guard < 120) {
+          if (grid.nextShiftMs <= grid.nextLifeMs) {
+            if (nowMs < grid.nextShiftMs) break;
+            stepFall(grid, probability);
+            grid.nextShiftMs += SHIFT_INTERVAL_MS;
+          } else {
+            if (nowMs < grid.nextLifeMs) break;
+            stepLife(grid);
+            grid.nextLifeMs += LIFE_INTERVAL_MS;
+          }
+          updated = true;
+          guard += 1;
+        }
+        if (updated) {
+          device.queue.writeTexture(
+            { texture: grid.texture },
+            grid.data,
+            { bytesPerRow: grid.size * 4 },
+            { width: grid.size, height: grid.size + OFFSCREEN_ROWS },
+          );
+        }
       };
 
       const render = (nowMs: number) => {
@@ -398,7 +455,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         const atlas = atlasRef.current;
         if (!atlas) return;
         ensureGrid(div);
-        shiftGrid(nowMs);
+        updateGrid(nowMs);
         const grid = gridRef.current;
         if (!grid) return;
         const bindTextures = bindGroupTexturesRef.current;

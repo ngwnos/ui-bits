@@ -25,17 +25,23 @@ export interface DocsBrandCanvasProps {
   palette?: string[];
   backgroundColor?: string;
   textColor?: string;
+  textBlur?: number;
+  textGain?: number;
   divisions?: number;
   textWidth?: number;
   textSpacing?: number;
   spawnProbability?: number;
   tickMs?: number;
+  colorAttack?: number;
+  colorRelease?: number;
   className?: string;
 }
 
 const BRAND_TEXT = "ui-bits";
 const MAX_BRAND_CHARS = 8;
 const DEFAULT_TEXT_WIDTH = 1.6;
+const DEFAULT_TEXT_BLUR = 0;
+const DEFAULT_TEXT_GAIN = 2;
 const DEFAULT_TICK_MS = 350;
 const OFFSCREEN_ROWS = 5;
 
@@ -43,11 +49,15 @@ export default function DocsBrandCanvas({
   palette = ["#205EA6", "#879A39", "#D0A215", "#DA702C"],
   backgroundColor = "#1C1B1A",
   textColor = "#F2F0E5",
+  textBlur = DEFAULT_TEXT_BLUR,
+  textGain = DEFAULT_TEXT_GAIN,
   divisions = 12,
   textWidth = DEFAULT_TEXT_WIDTH,
   textSpacing = 0.5,
   spawnProbability = 0.35,
   tickMs = DEFAULT_TICK_MS,
+  colorAttack = 6,
+  colorRelease = 10,
   className,
 }: DocsBrandCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -56,20 +66,26 @@ export default function DocsBrandCanvas({
   const uniformBufferRef = useRef<GPUBuffer | null>(null);
   const bindGroupRef = useRef<GPUBindGroup | null>(null);
   const bindGroupTexturesRef = useRef<{ atlas?: GPUTexture; grid?: GPUTexture } | null>(null);
-  const startTimeRef = useRef<number | null>(null);
   const paramsRef = useRef({
     backgroundColor,
     textColor,
+    textBlur,
+    textGain,
     divisions,
     textWidth,
     textSpacing,
     spawnProbability,
     tickMs,
+    colorAttack,
+    colorRelease,
   });
   const paletteRef = useRef<Array<[number, number, number]>>([]);
   const gridRef = useRef<{
     size: number;
     data: Uint8Array<ArrayBuffer>;
+    target: Uint8Array<ArrayBuffer>;
+    current: Float32Array;
+    lastUpdateMs: number;
     scratch: Uint8Array<ArrayBuffer>;
     texture: GPUTexture;
     nextShiftMs: number;
@@ -167,13 +183,29 @@ export default function DocsBrandCanvas({
     paramsRef.current = {
       backgroundColor,
       textColor,
+      textBlur,
+      textGain,
       divisions,
       textWidth,
       textSpacing,
       spawnProbability,
       tickMs,
+      colorAttack,
+      colorRelease,
     };
-  }, [backgroundColor, textColor, divisions, textWidth, textSpacing, spawnProbability, tickMs]);
+  }, [
+    backgroundColor,
+    textColor,
+    textBlur,
+    textGain,
+    divisions,
+    textWidth,
+    textSpacing,
+    spawnProbability,
+    tickMs,
+    colorAttack,
+    colorRelease,
+  ]);
 
   useEffect(() => {
     const fallback: [number, number, number] = [255, 255, 255];
@@ -186,10 +218,6 @@ export default function DocsBrandCanvas({
   useEffect(() => {
     let disposed = false;
     let rafId = 0;
-    if (startTimeRef.current == null) {
-      startTimeRef.current = performance.now();
-    }
-
     const run = async () => {
       const root = await getSharedRoot();
       if (!root || disposed) return;
@@ -223,6 +251,7 @@ struct Uniforms {
   textColor : vec4<f32>,
   params : vec4<f32>,
   textParams : vec4<f32>,
+  screenParams : vec4<f32>,
   indices0 : vec4<f32>,
   indices1 : vec4<f32>,
 };
@@ -231,6 +260,7 @@ struct Uniforms {
 @group(0) @binding(1) var brandSampler : sampler;
 @group(0) @binding(2) var brandAtlas : texture_2d<f32>;
 @group(0) @binding(3) var gridAtlas : texture_2d<f32>;
+@group(0) @binding(4) var gridSampler : sampler;
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
@@ -261,6 +291,19 @@ fn glyphIndex(i: u32) -> f32 {
     return uniforms.indices0[i];
   }
   return uniforms.indices1[i - 4u];
+}
+
+fn sampleGrid(uv: vec2<f32>) -> vec3<f32> {
+  let div = max(uniforms.params.x, 1.0);
+  let offscreen = ${OFFSCREEN_ROWS}.0;
+  let clampedUv = clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0));
+  let gridUv = vec2<f32>(
+    clampedUv.x,
+    (clampedUv.y * div + offscreen) / (div + offscreen)
+  );
+  let sample = textureSample(gridAtlas, gridSampler, gridUv);
+  let cellOn = step(0.5, sample.a);
+  return uniforms.backgroundColor.xyz * (1.0 - cellOn) + sample.rgb * cellOn;
 }
 
 @fragment
@@ -310,7 +353,23 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let localMask = step(0.2, sample.a) * inside * insideGlyph * glyphActive;
     glyphMask = max(glyphMask, localMask);
   }
-  let finalColor = baseColor * (1.0 - glyphMask) + uniforms.textColor.xyz * glyphMask;
+  let blurPx = max(uniforms.screenParams.z, 0.0);
+  let screenSize = max(uniforms.screenParams.xy, vec2<f32>(1.0));
+  let blurUv = vec2<f32>(blurPx) / screenSize;
+  let blurredColor =
+    (sampleGrid(in.uv + blurUv * vec2<f32>(-1.0, -1.0))
+      + sampleGrid(in.uv + blurUv * vec2<f32>(0.0, -1.0)) * 2.0
+      + sampleGrid(in.uv + blurUv * vec2<f32>(1.0, -1.0))
+      + sampleGrid(in.uv + blurUv * vec2<f32>(-1.0, 0.0)) * 2.0
+      + sampleGrid(in.uv) * 4.0
+      + sampleGrid(in.uv + blurUv * vec2<f32>(1.0, 0.0)) * 2.0
+      + sampleGrid(in.uv + blurUv * vec2<f32>(-1.0, 1.0))
+      + sampleGrid(in.uv + blurUv * vec2<f32>(0.0, 1.0)) * 2.0
+      + sampleGrid(in.uv + blurUv * vec2<f32>(1.0, 1.0))
+    ) / 16.0;
+  let textGain = clamp(uniforms.params.y, 0.0, 10.0);
+  let boostedColor = clamp(blurredColor * textGain, vec3<f32>(0.0), vec3<f32>(1.0));
+  let finalColor = baseColor * (1.0 - glyphMask) + boostedColor * glyphMask;
   return vec4<f32>(finalColor, 1.0);
 }
 `,
@@ -326,7 +385,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
       if (!uniformBufferRef.current) {
         uniformBufferRef.current = device.createBuffer({
-          size: Float32Array.BYTES_PER_ELEMENT * 24,
+          size: Float32Array.BYTES_PER_ELEMENT * 28,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
       }
@@ -337,6 +396,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         const totalRows = rounded + OFFSCREEN_ROWS;
         const totalCells = rounded * totalRows;
         const data = new Uint8Array(totalCells * 4);
+        const target = new Uint8Array(totalCells * 4);
+        const current = new Float32Array(totalCells * 4);
         const probability = paramsRef.current.spawnProbability;
         const paletteColors = paletteRef.current.length ? paletteRef.current : [[255, 255, 255]];
         for (let i = 0; i < totalCells; i += 1) {
@@ -354,6 +415,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             data[base + 2] = 0;
             data[base + 3] = 0;
           }
+          target[base] = data[base];
+          target[base + 1] = data[base + 1];
+          target[base + 2] = data[base + 2];
+          target[base + 3] = data[base + 3];
+          current[base] = data[base];
+          current[base + 1] = data[base + 1];
+          current[base + 2] = data[base + 2];
+          current[base + 3] = data[base + 3];
         }
         const scratch = new Uint8Array(totalCells * 4);
         const texture = device.createTexture({
@@ -372,6 +441,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         gridRef.current = {
           size: rounded,
           data,
+          target,
+          current,
+          lastUpdateMs: now,
           scratch,
           texture,
           nextShiftMs: now + tick,
@@ -386,7 +458,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         for (let y = totalRows - 1; y > 0; y -= 1) {
           const dst = y * rowBytes;
           const src = (y - 1) * rowBytes;
-          grid.data.copyWithin(dst, src, src + rowBytes);
+          grid.target.copyWithin(dst, src, src + rowBytes);
         }
         const paletteColors = paletteRef.current.length ? paletteRef.current : [[255, 255, 255]];
         for (let x = 0; x < grid.size; x += 1) {
@@ -394,21 +466,21 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
           const on = Math.random() < probability;
           if (on) {
             const color = paletteColors[Math.floor(Math.random() * paletteColors.length)];
-            grid.data[base] = color[0];
-            grid.data[base + 1] = color[1];
-            grid.data[base + 2] = color[2];
-            grid.data[base + 3] = 255;
+            grid.target[base] = color[0];
+            grid.target[base + 1] = color[1];
+            grid.target[base + 2] = color[2];
+            grid.target[base + 3] = 255;
           } else {
-            grid.data[base] = 0;
-            grid.data[base + 1] = 0;
-            grid.data[base + 2] = 0;
-            grid.data[base + 3] = 0;
+            grid.target[base] = 0;
+            grid.target[base + 1] = 0;
+            grid.target[base + 2] = 0;
+            grid.target[base + 3] = 0;
           }
         }
       };
 
       const stepLife = (grid: NonNullable<typeof gridRef.current>) => {
-        const { size, data, scratch } = grid;
+        const { size, target, scratch } = grid;
         const totalRows = size + OFFSCREEN_ROWS;
         for (let y = 0; y < totalRows; y += 1) {
           for (let x = 0; x < size; x += 1) {
@@ -420,17 +492,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 if (ny < 0 || ny >= totalRows) continue;
                 const nx = (x + dx + size) % size;
                 const idx = (ny * size + nx) * 4;
-                if (data[idx + 3] > 0) count += 1;
+                if (target[idx + 3] > 0) count += 1;
               }
             }
             const idx = (y * size + x) * 4;
-            const alive = data[idx + 3] > 0;
+            const alive = target[idx + 3] > 0;
             const survives = alive && (count === 2 || count === 3);
             const born = !alive && count === 3;
             if (survives) {
-              scratch[idx] = data[idx];
-              scratch[idx + 1] = data[idx + 1];
-              scratch[idx + 2] = data[idx + 2];
+              scratch[idx] = target[idx];
+              scratch[idx + 1] = target[idx + 1];
+              scratch[idx + 2] = target[idx + 2];
               scratch[idx + 3] = 255;
             } else if (born) {
               let sumR = 0;
@@ -443,10 +515,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                   if (ny < 0 || ny >= totalRows) continue;
                   const nx = (x + dx + size) % size;
                   const nidx = (ny * size + nx) * 4;
-                  if (data[nidx + 3] > 0) {
-                    sumR += data[nidx];
-                    sumG += data[nidx + 1];
-                    sumB += data[nidx + 2];
+                  if (target[nidx + 3] > 0) {
+                    sumR += target[nidx];
+                    sumG += target[nidx + 1];
+                    sumB += target[nidx + 2];
                   }
                 }
               }
@@ -463,7 +535,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             }
           }
         }
-        grid.data.set(scratch);
+        grid.target.set(scratch);
       };
 
       const updateGrid = (nowMs: number) => {
@@ -480,14 +552,38 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
           updated = true;
           guard += 1;
         }
-        if (updated) {
-          device.queue.writeTexture(
-            { texture: grid.texture },
-            grid.data,
-            { bytesPerRow: grid.size * 4 },
-            { width: grid.size, height: grid.size + OFFSCREEN_ROWS },
-          );
+        return updated;
+      };
+
+      const updateCurrentColors = (nowMs: number) => {
+        const grid = gridRef.current;
+        if (!grid) return;
+        const { colorAttack, colorRelease } = paramsRef.current;
+        const dtMs = Math.max(0, nowMs - grid.lastUpdateMs);
+        grid.lastUpdateMs = nowMs;
+        const attackAlpha = Math.min(1, (colorAttack * dtMs) / 1000);
+        const releaseAlpha = Math.min(1, (colorRelease * dtMs) / 1000);
+        const totalCells = grid.size * (grid.size + OFFSCREEN_ROWS);
+        for (let i = 0; i < totalCells; i += 1) {
+          const base = i * 4;
+          for (let c = 0; c < 4; c += 1) {
+            const current = grid.current[base + c];
+            const target = grid.target[base + c];
+            if (current === target) continue;
+            const alpha = target > current ? attackAlpha : releaseAlpha;
+            grid.current[base + c] = current + (target - current) * alpha;
+          }
+          grid.data[base] = Math.round(grid.current[base]);
+          grid.data[base + 1] = Math.round(grid.current[base + 1]);
+          grid.data[base + 2] = Math.round(grid.current[base + 2]);
+          grid.data[base + 3] = Math.round(grid.current[base + 3]);
         }
+        device.queue.writeTexture(
+          { texture: grid.texture },
+          grid.data,
+          { bytesPerRow: grid.size * 4 },
+          { width: grid.size, height: grid.size + OFFSCREEN_ROWS },
+        );
       };
 
       const render = (nowMs: number) => {
@@ -505,18 +601,30 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         const encoder = device.createCommandEncoder();
-        const { backgroundColor: bgColor, textColor: fgColor, divisions: div, textWidth: textScale, textSpacing: spacing } = paramsRef.current;
+        const {
+          backgroundColor: bgColor,
+          textColor: fgColor,
+          textBlur,
+          textGain,
+          divisions: div,
+          textWidth: textScale,
+          textSpacing: spacing,
+        } = paramsRef.current;
         const background = parseHexColor(bgColor);
         const text = parseHexColor(fgColor);
-        const time = (nowMs - (startTimeRef.current ?? nowMs)) / 1000;
         const atlas = atlasRef.current;
         if (!atlas) return;
         ensureGrid(div);
         updateGrid(nowMs);
+        updateCurrentColors(nowMs);
         const grid = gridRef.current;
         if (!grid) return;
         const bindTextures = bindGroupTexturesRef.current;
         if (!bindGroupRef.current || !bindTextures || bindTextures.atlas !== atlas.texture || bindTextures.grid !== grid.texture) {
+          const gridSampler = device.createSampler({
+            magFilter: "linear",
+            minFilter: "linear",
+          });
           bindGroupRef.current = device.createBindGroup({
             layout: pipelineRef.current!.getBindGroupLayout(0),
             entries: [
@@ -536,6 +644,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 binding: 3,
                 resource: grid.texture.createView(),
               },
+              {
+                binding: 4,
+                resource: gridSampler,
+              },
             ],
           });
           bindGroupTexturesRef.current = { atlas: atlas.texture, grid: grid.texture };
@@ -545,8 +657,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         const params = new Float32Array([
           background[0], background[1], background[2], 1,
           text[0], text[1], text[2], 1,
-          Math.max(1, div), time, atlas.charCount, spacing,
+          Math.max(1, div), textGain, atlas.charCount, spacing,
           textScale, atlas.glyphAspect, atlas.cols, atlas.rows,
+          width, height, textBlur, 0,
           indices[0], indices[1], indices[2], indices[3],
           indices[4], indices[5], indices[6], indices[7],
         ]);

@@ -9,6 +9,7 @@ export interface FloatingPanelProps extends Omit<React.HTMLAttributes<HTMLDivEle
   header?: React.ReactNode;
   title?: React.ReactNode;
   collapsible?: boolean;
+  showDockButton?: boolean;
   colorA?: string;
   colorB?: string;
   borderStyle?: FloatingPanelBorderStyle;
@@ -83,6 +84,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     header,
     title,
     collapsible = false,
+    showDockButton = false,
     colorA = FALLBACK_COLOR_A,
     colorB = FALLBACK_COLOR_B,
     borderStyle = "a",
@@ -255,54 +257,98 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     }
     onCollapseChange?.(next);
   };
+  const showDock = Boolean(showDockButton && draggable);
+  const handleDock = React.useCallback(() => {
+    const panelNode = panelRef.current;
+    if (!panelNode || typeof window === "undefined") return;
+    const rect = panelNode.getBoundingClientRect();
+    const margin = 6;
+    const dockX = Math.max(0, window.innerWidth - rect.width - margin);
+    const maxY = Math.max(0, window.innerHeight - rect.height - margin);
+    const dockY = Math.max(0, Math.min(margin, maxY));
+    const nextPosition = { x: dockX, y: dockY };
+    if (position && onPositionChange) {
+      onPositionChange(nextPosition);
+    } else {
+      setDragPosition(nextPosition);
+    }
+  }, [onPositionChange, position]);
   const resolvedHeader = header ?? (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      {collapsible && (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: showDock ? "space-between" : "flex-start", width: "100%" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {collapsible && (
+          <IconButton
+            behavior="cycle"
+            value={toggleValue}
+            options={toggleOptions}
+            onChange={(value) => handleToggle(value)}
+            borderStyle="none"
+            fontSize={resolvedFontSize}
+            colorA={colorA}
+            colorB={colorB}
+            aria-label={toggleOptions[resolvedCollapsed ? 0 : 1]?.ariaLabel}
+            title={toggleOptions[resolvedCollapsed ? 0 : 1]?.title}
+          >
+            {resolvedCollapsed ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="100%"
+                height="100%"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="100%"
+                height="100%"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12h14" />
+              </svg>
+            )}
+          </IconButton>
+        )}
+        {title ? <span>{title}</span> : null}
+      </div>
+      {showDock ? (
         <IconButton
-          behavior="cycle"
-          value={toggleValue}
-          options={toggleOptions}
-          onChange={(value) => handleToggle(value)}
           borderStyle="none"
           fontSize={resolvedFontSize}
           colorA={colorA}
           colorB={colorB}
-          aria-label={toggleOptions[resolvedCollapsed ? 0 : 1]?.ariaLabel}
-          title={toggleOptions[resolvedCollapsed ? 0 : 1]?.title}
+          aria-label="Dock panel"
+          title="Dock panel"
+          onClick={handleDock}
         >
-          {resolvedCollapsed ? (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="100%"
-              height="100%"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="100%"
-              height="100%"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M5 12h14" />
-            </svg>
-          )}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="100%"
+            height="100%"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M7 7h10v10" />
+            <path d="M7 17 17 7" />
+          </svg>
         </IconButton>
-      )}
-      {title ? <span>{title}</span> : null}
+      ) : null}
     </div>
   );
 

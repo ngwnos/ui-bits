@@ -17,15 +17,19 @@ const getRouteFromHash = () => {
 
 function App() {
   const [activeRouteId, setActiveRouteId] = useState(() => getRouteFromHash().id)
-  const [brandDivisions, setBrandDivisions] = useState(12)
+  const [brandDivisions, setBrandDivisions] = useState(25)
   const [brandTextWidth, setBrandTextWidth] = useState(1.6)
   const [brandTextSpacing, setBrandTextSpacing] = useState(0.5)
+  const [brandTextGain, setBrandTextGain] = useState(2)
+  const [brandTextBlur, setBrandTextBlur] = useState(0)
   const [brandSpawnProbability, setBrandSpawnProbability] = useState(0.35)
-  const [brandTickMs, setBrandTickMs] = useState(350)
+  const [brandTickMs, setBrandTickMs] = useState(200)
+  const [brandColorAttack, setBrandColorAttack] = useState(10)
+  const [brandColorRelease, setBrandColorRelease] = useState(2)
   const brandPalette = useMemo(
     () => [
-      flexoki.blue['600'],
-      flexoki.purple['600'],
+      flexoki.red['600'],
+      flexoki.yellow['600'],
     ],
     [],
   )
@@ -40,19 +44,27 @@ function App() {
     palette: brandPalette,
     backgroundColor: brandBackground,
     textColor: brandTextColor,
+    textBlur: brandTextBlur,
+    textGain: brandTextGain,
     textWidth: brandTextWidth,
     textSpacing: brandTextSpacing,
     spawnProbability: brandSpawnProbability,
     tickMs: brandTickMs,
+    colorAttack: brandColorAttack,
+    colorRelease: brandColorRelease,
   }), [
     brandDivisions,
     brandPalette,
     brandBackground,
     brandTextColor,
+    brandTextBlur,
+    brandTextGain,
     brandTextWidth,
     brandTextSpacing,
     brandSpawnProbability,
     brandTickMs,
+    brandColorAttack,
+    brandColorRelease,
   ])
 
   useEffect(() => {
@@ -109,6 +121,7 @@ function App() {
           className="docs-panel"
           title="Shader"
           collapsible
+          showDockButton
           colorA="#F2F0E5"
           colorB="#282726"
           borderStyle="a"
@@ -174,6 +187,40 @@ function App() {
           formatDisplayValue={(value) => value.toFixed(2)}
         />
         <LFOSlider
+          label="Text Blur"
+          min={0}
+          max={20}
+          step={0.5}
+          width="100%"
+          colorA="#F2F0E5"
+          colorB="#282726"
+          border="left"
+          fontSize={12}
+          mode="auto"
+          showLfoControls
+          readExternal={() => brandTextBlur}
+          onUserChange={setBrandTextBlur}
+          onAnimatedUpdate={setBrandTextBlur}
+          formatDisplayValue={(value) => value.toFixed(1)}
+        />
+        <LFOSlider
+          label="Text Gain"
+          min={0.5}
+          max={10}
+          step={0.1}
+          width="100%"
+          colorA="#F2F0E5"
+          colorB="#282726"
+          border="left"
+          fontSize={12}
+          mode="auto"
+          showLfoControls
+          readExternal={() => brandTextGain}
+          onUserChange={setBrandTextGain}
+          onAnimatedUpdate={setBrandTextGain}
+          formatDisplayValue={(value) => value.toFixed(1)}
+        />
+        <LFOSlider
           label="Spawn Chance"
           min={0}
           max={1}
@@ -206,6 +253,40 @@ function App() {
           onUserChange={setBrandTickMs}
           onAnimatedUpdate={setBrandTickMs}
           formatDisplayValue={(value) => `${Math.round(value)}`}
+        />
+        <LFOSlider
+          label="Color Attack"
+          min={0.5}
+          max={20}
+          step={0.1}
+          width="100%"
+          colorA="#F2F0E5"
+          colorB="#282726"
+          border="left"
+          fontSize={12}
+          mode="auto"
+          showLfoControls
+          readExternal={() => brandColorAttack}
+          onUserChange={setBrandColorAttack}
+          onAnimatedUpdate={setBrandColorAttack}
+          formatDisplayValue={(value) => value.toFixed(1)}
+        />
+        <LFOSlider
+          label="Color Release"
+          min={0.5}
+          max={20}
+          step={0.1}
+          width="100%"
+          colorA="#F2F0E5"
+          colorB="#282726"
+          border="left"
+          fontSize={12}
+          mode="auto"
+          showLfoControls
+          readExternal={() => brandColorRelease}
+          onUserChange={setBrandColorRelease}
+          onAnimatedUpdate={setBrandColorRelease}
+          formatDisplayValue={(value) => value.toFixed(1)}
         />
       </FloatingPanel>
       </div>

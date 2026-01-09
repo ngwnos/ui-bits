@@ -570,6 +570,7 @@ function EditableRectPOC() {
   const [floatingPanelOpacity, setFloatingPanelOpacity] = React.useState<number>(0.5);
   const [floatingPanelBlur, setFloatingPanelBlur] = React.useState<number>(20);
   const [floatingPanelGap, setFloatingPanelGap] = React.useState<number>(8);
+  const [floatingPanelBrightness, setFloatingPanelBrightness] = React.useState<number>(75);
   const [floatingPanelCollapsed, setFloatingPanelCollapsed] = React.useState(false);
   const [floatingPanelPosition, setFloatingPanelPosition] = React.useState<{ x: number; y: number } | null>(() => ({
     x: 48,
@@ -1824,6 +1825,25 @@ function EditableRectPOC() {
                   />
                 </div>
               </Folder>
+            </div>
+            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+              <LFOSlider
+                label="Brightness"
+                min={0}
+                max={100}
+                step={1}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelBrightness}
+                onUserChange={setFloatingPanelBrightness}
+                onAnimatedUpdate={setFloatingPanelBrightness}
+                formatDisplayValue={(value) => `${Math.round(value)}`}
+                valueSuffix="%"
+              />
             </div>
           </FloatingPanel>
         </div>

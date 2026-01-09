@@ -258,7 +258,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       {renderBody && (
         <div
           style={{
-            padding: `${verticalGapValue} ${resolvedPaddingValue}`,
+            padding: `${verticalGapValue} ${resolvedPaddingValue} 0`,
             display: collapsed ? "none" : "flex",
             flexDirection: "column",
             gap: resolvedVerticalGap,

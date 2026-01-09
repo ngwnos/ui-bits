@@ -27,12 +27,14 @@ export interface DocsBrandCanvasProps {
   divisions?: number;
   textWidth?: number;
   textSpacing?: number;
+  spawnProbability?: number;
   className?: string;
 }
 
 const BRAND_TEXT = "ui-bits";
 const MAX_BRAND_CHARS = 8;
 const DEFAULT_TEXT_WIDTH = 1.6;
+const SHIFT_INTERVAL_MS = 350;
 
 export default function DocsBrandCanvas({
   leftColor = "#1C1B1A",
@@ -40,6 +42,7 @@ export default function DocsBrandCanvas({
   divisions = 12,
   textWidth = DEFAULT_TEXT_WIDTH,
   textSpacing = 0.5,
+  spawnProbability = 0.35,
   className,
 }: DocsBrandCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -47,6 +50,7 @@ export default function DocsBrandCanvas({
   const pipelineRef = useRef<GPURenderPipeline | null>(null);
   const uniformBufferRef = useRef<GPUBuffer | null>(null);
   const bindGroupRef = useRef<GPUBindGroup | null>(null);
+  const bindGroupTexturesRef = useRef<{ atlas?: GPUTexture; grid?: GPUTexture } | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const paramsRef = useRef({
     leftColor,
@@ -54,7 +58,14 @@ export default function DocsBrandCanvas({
     divisions,
     textWidth,
     textSpacing,
+    spawnProbability,
   });
+  const gridRef = useRef<{
+    size: number;
+    data: Uint8Array<ArrayBuffer>;
+    texture: GPUTexture;
+    lastShiftMs: number;
+  } | null>(null);
   const atlasRef = useRef<{
     texture: GPUTexture;
     sampler: GPUSampler;
@@ -146,8 +157,9 @@ export default function DocsBrandCanvas({
       divisions,
       textWidth,
       textSpacing,
+      spawnProbability,
     };
-  }, [leftColor, rightColor, divisions, textWidth, textSpacing]);
+  }, [leftColor, rightColor, divisions, textWidth, textSpacing, spawnProbability]);
 
   useEffect(() => {
     let disposed = false;
@@ -196,6 +208,7 @@ struct Uniforms {
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 @group(0) @binding(1) var brandSampler : sampler;
 @group(0) @binding(2) var brandAtlas : texture_2d<f32>;
+@group(0) @binding(3) var gridAtlas : texture_2d<f32>;
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
@@ -236,22 +249,12 @@ fn glyphIndex(i: u32) -> f32 {
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
   let div = max(uniforms.params.x, 1.0);
   let cell = floor(in.uv * div);
-  let time = uniforms.params.y;
-  var hasPoint = false;
-  for (var i = 0u; i < 24u; i = i + 1u) {
-    let fi = f32(i);
-    let px = hash(vec2<f32>(fi * 13.1, fi * 7.7));
-    let speed = 0.08 + 0.18 * hash(vec2<f32>(fi * 5.3, fi * 11.9));
-    let offset = hash(vec2<f32>(fi * 2.7, fi * 9.2));
-    let py = fract(offset + time * speed);
-    let pointCell = floor(vec2<f32>(px, py) * div);
-    if (all(pointCell == cell)) {
-      hasPoint = true;
-      break;
-    }
-  }
-  let baseColor = select(uniforms.colorRight.xyz, uniforms.colorLeft.xyz, hasPoint);
-  let invertColor = select(uniforms.colorLeft.xyz, uniforms.colorRight.xyz, hasPoint);
+  let cellUv = (cell + vec2<f32>(0.5)) / div;
+  let cellSample = textureSample(gridAtlas, brandSampler, cellUv);
+  let cellOn = step(0.5, cellSample.r);
+  let cellActive = cellOn > 0.5;
+  let baseColor = select(uniforms.colorRight.xyz, uniforms.colorLeft.xyz, cellActive);
+  let invertColor = select(uniforms.colorLeft.xyz, uniforms.colorRight.xyz, cellActive);
 
   let textWidth = uniforms.textParams.x;
   let glyphAspect = uniforms.textParams.y;
@@ -308,25 +311,70 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         });
       }
 
-      if (!bindGroupRef.current && atlasRef.current) {
-        bindGroupRef.current = device.createBindGroup({
-          layout: pipelineRef.current.getBindGroupLayout(0),
-          entries: [
-            {
-              binding: 0,
-              resource: { buffer: uniformBufferRef.current },
-            },
-            {
-              binding: 1,
-              resource: atlasRef.current.sampler,
-            },
-            {
-              binding: 2,
-              resource: atlasRef.current.texture.createView(),
-            },
-          ],
+      const ensureGrid = (size: number) => {
+        const rounded = Math.max(1, Math.round(size));
+        if (gridRef.current && gridRef.current.size === rounded) return;
+        const data = new Uint8Array(rounded * rounded * 4);
+        for (let i = 0; i < rounded * rounded; i += 1) {
+          const on = Math.random() > 0.55;
+          const base = i * 4;
+          data[base] = on ? 255 : 0;
+          data[base + 1] = 0;
+          data[base + 2] = 0;
+          data[base + 3] = 255;
+        }
+        const texture = device.createTexture({
+          size: { width: rounded, height: rounded },
+          format: "rgba8unorm",
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
         });
-      }
+        device.queue.writeTexture(
+          { texture },
+          data,
+          { bytesPerRow: rounded * 4 },
+          { width: rounded, height: rounded },
+        );
+        gridRef.current = {
+          size: rounded,
+          data,
+          texture,
+          lastShiftMs: performance.now(),
+        };
+        bindGroupRef.current = null;
+        bindGroupTexturesRef.current = null;
+      };
+
+      const shiftGrid = (nowMs: number) => {
+        const grid = gridRef.current;
+        if (!grid) return;
+        const elapsed = nowMs - grid.lastShiftMs;
+        if (elapsed < SHIFT_INTERVAL_MS) return;
+        const steps = Math.floor(elapsed / SHIFT_INTERVAL_MS);
+        grid.lastShiftMs += steps * SHIFT_INTERVAL_MS;
+        const rowBytes = grid.size * 4;
+        const { spawnProbability: probability } = paramsRef.current;
+        for (let step = 0; step < steps; step += 1) {
+          for (let y = grid.size - 1; y > 0; y -= 1) {
+            const dst = y * rowBytes;
+            const src = (y - 1) * rowBytes;
+            grid.data.copyWithin(dst, src, src + rowBytes);
+          }
+          for (let x = 0; x < grid.size; x += 1) {
+            const base = x * 4;
+            const on = Math.random() < probability;
+            grid.data[base] = on ? 255 : 0;
+            grid.data[base + 1] = 0;
+            grid.data[base + 2] = 0;
+            grid.data[base + 3] = 255;
+          }
+        }
+        device.queue.writeTexture(
+          { texture: grid.texture },
+          grid.data,
+          { bytesPerRow: grid.size * 4 },
+          { width: grid.size, height: grid.size },
+        );
+      };
 
       const render = (nowMs: number) => {
         if (disposed) return;
@@ -349,6 +397,35 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         const time = (nowMs - (startTimeRef.current ?? nowMs)) / 1000;
         const atlas = atlasRef.current;
         if (!atlas) return;
+        ensureGrid(div);
+        shiftGrid(nowMs);
+        const grid = gridRef.current;
+        if (!grid) return;
+        const bindTextures = bindGroupTexturesRef.current;
+        if (!bindGroupRef.current || !bindTextures || bindTextures.atlas !== atlas.texture || bindTextures.grid !== grid.texture) {
+          bindGroupRef.current = device.createBindGroup({
+            layout: pipelineRef.current!.getBindGroupLayout(0),
+            entries: [
+              {
+                binding: 0,
+                resource: { buffer: uniformBufferRef.current! },
+              },
+              {
+                binding: 1,
+                resource: atlas.sampler,
+              },
+              {
+                binding: 2,
+                resource: atlas.texture.createView(),
+              },
+              {
+                binding: 3,
+                resource: grid.texture.createView(),
+              },
+            ],
+          });
+          bindGroupTexturesRef.current = { atlas: atlas.texture, grid: grid.texture };
+        }
         const indices = [...atlas.indices];
         while (indices.length < MAX_BRAND_CHARS) indices.push(0);
         const params = new Float32Array([

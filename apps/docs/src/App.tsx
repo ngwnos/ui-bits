@@ -20,6 +20,7 @@ function App() {
   const [brandDivisions, setBrandDivisions] = useState(12)
   const [brandTextWidth, setBrandTextWidth] = useState(1.6)
   const [brandTextSpacing, setBrandTextSpacing] = useState(0.5)
+  const [brandSpawnProbability, setBrandSpawnProbability] = useState(0.35)
   const [brandLeftColor] = useState(flexoki.blue['700'])
   const [brandRightColor] = useState(flexoki.green['100'])
   const activeRoute = useMemo(
@@ -32,12 +33,14 @@ function App() {
     rightColor: brandRightColor,
     textWidth: brandTextWidth,
     textSpacing: brandTextSpacing,
+    spawnProbability: brandSpawnProbability,
   }), [
     brandDivisions,
     brandLeftColor,
     brandRightColor,
     brandTextWidth,
     brandTextSpacing,
+    brandSpawnProbability,
   ])
 
   useEffect(() => {
@@ -156,6 +159,23 @@ function App() {
           readExternal={() => brandTextSpacing}
           onUserChange={setBrandTextSpacing}
           onAnimatedUpdate={setBrandTextSpacing}
+          formatDisplayValue={(value) => value.toFixed(2)}
+        />
+        <LFOSlider
+          label="Spawn Chance"
+          min={0}
+          max={1}
+          step={0.01}
+          width="100%"
+          colorA="#F2F0E5"
+          colorB="#282726"
+          border="left"
+          fontSize={12}
+          mode="auto"
+          showLfoControls
+          readExternal={() => brandSpawnProbability}
+          onUserChange={setBrandSpawnProbability}
+          onAnimatedUpdate={setBrandSpawnProbability}
           formatDisplayValue={(value) => value.toFixed(2)}
         />
       </FloatingPanel>

@@ -149,6 +149,8 @@ export interface LFOSliderProps {
   style?: React.CSSProperties;
   formatDisplayValue?: FormatDisplayValueFn;
   parseDisplayValue?: ParseDisplayValueFn;
+  valuePrefix?: string;
+  valueSuffix?: string;
   displayFormatterPreset?: DisplayValueFormatterPreset;
   displayFormatterPresetOptions?: DisplayFormatterPresetOptions;
   audioBins?: readonly number[];
@@ -212,6 +214,8 @@ function SliderCore({
   style,
   formatDisplayValue,
   parseDisplayValue,
+  valuePrefix,
+  valueSuffix,
   displayFormatterPreset,
   displayFormatterPresetOptions,
   audioBins,
@@ -425,8 +429,9 @@ function SliderCore({
   const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const valueWrapRef = useRef<HTMLDivElement | null>(null);
-  charRefs.current.length = text.length + 1;
+  const valueTextRef = useRef<HTMLSpanElement | null>(null);
   const appliedFontSize = fontSize ?? 16;
+  charRefs.current.length = text.length + 1;
 
   // Caret metrics — 70% of bar height
   const [caretH, setCaretH] = useState<number>(0);
@@ -537,6 +542,7 @@ function SliderCore({
       backgroundClip: 'padding-box',
       boxSizing: 'border-box' as const,
       touchAction: 'none' as const,
+      isolation: 'isolate' as const,
     }
     : {
       width: '100%',
@@ -553,6 +559,7 @@ function SliderCore({
       backgroundClip: 'padding-box',
       boxSizing: 'border-box' as const,
       touchAction: 'none' as const,
+      isolation: 'isolate' as const,
     };
   const iconStrokeWidth = 18;
   const infoFontSize = (fontSize ?? 16);
@@ -610,6 +617,35 @@ function SliderCore({
       maxMagnitude: audioMaxMagnitude ?? snapshot.maxMagnitude,
     };
   }, [audioAnalysisStore, audioBinCount, audioBins, audioMaxMagnitude]);
+  const [measuredWidth, setMeasuredWidth] = useState<number>(() => (
+    typeof width === 'number' ? width : Number(width) || 0
+  ));
+
+  useLayoutEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return;
+    const node = containerRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const next = entry.contentRect.width;
+      setMeasuredWidth((prev) => (Math.abs(prev - next) < 0.5 ? prev : next));
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const targetWidthPx = typeof width === 'number' ? width : Number(width) || 0;
+  const effectiveWidthPx = Math.max(measuredWidth || targetWidthPx, 0);
+  const handleLeftRatio = drawerHandleActive ? clamp(handleOffset / Math.max(effectiveWidthPx, 1), 0, 1) : 0;
+  const handleRightRatio = drawerHandleActive
+    ? clamp((handleOffset + handleSize) / Math.max(effectiveWidthPx, 1), 0, 1)
+    : 0;
+  const handleSpanRatio = Math.max(handleRightRatio - handleLeftRatio, 1 / Math.max(effectiveWidthPx, 1, 1000));
+  const handleSplitLocal = drawerHandleActive
+    ? clamp((split - handleLeftRatio) / Math.max(handleSpanRatio, Number.EPSILON), 0, 1)
+    : 0;
+  const handleSplitPct = (handleSplitLocal * 100).toFixed(3);
   const PHASE_MIN = 0;
   const PHASE_MAX = 1;
   const PHASE_STEP = 0.01;
@@ -672,33 +708,6 @@ function SliderCore({
     const hi = Math.max(drawerValueMin, drawerValueMax);
     return clamp(mapped, lo, hi);
   }, [drawerValueMax, drawerValueMin, getAudioAnalysisInput, phaseSliderValue]);
-  const [measuredWidth, setMeasuredWidth] = useState<number>(() => (
-    typeof width === 'number' ? width : Number(width) || 0
-  ));
-
-  useLayoutEffect(() => {
-    if (typeof ResizeObserver === 'undefined') return;
-    const node = containerRef.current;
-    if (!node) return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const next = entry.contentRect.width;
-      setMeasuredWidth((prev) => (Math.abs(prev - next) < 0.5 ? prev : next));
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
-  const targetWidthPx = typeof width === 'number' ? width : Number(width) || 0;
-  const effectiveWidthPx = Math.max(measuredWidth || targetWidthPx, 0);
-  const handleLeftRatio = drawerHandleActive ? clamp(handleOffset / Math.max(effectiveWidthPx, 1), 0, 1) : 0;
-  const handleRightRatio = drawerHandleActive ? clamp((handleOffset + handleSize) / Math.max(effectiveWidthPx, 1), 0, 1) : 0;
-  const handleSpanRatio = Math.max(handleRightRatio - handleLeftRatio, 1 / Math.max(effectiveWidthPx, 1, 1000));
-  const handleSplitLocal = drawerHandleActive
-    ? clamp((split - handleLeftRatio) / Math.max(handleSpanRatio, Number.EPSILON), 0, 1)
-    : 0;
-  const handleSplitPct = (handleSplitLocal * 100).toFixed(3);
   const quantizeRatioToStep = useCallback((ratio: number) => {
     if (!Number.isFinite(step) || step <= 0 || !Number.isFinite(max - min) || max === min) {
       return clamp(ratio, 0, 1);
@@ -836,8 +845,8 @@ function SliderCore({
   const accessibleLabel = (ariaLabel ?? label).trim();
   const hasSelection = allowTextEditing && selStart !== selEnd;
   const caret = selEnd;
-  const setSelection = (a: number, b: number) => {
-    const [s, e] = normalizeSelection(a, b, text.length);
+  const setSelection = (a: number, b: number, maxLen: number = text.length) => {
+    const [s, e] = normalizeSelection(a, b, maxLen);
     setSelStart(s);
     setSelEnd(e);
   };
@@ -1088,6 +1097,11 @@ function SliderCore({
     return left <= right ? { left, right } : { left: right, right: left };
   };
   const clickIsInsideText = (clientX: number) => {
+    const valueNode = valueTextRef.current;
+    if (valueNode) {
+      const r = valueNode.getBoundingClientRect();
+      return clientX >= r.left && clientX <= r.right;
+    }
     const b = getTextXBounds();
     if (!b) return false;
     return clientX >= b.left && clientX <= b.right;
@@ -1246,7 +1260,7 @@ function SliderCore({
 
   const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
     if (!allowTextEditing) return;
-    const insideText = clickIsInsideText(e.clientX) && text.length > 0;
+    const insideText = clickIsInsideText(e.clientX) && textRef.current.length > 0;
     if (!insideText) return;
     e.preventDefault();
     containerRef.current?.focus();
@@ -1265,7 +1279,7 @@ function SliderCore({
       e.stopPropagation();
       return;
     }
-    const rawInsideText = clickIsInsideText(e.clientX) && text.length > 0;
+    const rawInsideText = clickIsInsideText(e.clientX) && textRef.current.length > 0;
     const isTouch = e.pointerType === 'touch';
     const insideText = rawInsideText && !isTouch;
     setHoverInside(insideText);
@@ -1303,9 +1317,14 @@ function SliderCore({
     // begin text edit
     preEditTextRef.current = textRef.current; editingRef.current = true;
     containerRef.current?.focus(); setFocused(true);
-    const idx = xToIndex(e.clientX); dragAnchorRef.current = idx;
+    const maxLen = textRef.current.length;
+    let idx = xToIndex(e.clientX);
+    if (charRefs.current.length !== maxLen + 1) {
+      idx = maxLen;
+    }
+    dragAnchorRef.current = idx;
     setIsDragging(true);
-    setSelection(idx, idx);
+    setSelection(idx, idx, maxLen);
     e.preventDefault();
   };
   const onPointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
@@ -1316,7 +1335,7 @@ function SliderCore({
       updateSplitFromClientX(e.clientX);
       return;
     }
-    const rawInsideText = clickIsInsideText(e.clientX) && text.length > 0;
+    const rawInsideText = clickIsInsideText(e.clientX) && textRef.current.length > 0;
     const isTouch = e.pointerType === 'touch';
     const insideText = rawInsideText && !isTouch;
     setHoverInside(insideText);
@@ -1333,8 +1352,9 @@ function SliderCore({
     e.preventDefault();
     e.stopPropagation();
     const idx = xToIndex(e.clientX);
-    const [s, ee] = normalizeSelection(dragAnchorRef.current, idx, text.length);
-    setSelection(s, ee);
+    const maxLen = textRef.current.length;
+    const [s, ee] = normalizeSelection(dragAnchorRef.current, idx, maxLen);
+    setSelection(s, ee, maxLen);
   };
   const onPointerUp: React.PointerEventHandler<HTMLDivElement> = (e) => {
     if (!allowTextEditing) {
@@ -1365,7 +1385,7 @@ function SliderCore({
   };
   const onPointerEnter: React.PointerEventHandler<HTMLDivElement> = (e) => {
     if (!allowTextEditing) return;
-    const insideText = clickIsInsideText(e.clientX) && text.length > 0;
+    const insideText = clickIsInsideText(e.clientX) && textRef.current.length > 0;
     setHoverInside(insideText);
     setOverHandle(!insideText && isOnHandle(e.clientX));
   };
@@ -1426,6 +1446,8 @@ function SliderCore({
   const hasActiveSelection = allowTextEditing && focused && selectionEnd > selectionStart;
   const highlightColorLeft = hexToRGBA(bgRight, 0.36);
   const highlightColorRight = hexToRGBA(bgLeft, 0.36);
+  const valuePrefixText = valuePrefix ?? '';
+  const valueSuffixText = valueSuffix ?? '';
 
   const stackGap = drawerHandleActive ? '0' : '0.25em';
 
@@ -1540,6 +1562,7 @@ function SliderCore({
             <span
               style={{ color: textLeft, whiteSpace: 'pre', textAlign: 'right', flex: '1 1 auto', display: 'flex', justifyContent: 'flex-end' }}
             >
+              {valuePrefixText ? <span className="inline-block">{valuePrefixText}</span> : null}
               {displayChars.map((ch, i) => (
                 <span
                   key={`left-display-${i}`}
@@ -1549,6 +1572,7 @@ function SliderCore({
                   {ch}
                 </span>
               ))}
+              {valueSuffixText ? <span className="inline-block">{valueSuffixText}</span> : null}
             </span>
           </div>
         </div>
@@ -1563,6 +1587,7 @@ function SliderCore({
             <span
               style={{ color: textRight, whiteSpace: 'pre', textAlign: 'right', flex: '1 1 auto', display: 'flex', justifyContent: 'flex-end' }}
             >
+              {valuePrefixText ? <span className="inline-block">{valuePrefixText}</span> : null}
               {displayChars.map((ch, i) => (
                 <span
                   key={`right-display-${i}`}
@@ -1572,6 +1597,7 @@ function SliderCore({
                   {ch}
                 </span>
               ))}
+              {valueSuffixText ? <span className="inline-block">{valueSuffixText}</span> : null}
             </span>
           </div>
         </div>
@@ -1586,24 +1612,28 @@ function SliderCore({
           {showLabel ? <span style={{ flexShrink: 0, marginRight: '0.5em' }}>{labelText}</span> : null}
           <span
             className="whitespace-pre"
-            style={{ flex: '1 1 auto', display: 'flex', justifyContent: 'flex-end' }}
+            style={{ display: 'inline-flex', justifyContent: 'flex-end', marginLeft: 'auto', alignItems: 'center' }}
           >
-            {activeDrawerValue === null
-              ? (
-                <>
-                  {chars.map((ch, i) => (
-                    <span
-                      key={i}
-                      ref={(el) => { charRefs.current[i] = el; }}
-                      className="inline-block"
-                    >{ch}</span>
-                  ))}
-                  <span ref={(el) => { charRefs.current[chars.length] = el; }} />
-                </>
-              )
-              : (
-                <span className="inline-block">{formattedDrawerValue ?? ''}</span>
-              )}
+            {valuePrefixText ? <span className="inline-block" aria-hidden>{valuePrefixText}</span> : null}
+            <span className="inline-flex whitespace-pre" ref={valueTextRef}>
+              {activeDrawerValue === null
+                ? (
+                  <>
+                    {chars.map((ch, i) => (
+                      <span
+                        key={i}
+                        ref={(el) => { charRefs.current[i] = el; }}
+                        className="inline-block"
+                      >{ch}</span>
+                    ))}
+                    <span ref={(el) => { charRefs.current[chars.length] = el; }} />
+                  </>
+                )
+                : (
+                  <span className="inline-block">{formattedDrawerValue ?? ''}</span>
+                )}
+            </span>
+            {valueSuffixText ? <span className="inline-block" aria-hidden>{valueSuffixText}</span> : null}
           </span>
 
           {/* Absolute overlay caret centered in the bar */}

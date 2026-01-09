@@ -1,5 +1,6 @@
 import React from "react";
 import { AnimationSuspensionProvider } from "../../animationSuspension";
+import { useVerticalGap, VerticalGapContext } from "../../panelGap";
 import IconButton from "../IconButton";
 
 export type FolderBorderStyle = "a" | "b" | "none";
@@ -11,6 +12,7 @@ export interface FolderProps extends React.HTMLAttributes<HTMLDivElement> {
   borderStyle?: FolderBorderStyle;
   fontSize?: number;
   padding?: number | string;
+  verticalGap?: number;
   collapsed?: boolean;
   defaultCollapsed?: boolean;
   keepMounted?: boolean;
@@ -42,6 +44,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
     borderStyle = "a",
     fontSize = 12,
     padding = 0,
+    verticalGap,
     collapsed,
     defaultCollapsed = false,
     keepMounted = true,
@@ -66,8 +69,9 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const headerHeight = computeHeaderHeight(fontSize);
   const headerBorderWidth = 1;
   const headerOuterHeight = headerHeight + headerBorderWidth;
-  const bodyGap = Math.max(6, Math.round(fontSize * 0.4));
-  const bodyPaddingY = `${bodyGap}px`;
+  const resolvedVerticalGap = useVerticalGap(verticalGap);
+  const bodyGap = resolvedVerticalGap;
+  const bodyPaddingY = `${resolvedVerticalGap}px`;
   const renderBody = !isCollapsed || keepMounted;
   const suspendChildren = Boolean(suspended || (keepMounted && isCollapsed));
   const toggleValue = isCollapsed ? "collapsed" : "expanded";
@@ -115,6 +119,8 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
           gridTemplateColumns: `${headerHeight}px 1fr ${headerHeight}px`,
           alignItems: "center",
           padding: `0 ${resolvedPadding}`,
+          borderLeft: `1px solid ${resolvedBorderColor}`,
+          borderRight: `1px solid ${resolvedBorderColor}`,
           borderBottom: `1px solid ${resolvedBorderColor}`,
           background: headerBackground,
           color: headerTextColor,
@@ -190,9 +196,11 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
           }}
           aria-hidden={isCollapsed}
         >
-          <AnimationSuspensionProvider suspended={suspendChildren}>
-            {children}
-          </AnimationSuspensionProvider>
+          <VerticalGapContext.Provider value={resolvedVerticalGap}>
+            <AnimationSuspensionProvider suspended={suspendChildren}>
+              {children}
+            </AnimationSuspensionProvider>
+          </VerticalGapContext.Provider>
         </div>
       )}
     </div>

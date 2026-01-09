@@ -569,8 +569,12 @@ function EditableRectPOC() {
   const [floatingPanelValue, setFloatingPanelValue] = React.useState<number>(42);
   const [floatingPanelOpacity, setFloatingPanelOpacity] = React.useState<number>(0.5);
   const [floatingPanelBlur, setFloatingPanelBlur] = React.useState<number>(20);
+  const [floatingPanelGap, setFloatingPanelGap] = React.useState<number>(8);
   const [floatingPanelCollapsed, setFloatingPanelCollapsed] = React.useState(false);
-  const [floatingPanelPosition, setFloatingPanelPosition] = React.useState<{ x: number; y: number } | null>(null);
+  const [floatingPanelPosition, setFloatingPanelPosition] = React.useState<{ x: number; y: number } | null>(() => ({
+    x: 48,
+    y: 120,
+  }));
   const floatingPanelRef = React.useRef<HTMLDivElement | null>(null);
   const CONTROL_FONT_SIZE = 12;
   const columnGap = 5;
@@ -1173,137 +1177,101 @@ function EditableRectPOC() {
             </div>
           </Tabs.Content>
           <Tabs.Content value="floating-panel" style={tabBodyStyle}>
-            <FloatingPanel
-              ref={floatingPanelRef}
-              width={360}
-              fontSize={CONTROL_FONT_SIZE}
-              colorA={floatingPanelColorA}
-              colorB={floatingPanelColorB}
-              borderStyle="a"
-              header={(
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <IconButton
-                      behavior="cycle"
-                      value={floatingPanelCollapseValue}
-                      options={floatingPanelCollapseOptions}
-                      onChange={(nextValue) => setFloatingPanelCollapsed(nextValue === "collapsed")}
-                      borderStyle="none"
-                      fontSize={CONTROL_FONT_SIZE}
-                      colorA={floatingPanelColorA}
-                      colorB={floatingPanelColorB}
-                      aria-label="Toggle panel collapse"
-                      title="Toggle panel collapse"
-                    />
-                    <span>Floating Panel</span>
-                  </div>
-                  <IconButton
-                    borderStyle="none"
-                    fontSize={CONTROL_FONT_SIZE}
-                    colorA={floatingPanelColorA}
-                    colorB={floatingPanelColorB}
-                    aria-label="Dock panel"
-                    title="Dock panel"
-                    onClick={handleDockFloatingPanel}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="100%"
-                      height="100%"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M7 7h10v10" />
-                      <path d="M7 17 17 7" />
-                    </svg>
-                  </IconButton>
-                </div>
-              )}
-              transparent
-              draggable
-              bodyOpacity={floatingPanelOpacity}
-              bodyBlur={floatingPanelBlur}
-              collapsed={floatingPanelCollapsed}
-              position={floatingPanelPosition ?? undefined}
-              onPositionChange={setFloatingPanelPosition}
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                minHeight: 520,
+                padding: 24,
+                borderRadius: 20,
+                background: 'linear-gradient(135deg, #f6efe4 0%, #eadfce 55%, #f7f0e6 100%)',
+                overflow: 'hidden',
+              }}
             >
-              <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
-                <AudioControls
-                  fontSize={CONTROL_FONT_SIZE}
-                  colorA={floatingPanelColorA}
-                  colorB={floatingPanelColorB}
-                  borderStyle="a"
-                  audioSrc="/audio/credits.mp3"
-                />
-              </div>
-              <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
-                <LFOSlider
-                  label="Opacity"
-                  min={0.1}
-                  max={1}
-                  step={0.05}
-                  width="100%"
-                  colorA={floatingPanelColorA}
-                  colorB={floatingPanelColorB}
-                  border="left"
-                  fontSize={CONTROL_FONT_SIZE}
-                  mode="external"
-                  readExternal={() => floatingPanelOpacity}
-                  onUserChange={setFloatingPanelOpacity}
-                  onAnimatedUpdate={setFloatingPanelOpacity}
-                  formatDisplayValue={(value) => value.toFixed(2)}
-                />
-              </div>
-              <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
-                <LFOSlider
-                  label="Blur"
-                  min={0}
-                  max={40}
-                  step={1}
-                  width="100%"
-                  colorA={floatingPanelColorA}
-                  colorB={floatingPanelColorB}
-                  border="left"
-                  fontSize={CONTROL_FONT_SIZE}
-                  mode="external"
-                  readExternal={() => floatingPanelBlur}
-                  onUserChange={setFloatingPanelBlur}
-                  onAnimatedUpdate={setFloatingPanelBlur}
-                  formatDisplayValue={(value) => `${Math.round(value)} px`}
-                />
-              </div>
-              <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
-                <Folder
-                  label="Level"
-                  colorA={floatingPanelLevelColorA}
-                  colorB={floatingPanelLevelColorB}
-                  fontSize={CONTROL_FONT_SIZE}
-                  padding={floatingPanelPadding}
+              <div
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  padding: 24,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 16,
+                  pointerEvents: 'none',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                    gap: 16,
+                  }}
                 >
-                  <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
-                    <LFOSlider
-                      label="Level"
-                      min={0}
-                      max={100}
-                      step={1}
-                      width="100%"
-                      colorA={floatingPanelLevelColorA}
-                      colorB={floatingPanelLevelColorB}
-                      border="left"
-                      fontSize={CONTROL_FONT_SIZE}
-                      showLfoControls
-                      readExternal={() => floatingPanelValue}
-                      onUserChange={setFloatingPanelValue}
-                      onAnimatedUpdate={setFloatingPanelValue}
-                    />
-                  </div>
-                </Folder>
+                  {[
+                    { label: 'Signal', value: '-12.4 dB', note: 'Peak 0.8s ago' },
+                    { label: 'Noise', value: '-38.9 dB', note: 'Floor stable' },
+                    { label: 'Dynamics', value: '7.2 LU', note: 'Auto gain' },
+                    { label: 'CPU', value: '18%', note: 'Realtime' },
+                  ].map((card) => (
+                    <div
+                      key={card.label}
+                      style={{
+                        background: '#f9f5ef',
+                        border: '1px solid #d8cdbc',
+                        borderRadius: 14,
+                        padding: 14,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                        boxShadow: '0 6px 18px rgba(57, 45, 32, 0.08)',
+                      }}
+                    >
+                      <span style={{ fontSize: CONTROL_FONT_SIZE, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.6 }}>
+                        {card.label}
+                      </span>
+                      <span style={{ fontSize: CONTROL_FONT_SIZE + 6, fontWeight: 600 }}>{card.value}</span>
+                      <span style={{ fontSize: CONTROL_FONT_SIZE - 1, opacity: 0.6 }}>{card.note}</span>
+                      <div
+                        style={{
+                          height: 6,
+                          borderRadius: 999,
+                          background: 'linear-gradient(90deg, #d7b98b 0%, #f0dec0 45%, #c7b39a 100%)',
+                          opacity: 0.9,
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {['Session A', 'Session B', 'Session C', 'Session D'].map((tag) => (
+                    <span
+                      key={tag}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 999,
+                        background: '#efe4d6',
+                        border: '1px solid #d8cdbc',
+                        fontSize: CONTROL_FONT_SIZE,
+                        opacity: 0.75,
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <div
+                  style={{
+                    marginTop: 'auto',
+                    height: 80,
+                    borderRadius: 16,
+                    border: '1px solid #d8cdbc',
+                    backgroundImage: 'linear-gradient(90deg, rgba(126, 92, 63, 0.25) 0%, transparent 18%, rgba(126, 92, 63, 0.25) 36%, transparent 54%, rgba(126, 92, 63, 0.25) 72%, transparent 90%), linear-gradient(180deg, #f5ecdf 0%, #e7d8c6 100%)',
+                    backgroundSize: '120px 100%, 100% 100%',
+                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.35)',
+                  }}
+                />
               </div>
-            </FloatingPanel>
+            </div>
           </Tabs.Content>
           <Tabs.Content value="segment-bar" style={tabBodyStyle}>
             <div
@@ -1706,6 +1674,158 @@ function EditableRectPOC() {
             </div>
           </Tabs.Content>
           </Tabs.Root>
+          <FloatingPanel
+            ref={floatingPanelRef}
+            width={360}
+            fontSize={CONTROL_FONT_SIZE}
+            colorA={floatingPanelColorA}
+            colorB={floatingPanelColorB}
+            borderStyle="a"
+            header={(
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <IconButton
+                    behavior="cycle"
+                    value={floatingPanelCollapseValue}
+                    options={floatingPanelCollapseOptions}
+                    onChange={(nextValue) => setFloatingPanelCollapsed(nextValue === "collapsed")}
+                    borderStyle="none"
+                    fontSize={CONTROL_FONT_SIZE}
+                    colorA={floatingPanelColorA}
+                    colorB={floatingPanelColorB}
+                    aria-label="Toggle panel collapse"
+                    title="Toggle panel collapse"
+                  />
+                  <span>Floating Panel</span>
+                </div>
+                <IconButton
+                  borderStyle="none"
+                  fontSize={CONTROL_FONT_SIZE}
+                  colorA={floatingPanelColorA}
+                  colorB={floatingPanelColorB}
+                  aria-label="Dock panel"
+                  title="Dock panel"
+                  onClick={handleDockFloatingPanel}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="100%"
+                    height="100%"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M7 7h10v10" />
+                    <path d="M7 17 17 7" />
+                  </svg>
+                </IconButton>
+              </div>
+            )}
+            transparent
+            draggable
+            bodyOpacity={floatingPanelOpacity}
+            bodyBlur={floatingPanelBlur}
+            verticalGap={floatingPanelGap}
+            collapsed={floatingPanelCollapsed}
+            position={floatingPanelPosition ?? undefined}
+            onPositionChange={setFloatingPanelPosition}
+          >
+            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+              <AudioControls
+                fontSize={CONTROL_FONT_SIZE}
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                borderStyle="a"
+                audioSrc="/audio/credits.mp3"
+              />
+            </div>
+            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+              <LFOSlider
+                label="Opacity"
+                min={0.1}
+                max={1}
+                step={0.05}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelOpacity}
+                onUserChange={setFloatingPanelOpacity}
+                onAnimatedUpdate={setFloatingPanelOpacity}
+                formatDisplayValue={(value) => value.toFixed(2)}
+              />
+            </div>
+            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+              <LFOSlider
+                label="Blur"
+                min={0}
+                max={40}
+                step={1}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelBlur}
+                onUserChange={setFloatingPanelBlur}
+                onAnimatedUpdate={setFloatingPanelBlur}
+                formatDisplayValue={(value) => `${Math.round(value)}`}
+                valueSuffix=" px"
+              />
+            </div>
+            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+              <LFOSlider
+                label="Gap"
+                min={0}
+                max={32}
+                step={1}
+                width="100%"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                border="left"
+                fontSize={CONTROL_FONT_SIZE}
+                mode="external"
+                readExternal={() => floatingPanelGap}
+                onUserChange={setFloatingPanelGap}
+                onAnimatedUpdate={setFloatingPanelGap}
+                formatDisplayValue={(value) => `${Math.round(value)}`}
+                valueSuffix=" px"
+              />
+            </div>
+            <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+              <Folder
+                label="Level"
+                colorA={floatingPanelLevelColorA}
+                colorB={floatingPanelLevelColorB}
+                fontSize={CONTROL_FONT_SIZE}
+                padding={floatingPanelPadding}
+              >
+                <div style={{ marginLeft: -floatingPanelPadding, marginRight: -floatingPanelPadding }}>
+                  <LFOSlider
+                    label="Level"
+                    min={0}
+                    max={100}
+                    step={1}
+                    width="100%"
+                    colorA={floatingPanelLevelColorA}
+                    colorB={floatingPanelLevelColorB}
+                    border="left"
+                    fontSize={CONTROL_FONT_SIZE}
+                    showLfoControls
+                    readExternal={() => floatingPanelValue}
+                    onUserChange={setFloatingPanelValue}
+                    onAnimatedUpdate={setFloatingPanelValue}
+                  />
+                </div>
+              </Folder>
+            </div>
+          </FloatingPanel>
         </div>
       </AudioAnalysisProvider>
     </FrameLoopProvider>

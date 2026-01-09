@@ -1,5 +1,6 @@
 import React from "react";
 import { AnimationSuspensionProvider } from "../../animationSuspension";
+import { useVerticalGap, VerticalGapContext } from "../../panelGap";
 
 export type FloatingPanelBorderStyle = "a" | "b" | "none";
 
@@ -11,6 +12,7 @@ export interface FloatingPanelProps extends React.HTMLAttributes<HTMLDivElement>
   transparent?: boolean;
   bodyBlur?: number;
   bodyOpacity?: number;
+  verticalGap?: number;
   collapsed?: boolean;
   keepMounted?: boolean;
   suspended?: boolean;
@@ -30,6 +32,8 @@ const FALLBACK_COLOR_B = "#f0f0f0";
 const SLIDER_LINE_HEIGHT = 1;
 const SLIDER_PAD_Y_EM = 0.35;
 const SLIDER_BORDER_WIDTH = 1;
+const DEFAULT_BODY_BLUR = 10;
+const DEFAULT_BODY_OPACITY = 0.5;
 const DEFAULT_SHADOW = "none";
 
 function resolveSize(value?: number | string): string | undefined {
@@ -38,6 +42,28 @@ function resolveSize(value?: number | string): string | undefined {
 }
 
 const clampBetween = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+function normalizeHex(hex: string): string | null {
+  if (!hex) return null;
+  const cleaned = hex.trim().replace("#", "");
+  if (/^[0-9a-fA-F]{3}$/.test(cleaned)) {
+    return cleaned.split("").map((c) => c + c).join("");
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(cleaned)) {
+    return cleaned;
+  }
+  return null;
+}
+
+function colorWithAlpha(color: string, alpha: number, fallback = "255,255,255"): string {
+  const normalized = normalizeHex(color);
+  if (!normalized) return `rgba(${fallback},${alpha})`;
+  const intVal = parseInt(normalized, 16);
+  const r = (intVal >> 16) & 255;
+  const g = (intVal >> 8) & 255;
+  const b = intVal & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 function computeHeaderHeight(fontSize: number) {
   const contentHeight = fontSize * (SLIDER_LINE_HEIGHT + SLIDER_PAD_Y_EM * 2);
@@ -50,6 +76,9 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     colorA = FALLBACK_COLOR_A,
     colorB = FALLBACK_COLOR_B,
     borderStyle = "a",
+    transparent = false,
+    bodyBlur,
+    bodyOpacity,
     collapsed = false,
     keepMounted = true,
     suspended,
@@ -62,6 +91,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     radius,
     shadow,
     fontSize = 12,
+    verticalGap,
     style,
     className,
     children,
@@ -95,7 +125,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   }, [defaultPosition?.x, defaultPosition?.y, position?.x, position?.y]);
   const resolvedFontSize = fontSize ?? 12;
   const resolvedPadding = padding ?? Math.round(resolvedFontSize * 0.75);
-  const resolvedPaddingValue = resolveSize(resolvedPadding);
+  const resolvedPaddingValue = resolveSize(resolvedPadding) ?? "0px";
   const resolvedRadius = radius ?? Math.max(4, Math.round(resolvedFontSize * 0.4));
   const resolvedShadow = shadow ?? DEFAULT_SHADOW;
   const resolvedBorderColor = borderStyle === "a"
@@ -103,9 +133,12 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     : borderStyle === "b"
       ? colorB
       : "transparent";
-  const gap = Math.max(6, Math.round(resolvedFontSize * 0.4));
+  const resolvedVerticalGap = useVerticalGap(verticalGap);
+  const verticalGapValue = `${resolvedVerticalGap}px`;
   const headerMinHeight = computeHeaderHeight(resolvedFontSize);
   const headerBorderWidth = SLIDER_BORDER_WIDTH;
+  const resolvedBodyOpacity = clampBetween(bodyOpacity ?? DEFAULT_BODY_OPACITY, 0, 1);
+  const resolvedBodyBlur = Math.max(0, bodyBlur ?? DEFAULT_BODY_BLUR);
   const renderBody = !collapsed || keepMounted;
   const suspendChildren = Boolean(suspended || (keepMounted && collapsed));
 
@@ -225,19 +258,21 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       {renderBody && (
         <div
           style={{
-            padding: resolvedPaddingValue,
+            padding: `${verticalGapValue} ${resolvedPaddingValue}`,
             display: collapsed ? "none" : "flex",
             flexDirection: "column",
-            gap,
-            background: "transparent",
-            backdropFilter: "none",
-            WebkitBackdropFilter: "none",
+            gap: resolvedVerticalGap,
+            background: transparent ? colorWithAlpha(colorB, resolvedBodyOpacity) : colorB,
+            backdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
+            WebkitBackdropFilter: transparent ? `blur(${resolvedBodyBlur}px)` : "none",
           }}
           aria-hidden={collapsed}
         >
-          <AnimationSuspensionProvider suspended={suspendChildren}>
-            {children}
-          </AnimationSuspensionProvider>
+          <VerticalGapContext.Provider value={resolvedVerticalGap}>
+            <AnimationSuspensionProvider suspended={suspendChildren}>
+              {children}
+            </AnimationSuspensionProvider>
+          </VerticalGapContext.Provider>
         </div>
       )}
     </div>

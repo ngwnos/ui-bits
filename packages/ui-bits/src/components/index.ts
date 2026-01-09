@@ -25,6 +25,7 @@ export {
   type IconButtonBorderMask,
   type IconButtonCycleOption,
 } from "./IconButton";
+export { default as BasicButton, type BasicButtonProps, type BasicButtonBorderStyle } from "./BasicButton";
 export { default as Folder, type FolderProps, type FolderBorderStyle } from "./Folder";
 export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./FloatingPanel";
 export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";

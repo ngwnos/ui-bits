@@ -14,6 +14,7 @@ export interface FolderProps extends React.HTMLAttributes<HTMLDivElement> {
   padding?: number | string;
   verticalGap?: number;
   inheritPanelSurface?: boolean;
+  transparent?: boolean;
   collapsed?: boolean;
   defaultCollapsed?: boolean;
   keepMounted?: boolean;
@@ -69,6 +70,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
     padding = 0,
     verticalGap,
     inheritPanelSurface,
+    transparent,
     collapsed,
     defaultCollapsed = false,
     keepMounted = true,
@@ -106,9 +108,11 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const surfaceOpacity = panelSurface?.opacity ?? 1;
   const headerBackground = rawHeaderBackground;
   const headerTextColor = rawHeaderTextColor;
-  const bodyBackground = usePanelSurfaceBackground
-    ? colorWithAlpha(rawHeaderTextColor, surfaceOpacity)
-    : rawHeaderTextColor;
+  const bodyBackground = transparent
+    ? "transparent"
+    : usePanelSurfaceBackground
+      ? colorWithAlpha(rawHeaderTextColor, surfaceOpacity)
+      : rawHeaderTextColor;
   const toggleValue = isCollapsed ? "collapsed" : "expanded";
   const toggleOptions = [
     { value: "collapsed", ariaLabel: "Expand section", title: "Expand section" },

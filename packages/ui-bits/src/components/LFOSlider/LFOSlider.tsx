@@ -1457,7 +1457,7 @@ function SliderCore({
 
   const stackGap = drawerHandleActive ? '0' : '0.25em';
 
-  const wrapperClassName = ['flex flex-col', className].filter(Boolean).join(' ');
+  const wrapperClassName = ['ui-bits-slider', 'flex flex-col', className].filter(Boolean).join(' ');
   const resolvedMaxWidth = width == null
     ? undefined
     : typeof width === 'number'
@@ -1613,7 +1613,14 @@ function SliderCore({
         <div
           ref={valueWrapRef}
           className="text-transparent z-10"
-          style={{ display: 'flex', alignItems: 'center', padding: `${padY} ${padRight} ${padY} ${padLeft}`, lineHeight: '1', width: '100%' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: `${padY} ${padRight} ${padY} ${padLeft}`,
+            lineHeight: '1',
+            width: '100%',
+            boxSizing: 'border-box',
+          }}
         >
           {showLabel ? <span style={{ flexShrink: 0, marginRight: '0.5em' }}>{labelText}</span> : null}
           <span

@@ -1,0 +1,82 @@
+.docs-layout {
+  min-height: 100vh;
+  display: flex;
+  width: 100%;
+}
+
+.docs-sidebar {
+  --sidebar-width: 220px;
+  width: var(--sidebar-width);
+  background: var(--flexoki-base-900);
+  border-right: 1px solid var(--flexoki-base-800);
+  display: flex;
+  flex-direction: column;
+  font-size: 16px;
+}
+
+.docs-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--sidebar-width);
+  position: relative;
+  overflow: hidden;
+}
+
+.docs-brand-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.docs-brand-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.docs-brand-text {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+}
+
+.docs-folder {
+  width: 100%;
+}
+
+.docs-button {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.docs-main {
+  flex: 1;
+  padding: 24px;
+}
+
+.docs-title {
+  margin: 0;
+  font-size: 24px;
+}
+
+.docs-code pre {
+  margin: 0;
+  min-height: 140px;
+  border-radius: 6px;
+  border: 1px solid var(--flexoki-base-800);
+}
+
+.docs-code-empty {
+  background: var(--flexoki-base-900);
+}
+
+.docs-panel {
+  z-index: 20;
+}

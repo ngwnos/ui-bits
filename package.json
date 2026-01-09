@@ -8,10 +8,13 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "bun --cwd apps/demo dev",
-    "build": "bun --cwd packages/ui-bits build && bun --cwd apps/demo build",
+    "dev": "bun --cwd apps/docs dev",
+    "build": "bun --cwd packages/ui-bits build && bun --cwd apps/docs build",
     "build:demo": "bun --cwd apps/demo build",
-    "lint": "bun --cwd packages/ui-bits lint && bun --cwd apps/demo lint",
-    "preview": "bun --cwd apps/demo build && bun --cwd apps/demo preview"
+    "build:docs": "bun --cwd apps/docs build",
+    "lint": "bun --cwd packages/ui-bits lint && bun --cwd apps/docs lint",
+    "lint:demo": "bun --cwd apps/demo lint",
+    "preview": "bun --cwd apps/docs build && bun --cwd apps/docs preview",
+    "preview:demo": "bun --cwd apps/demo build && bun --cwd apps/demo preview"
   }
 }

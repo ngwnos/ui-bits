@@ -1,11 +1,14 @@
 import React from "react";
 import { AnimationSuspensionProvider } from "../../animationSuspension";
 import { PanelSurfaceContext, useVerticalGap, VerticalGapContext } from "../../panelGap";
+import IconButton from "../IconButton";
 
 export type FloatingPanelBorderStyle = "a" | "b" | "none";
 
-export interface FloatingPanelProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface FloatingPanelProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   header?: React.ReactNode;
+  title?: React.ReactNode;
+  collapsible?: boolean;
   colorA?: string;
   colorB?: string;
   borderStyle?: FloatingPanelBorderStyle;
@@ -14,12 +17,14 @@ export interface FloatingPanelProps extends React.HTMLAttributes<HTMLDivElement>
   bodyOpacity?: number;
   verticalGap?: number;
   collapsed?: boolean;
+  defaultCollapsed?: boolean;
   keepMounted?: boolean;
   suspended?: boolean;
   draggable?: boolean;
   position?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
   defaultPosition?: { x: number; y: number };
+  onCollapseChange?: (collapsed: boolean) => void;
   width?: number | string;
   padding?: number | string;
   paddingLeft?: number | string;
@@ -76,25 +81,29 @@ function computeHeaderHeight(fontSize: number) {
 const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((props, ref) => {
   const {
     header,
+    title,
+    collapsible = false,
     colorA = FALLBACK_COLOR_A,
     colorB = FALLBACK_COLOR_B,
     borderStyle = "a",
     transparent = false,
     bodyBlur,
     bodyOpacity,
-    collapsed = false,
+    collapsed,
+    defaultCollapsed = false,
     keepMounted = true,
     suspended,
     draggable = false,
     position,
     onPositionChange,
     defaultPosition,
-  width,
-  padding,
-  paddingLeft,
-  paddingRight,
-  paddingBottom,
-  radius,
+    onCollapseChange,
+    width,
+    padding,
+    paddingLeft,
+    paddingRight,
+    paddingBottom,
+    radius,
     shadow,
     fontSize = 12,
     verticalGap,
@@ -135,6 +144,9 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     });
   }, [defaultPosition?.x, defaultPosition?.y, position?.x, position?.y]);
   const resolvedFontSize = fontSize ?? 12;
+  const isCollapsedControlled = collapsed !== undefined;
+  const [internalCollapsed, setInternalCollapsed] = React.useState(defaultCollapsed);
+  const resolvedCollapsed = isCollapsedControlled ? collapsed : internalCollapsed;
   const resolvedPadding = padding ?? Math.round(resolvedFontSize * 0.75);
   const resolvedPaddingLeft = paddingLeft ?? resolvedPadding;
   const resolvedPaddingRight = paddingRight ?? resolvedPadding;
@@ -157,8 +169,8 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const resolvedBodyBlur = Math.max(0, bodyBlur ?? DEFAULT_BODY_BLUR);
   const surfaceOpacity = transparent ? resolvedBodyOpacity : 1;
   const surfaceBlur = transparent ? resolvedBodyBlur : 0;
-  const renderBody = !collapsed || keepMounted;
-  const suspendChildren = Boolean(suspended || (keepMounted && collapsed));
+  const renderBody = !resolvedCollapsed || keepMounted;
+  const suspendChildren = Boolean(suspended || (keepMounted && resolvedCollapsed));
   const updateSurfaceRects = React.useCallback(() => {
     const bodyNode = bodyRef.current;
     if (!bodyNode) return;
@@ -231,6 +243,68 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     registerSurface,
     unregisterSurface,
   }), [registerSurface, surfaceBlur, surfaceOpacity, unregisterSurface]);
+  const toggleValue = resolvedCollapsed ? "collapsed" : "expanded";
+  const toggleOptions = [
+    { value: "collapsed", ariaLabel: "Expand panel", title: "Expand panel" },
+    { value: "expanded", ariaLabel: "Collapse panel", title: "Collapse panel" },
+  ];
+  const handleToggle = (nextValue: string) => {
+    const next = nextValue === "collapsed";
+    if (!isCollapsedControlled) {
+      setInternalCollapsed(next);
+    }
+    onCollapseChange?.(next);
+  };
+  const resolvedHeader = header ?? (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      {collapsible && (
+        <IconButton
+          behavior="cycle"
+          value={toggleValue}
+          options={toggleOptions}
+          onChange={(value) => handleToggle(value)}
+          borderStyle="none"
+          fontSize={resolvedFontSize}
+          colorA={colorA}
+          colorB={colorB}
+          aria-label={toggleOptions[resolvedCollapsed ? 0 : 1]?.ariaLabel}
+          title={toggleOptions[resolvedCollapsed ? 0 : 1]?.title}
+        >
+          {resolvedCollapsed ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="100%"
+              height="100%"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="100%"
+              height="100%"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 12h14" />
+            </svg>
+          )}
+        </IconButton>
+      )}
+      {title ? <span>{title}</span> : null}
+    </div>
+  );
 
   const resolvedPosition = position ?? dragPosition;
   const isFloating = Boolean(draggable && resolvedPosition);
@@ -327,8 +401,8 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
           border: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
           borderTopLeftRadius: resolvedRadius,
           borderTopRightRadius: resolvedRadius,
-          borderBottomLeftRadius: collapsed ? resolvedRadius : 0,
-          borderBottomRightRadius: collapsed ? resolvedRadius : 0,
+          borderBottomLeftRadius: resolvedCollapsed ? resolvedRadius : 0,
+          borderBottomRightRadius: resolvedCollapsed ? resolvedRadius : 0,
           boxSizing: "border-box",
           fontWeight: 600,
           lineHeight: 1,
@@ -343,18 +417,18 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        {header}
+        {resolvedHeader}
       </div>
       {renderBody && (
         <div
           ref={bodyRef}
           style={{
             padding: `${verticalGapValue} ${resolvedPaddingRightValue} ${resolvedPaddingBottomValue} ${resolvedPaddingLeftValue}`,
-            display: collapsed ? "none" : "flex",
+            display: resolvedCollapsed ? "none" : "flex",
             flexDirection: "column",
             position: "relative",
           }}
-          aria-hidden={collapsed}
+          aria-hidden={resolvedCollapsed}
         >
           <div
             aria-hidden

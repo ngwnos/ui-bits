@@ -1,3 +1,5 @@
+import "./style.css";
+
 export { default as LFOSlider } from "./components/LFOSlider";
 export type {
   LFOSliderProps,
@@ -73,6 +75,7 @@ export {
   type IconButtonBorderMask,
   type IconButtonCycleOption,
 } from "./components/IconButton";
+export { default as BasicButton, type BasicButtonProps, type BasicButtonBorderStyle } from "./components/BasicButton";
 export { default as Folder, type FolderProps, type FolderBorderStyle } from "./components/Folder";
 export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./components/FloatingPanel";
 export * from "./sliderStore";

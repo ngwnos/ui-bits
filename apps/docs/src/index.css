@@ -1,0 +1,19 @@
+:root {
+  color-scheme: dark;
+  --flexoki-base-50: #F2F0E5;
+  --flexoki-base-800: #403E3C;
+  --flexoki-base-900: #282726;
+  --flexoki-base-950: #1C1B1A;
+  --flexoki-base-200: #CECDC3;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--flexoki-base-50);
+  background-color: var(--flexoki-base-950);
+}
+
+body {
+  margin: 0;
+  background-color: var(--flexoki-base-950);
+  color: inherit;
+}

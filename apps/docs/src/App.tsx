@@ -21,26 +21,38 @@ function App() {
   const [brandTextWidth, setBrandTextWidth] = useState(1.6)
   const [brandTextSpacing, setBrandTextSpacing] = useState(0.5)
   const [brandSpawnProbability, setBrandSpawnProbability] = useState(0.35)
-  const [brandLeftColor] = useState(flexoki.blue['700'])
-  const [brandRightColor] = useState(flexoki.green['100'])
+  const [brandTickMs, setBrandTickMs] = useState(350)
+  const brandPalette = useMemo(
+    () => [
+      flexoki.blue['600'],
+      flexoki.purple['600'],
+    ],
+    [],
+  )
+  const brandBackground = flexoki.base['950']
+  const brandTextColor = flexoki.base['50']
   const activeRoute = useMemo(
     () => ROUTES.find((route) => route.id === activeRouteId) ?? ROUTES[0],
     [activeRouteId],
   )
   const brandCanvasProps = useMemo<DocsBrandCanvasProps>(() => ({
     divisions: brandDivisions,
-    leftColor: brandLeftColor,
-    rightColor: brandRightColor,
+    palette: brandPalette,
+    backgroundColor: brandBackground,
+    textColor: brandTextColor,
     textWidth: brandTextWidth,
     textSpacing: brandTextSpacing,
     spawnProbability: brandSpawnProbability,
+    tickMs: brandTickMs,
   }), [
     brandDivisions,
-    brandLeftColor,
-    brandRightColor,
+    brandPalette,
+    brandBackground,
+    brandTextColor,
     brandTextWidth,
     brandTextSpacing,
     brandSpawnProbability,
+    brandTickMs,
   ])
 
   useEffect(() => {
@@ -177,6 +189,23 @@ function App() {
           onUserChange={setBrandSpawnProbability}
           onAnimatedUpdate={setBrandSpawnProbability}
           formatDisplayValue={(value) => value.toFixed(2)}
+        />
+        <LFOSlider
+          label="Tick (ms)"
+          min={60}
+          max={1000}
+          step={10}
+          width="100%"
+          colorA="#F2F0E5"
+          colorB="#282726"
+          border="left"
+          fontSize={12}
+          mode="auto"
+          showLfoControls
+          readExternal={() => brandTickMs}
+          onUserChange={setBrandTickMs}
+          onAnimatedUpdate={setBrandTickMs}
+          formatDisplayValue={(value) => `${Math.round(value)}`}
         />
       </FloatingPanel>
       </div>

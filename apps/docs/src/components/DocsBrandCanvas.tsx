@@ -22,29 +22,32 @@ async function getSharedRoot(): Promise<TypeGpuRoot | null> {
 }
 
 export interface DocsBrandCanvasProps {
-  leftColor?: string;
-  rightColor?: string;
+  palette?: string[];
+  backgroundColor?: string;
+  textColor?: string;
   divisions?: number;
   textWidth?: number;
   textSpacing?: number;
   spawnProbability?: number;
+  tickMs?: number;
   className?: string;
 }
 
 const BRAND_TEXT = "ui-bits";
 const MAX_BRAND_CHARS = 8;
 const DEFAULT_TEXT_WIDTH = 1.6;
-const SHIFT_INTERVAL_MS = 350;
-const LIFE_INTERVAL_MS = SHIFT_INTERVAL_MS;
+const DEFAULT_TICK_MS = 350;
 const OFFSCREEN_ROWS = 5;
 
 export default function DocsBrandCanvas({
-  leftColor = "#1C1B1A",
-  rightColor = "#282726",
+  palette = ["#205EA6", "#879A39", "#D0A215", "#DA702C"],
+  backgroundColor = "#1C1B1A",
+  textColor = "#F2F0E5",
   divisions = 12,
   textWidth = DEFAULT_TEXT_WIDTH,
   textSpacing = 0.5,
   spawnProbability = 0.35,
+  tickMs = DEFAULT_TICK_MS,
   className,
 }: DocsBrandCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -55,20 +58,21 @@ export default function DocsBrandCanvas({
   const bindGroupTexturesRef = useRef<{ atlas?: GPUTexture; grid?: GPUTexture } | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const paramsRef = useRef({
-    leftColor,
-    rightColor,
+    backgroundColor,
+    textColor,
     divisions,
     textWidth,
     textSpacing,
     spawnProbability,
+    tickMs,
   });
+  const paletteRef = useRef<Array<[number, number, number]>>([]);
   const gridRef = useRef<{
     size: number;
     data: Uint8Array<ArrayBuffer>;
     scratch: Uint8Array<ArrayBuffer>;
     texture: GPUTexture;
     nextShiftMs: number;
-    nextLifeMs: number;
   } | null>(null);
   const atlasRef = useRef<{
     texture: GPUTexture;
@@ -100,6 +104,11 @@ export default function DocsBrandCanvas({
       }
     }
     return [0, 0, 0];
+  };
+
+  const parseHexBytes = (color: string): [number, number, number] => {
+    const [r, g, b] = parseHexColor(color);
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
   };
 
   const buildAtlas = async (device: GPUDevice) => {
@@ -156,14 +165,23 @@ export default function DocsBrandCanvas({
 
   useEffect(() => {
     paramsRef.current = {
-      leftColor,
-      rightColor,
+      backgroundColor,
+      textColor,
       divisions,
       textWidth,
       textSpacing,
       spawnProbability,
+      tickMs,
     };
-  }, [leftColor, rightColor, divisions, textWidth, textSpacing, spawnProbability]);
+  }, [backgroundColor, textColor, divisions, textWidth, textSpacing, spawnProbability, tickMs]);
+
+  useEffect(() => {
+    const fallback: [number, number, number] = [255, 255, 255];
+    const colors: Array<[number, number, number]> = palette.length
+      ? palette.map(parseHexBytes)
+      : [fallback];
+    paletteRef.current = colors;
+  }, [palette]);
 
   useEffect(() => {
     let disposed = false;
@@ -201,8 +219,8 @@ struct VertexOutput {
 };
 
 struct Uniforms {
-  colorLeft : vec4<f32>,
-  colorRight : vec4<f32>,
+  backgroundColor : vec4<f32>,
+  textColor : vec4<f32>,
   params : vec4<f32>,
   textParams : vec4<f32>,
   indices0 : vec4<f32>,
@@ -238,10 +256,6 @@ fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
   return out;
 }
 
-fn hash(p: vec2<f32>) -> f32 {
-  return fract(sin(dot(p, vec2<f32>(12.9898, 78.233))) * 43758.5453);
-}
-
 fn glyphIndex(i: u32) -> f32 {
   if (i < 4u) {
     return uniforms.indices0[i];
@@ -259,10 +273,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     (cell.y + 0.5 + offscreen) / (div + offscreen)
   );
   let cellSample = textureSample(gridAtlas, brandSampler, cellUv);
-  let cellOn = step(0.5, cellSample.r);
-  let cellActive = cellOn > 0.5;
-  let baseColor = select(uniforms.colorRight.xyz, uniforms.colorLeft.xyz, cellActive);
-  let invertColor = select(uniforms.colorLeft.xyz, uniforms.colorRight.xyz, cellActive);
+  let cellOn = step(0.5, cellSample.a);
+  let baseColor = uniforms.backgroundColor.xyz * (1.0 - cellOn) + cellSample.rgb * cellOn;
 
   let textWidth = uniforms.textParams.x;
   let glyphAspect = uniforms.textParams.y;
@@ -298,7 +310,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let localMask = step(0.2, sample.a) * inside * insideGlyph * glyphActive;
     glyphMask = max(glyphMask, localMask);
   }
-  let finalColor = baseColor * (1.0 - glyphMask) + invertColor * glyphMask;
+  let finalColor = baseColor * (1.0 - glyphMask) + uniforms.textColor.xyz * glyphMask;
   return vec4<f32>(finalColor, 1.0);
 }
 `,
@@ -325,13 +337,23 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         const totalRows = rounded + OFFSCREEN_ROWS;
         const totalCells = rounded * totalRows;
         const data = new Uint8Array(totalCells * 4);
+        const probability = paramsRef.current.spawnProbability;
+        const paletteColors = paletteRef.current.length ? paletteRef.current : [[255, 255, 255]];
         for (let i = 0; i < totalCells; i += 1) {
-          const on = Math.random() > 0.55;
+          const on = Math.random() < probability;
           const base = i * 4;
-          data[base] = on ? 255 : 0;
-          data[base + 1] = 0;
-          data[base + 2] = 0;
-          data[base + 3] = 255;
+          if (on) {
+            const color = paletteColors[Math.floor(Math.random() * paletteColors.length)];
+            data[base] = color[0];
+            data[base + 1] = color[1];
+            data[base + 2] = color[2];
+            data[base + 3] = 255;
+          } else {
+            data[base] = 0;
+            data[base + 1] = 0;
+            data[base + 2] = 0;
+            data[base + 3] = 0;
+          }
         }
         const scratch = new Uint8Array(totalCells * 4);
         const texture = device.createTexture({
@@ -346,13 +368,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
           { width: rounded, height: totalRows },
         );
         const now = performance.now();
+        const tick = Math.max(60, paramsRef.current.tickMs);
         gridRef.current = {
           size: rounded,
           data,
           scratch,
           texture,
-          nextShiftMs: now + SHIFT_INTERVAL_MS,
-          nextLifeMs: now + SHIFT_INTERVAL_MS / 2,
+          nextShiftMs: now + tick,
         };
         bindGroupRef.current = null;
         bindGroupTexturesRef.current = null;
@@ -366,13 +388,22 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
           const src = (y - 1) * rowBytes;
           grid.data.copyWithin(dst, src, src + rowBytes);
         }
+        const paletteColors = paletteRef.current.length ? paletteRef.current : [[255, 255, 255]];
         for (let x = 0; x < grid.size; x += 1) {
           const base = x * 4;
           const on = Math.random() < probability;
-          grid.data[base] = on ? 255 : 0;
-          grid.data[base + 1] = 0;
-          grid.data[base + 2] = 0;
-          grid.data[base + 3] = 255;
+          if (on) {
+            const color = paletteColors[Math.floor(Math.random() * paletteColors.length)];
+            grid.data[base] = color[0];
+            grid.data[base + 1] = color[1];
+            grid.data[base + 2] = color[2];
+            grid.data[base + 3] = 255;
+          } else {
+            grid.data[base] = 0;
+            grid.data[base + 1] = 0;
+            grid.data[base + 2] = 0;
+            grid.data[base + 3] = 0;
+          }
         }
       };
 
@@ -389,16 +420,47 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 if (ny < 0 || ny >= totalRows) continue;
                 const nx = (x + dx + size) % size;
                 const idx = (ny * size + nx) * 4;
-                if (data[idx] > 0) count += 1;
+                if (data[idx + 3] > 0) count += 1;
               }
             }
             const idx = (y * size + x) * 4;
-            const alive = data[idx] > 0;
-            const nextAlive = alive ? (count === 2 || count === 3) : count === 3;
-            scratch[idx] = nextAlive ? 255 : 0;
-            scratch[idx + 1] = 0;
-            scratch[idx + 2] = 0;
-            scratch[idx + 3] = 255;
+            const alive = data[idx + 3] > 0;
+            const survives = alive && (count === 2 || count === 3);
+            const born = !alive && count === 3;
+            if (survives) {
+              scratch[idx] = data[idx];
+              scratch[idx + 1] = data[idx + 1];
+              scratch[idx + 2] = data[idx + 2];
+              scratch[idx + 3] = 255;
+            } else if (born) {
+              let sumR = 0;
+              let sumG = 0;
+              let sumB = 0;
+              for (let dy = -1; dy <= 1; dy += 1) {
+                for (let dx = -1; dx <= 1; dx += 1) {
+                  if (dx === 0 && dy === 0) continue;
+                  const ny = y + dy;
+                  if (ny < 0 || ny >= totalRows) continue;
+                  const nx = (x + dx + size) % size;
+                  const nidx = (ny * size + nx) * 4;
+                  if (data[nidx + 3] > 0) {
+                    sumR += data[nidx];
+                    sumG += data[nidx + 1];
+                    sumB += data[nidx + 2];
+                  }
+                }
+              }
+              const denom = count || 1;
+              scratch[idx] = Math.round(sumR / denom);
+              scratch[idx + 1] = Math.round(sumG / denom);
+              scratch[idx + 2] = Math.round(sumB / denom);
+              scratch[idx + 3] = 255;
+            } else {
+              scratch[idx] = 0;
+              scratch[idx + 1] = 0;
+              scratch[idx + 2] = 0;
+              scratch[idx + 3] = 0;
+            }
           }
         }
         grid.data.set(scratch);
@@ -410,16 +472,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         const { spawnProbability: probability } = paramsRef.current;
         let updated = false;
         let guard = 0;
-        while ((nowMs >= grid.nextShiftMs || nowMs >= grid.nextLifeMs) && guard < 120) {
-          if (grid.nextShiftMs <= grid.nextLifeMs) {
-            if (nowMs < grid.nextShiftMs) break;
-            stepFall(grid, probability);
-            grid.nextShiftMs += SHIFT_INTERVAL_MS;
-          } else {
-            if (nowMs < grid.nextLifeMs) break;
-            stepLife(grid);
-            grid.nextLifeMs += LIFE_INTERVAL_MS;
-          }
+        const tick = Math.max(60, paramsRef.current.tickMs);
+        while (nowMs >= grid.nextShiftMs && guard < 120) {
+          stepLife(grid);
+          stepFall(grid, probability);
+          grid.nextShiftMs += tick;
           updated = true;
           guard += 1;
         }
@@ -448,9 +505,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         const encoder = device.createCommandEncoder();
-        const { leftColor: colorLeft, rightColor: colorRight, divisions: div, textWidth: textScale, textSpacing: spacing } = paramsRef.current;
-        const left = parseHexColor(colorLeft);
-        const right = parseHexColor(colorRight);
+        const { backgroundColor: bgColor, textColor: fgColor, divisions: div, textWidth: textScale, textSpacing: spacing } = paramsRef.current;
+        const background = parseHexColor(bgColor);
+        const text = parseHexColor(fgColor);
         const time = (nowMs - (startTimeRef.current ?? nowMs)) / 1000;
         const atlas = atlasRef.current;
         if (!atlas) return;
@@ -486,8 +543,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         const indices = [...atlas.indices];
         while (indices.length < MAX_BRAND_CHARS) indices.push(0);
         const params = new Float32Array([
-          left[0], left[1], left[2], 1,
-          right[0], right[1], right[2], 1,
+          background[0], background[1], background[2], 1,
+          text[0], text[1], text[2], 1,
           Math.max(1, div), time, atlas.charCount, spacing,
           textScale, atlas.glyphAspect, atlas.cols, atlas.rows,
           indices[0], indices[1], indices[2], indices[3],

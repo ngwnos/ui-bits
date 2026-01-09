@@ -568,6 +568,7 @@ function EditableRectPOC() {
   const [iconToggleOn, setIconToggleOn] = React.useState(false);
   const [iconCycleValue, setIconCycleValue] = React.useState<string>('play');
   const [floatingPanelValue, setFloatingPanelValue] = React.useState<number>(42);
+  const [floatingPanelTint, setFloatingPanelTint] = React.useState<number>(58);
   const [floatingPanelOpacity, setFloatingPanelOpacity] = React.useState<number>(0.5);
   const [floatingPanelBlur, setFloatingPanelBlur] = React.useState<number>(20);
   const [floatingPanelGap, setFloatingPanelGap] = React.useState<number>(3);
@@ -668,6 +669,20 @@ function EditableRectPOC() {
   const floatingPanelColorB = flexoki.red['100'];
   const floatingPanelLevelColorA = flexoki.blue['600'];
   const floatingPanelLevelColorB = flexoki.blue['100'];
+  const floatingPanelOpacityColorA = flexoki.green['600'];
+  const floatingPanelOpacityColorB = flexoki.green['100'];
+  const floatingPanelBlurColorA = flexoki.orange['600'];
+  const floatingPanelBlurColorB = flexoki.orange['100'];
+  const floatingPanelGapColorA = flexoki.yellow['600'];
+  const floatingPanelGapColorB = flexoki.yellow['100'];
+  const floatingPanelPadLeftColorA = flexoki.cyan['600'];
+  const floatingPanelPadLeftColorB = flexoki.cyan['100'];
+  const floatingPanelPadRightColorA = flexoki.purple['600'];
+  const floatingPanelPadRightColorB = flexoki.purple['100'];
+  const floatingPanelPadBottomColorA = flexoki.magenta['600'];
+  const floatingPanelPadBottomColorB = flexoki.magenta['100'];
+  const floatingPanelBrightnessColorA = flexoki.base['700'];
+  const floatingPanelBrightnessColorB = flexoki.base['100'];
   const floatingPanelCollapseValue = floatingPanelCollapsed ? "collapsed" : "expanded";
   const floatingPanelCollapseOptions = [
     { value: "collapsed", icon: <Plus strokeWidth={1.6} />, ariaLabel: "Expand panel", title: "Expand panel" },
@@ -1755,8 +1770,8 @@ function EditableRectPOC() {
                 max={1}
                 step={0.05}
                 width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
+                colorA={floatingPanelOpacityColorA}
+                colorB={floatingPanelOpacityColorB}
                 border="left"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
@@ -1773,8 +1788,8 @@ function EditableRectPOC() {
                 max={40}
                 step={1}
                 width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
+                colorA={floatingPanelBlurColorA}
+                colorB={floatingPanelBlurColorB}
                 border="left"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
@@ -1792,8 +1807,8 @@ function EditableRectPOC() {
                 max={32}
                 step={1}
                 width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
+                colorA={floatingPanelGapColorA}
+                colorB={floatingPanelGapColorB}
                 border="left"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
@@ -1811,8 +1826,8 @@ function EditableRectPOC() {
                 max={32}
                 step={1}
                 width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
+                colorA={floatingPanelPadLeftColorA}
+                colorB={floatingPanelPadLeftColorB}
                 border="left"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
@@ -1830,8 +1845,8 @@ function EditableRectPOC() {
                 max={32}
                 step={1}
                 width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
+                colorA={floatingPanelPadRightColorA}
+                colorB={floatingPanelPadRightColorB}
                 border="left"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
@@ -1849,8 +1864,8 @@ function EditableRectPOC() {
                 max={32}
                 step={1}
                 width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
+                colorA={floatingPanelPadBottomColorA}
+                colorB={floatingPanelPadBottomColorB}
                 border="left"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
@@ -1888,14 +1903,40 @@ function EditableRectPOC() {
               </Folder>
             </div>
             <div>
+              <Folder
+                label="Panel Match"
+                colorA={floatingPanelColorA}
+                colorB={floatingPanelColorB}
+                fontSize={CONTROL_FONT_SIZE}
+              >
+                <div>
+                  <LFOSlider
+                    label="Tint"
+                    min={0}
+                    max={100}
+                    step={1}
+                    width="100%"
+                    colorA={floatingPanelColorA}
+                    colorB={floatingPanelColorB}
+                    border="left"
+                    fontSize={CONTROL_FONT_SIZE}
+                    mode="external"
+                    readExternal={() => floatingPanelTint}
+                    onUserChange={setFloatingPanelTint}
+                    onAnimatedUpdate={setFloatingPanelTint}
+                  />
+                </div>
+              </Folder>
+            </div>
+            <div>
               <LFOSlider
                 label="Brightness"
                 min={0}
                 max={100}
                 step={1}
                 width="100%"
-                colorA={floatingPanelColorA}
-                colorB={floatingPanelColorB}
+                colorA={floatingPanelBrightnessColorA}
+                colorB={floatingPanelBrightnessColorB}
                 border="left"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"

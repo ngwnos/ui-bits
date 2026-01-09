@@ -1,6 +1,6 @@
 import React from "react";
 import { AnimationSuspensionProvider } from "../../animationSuspension";
-import { usePanelEdgeBorders, useVerticalGap, VerticalGapContext } from "../../panelGap";
+import { usePanelEdgeBorders, usePanelSurface, useVerticalGap, VerticalGapContext } from "../../panelGap";
 import IconButton from "../IconButton";
 
 export type FolderBorderStyle = "a" | "b" | "none";
@@ -13,6 +13,7 @@ export interface FolderProps extends React.HTMLAttributes<HTMLDivElement> {
   fontSize?: number;
   padding?: number | string;
   verticalGap?: number;
+  inheritPanelSurface?: boolean;
   collapsed?: boolean;
   defaultCollapsed?: boolean;
   keepMounted?: boolean;
@@ -25,6 +26,28 @@ const FALLBACK_COLOR_B = "#f0f0f0";
 const SLIDER_LINE_HEIGHT = 1;
 const SLIDER_PAD_Y_EM = 0.35;
 const SLIDER_BORDER_WIDTH = 1;
+
+function normalizeHex(hex: string): string | null {
+  if (!hex) return null;
+  const cleaned = hex.trim().replace("#", "");
+  if (/^[0-9a-fA-F]{3}$/.test(cleaned)) {
+    return cleaned.split("").map((c) => c + c).join("");
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(cleaned)) {
+    return cleaned;
+  }
+  return null;
+}
+
+function colorWithAlpha(color: string, alpha: number, fallback = "255,255,255"): string {
+  const normalized = normalizeHex(color);
+  if (!normalized) return `rgba(${fallback},${alpha})`;
+  const intVal = parseInt(normalized, 16);
+  const r = (intVal >> 16) & 255;
+  const g = (intVal >> 8) & 255;
+  const b = intVal & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 function resolveSize(value?: number | string): string | undefined {
   if (value == null) return undefined;
@@ -45,6 +68,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
     fontSize = 12,
     padding = 0,
     verticalGap,
+    inheritPanelSurface,
     collapsed,
     defaultCollapsed = false,
     keepMounted = true,
@@ -64,8 +88,8 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
     : borderStyle === "b"
       ? colorB
       : "transparent";
-  const headerBackground = isCollapsed ? colorB : colorA;
-  const headerTextColor = isCollapsed ? colorA : colorB;
+  const rawHeaderBackground = isCollapsed ? colorB : colorA;
+  const rawHeaderTextColor = isCollapsed ? colorA : colorB;
   const headerHeight = computeHeaderHeight(fontSize);
   const headerBorderWidth = 1;
   const headerOuterHeight = headerHeight + headerBorderWidth;
@@ -77,11 +101,42 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const panelEdgeBorders = usePanelEdgeBorders();
   const showLeftBorder = panelEdgeBorders?.left ?? true;
   const showRightBorder = panelEdgeBorders?.right ?? true;
+  const panelSurface = usePanelSurface();
+  const usePanelSurfaceBackground = inheritPanelSurface ?? Boolean(panelSurface);
+  const surfaceOpacity = panelSurface?.opacity ?? 1;
+  const headerBackground = rawHeaderBackground;
+  const headerTextColor = rawHeaderTextColor;
+  const bodyBackground = usePanelSurfaceBackground
+    ? colorWithAlpha(rawHeaderTextColor, surfaceOpacity)
+    : rawHeaderTextColor;
   const toggleValue = isCollapsed ? "collapsed" : "expanded";
   const toggleOptions = [
     { value: "collapsed", ariaLabel: "Expand section", title: "Expand section" },
     { value: "expanded", ariaLabel: "Collapse section", title: "Collapse section" },
   ];
+  const localRef = React.useRef<HTMLDivElement | null>(null);
+  const bodyRef = React.useRef<HTMLDivElement | null>(null);
+  const registerSurface = panelSurface?.registerSurface;
+  const unregisterSurface = panelSurface?.unregisterSurface;
+  const setRefs = React.useCallback((node: HTMLDivElement | null) => {
+    localRef.current = node;
+    if (!ref) return;
+    if (typeof ref === "function") {
+      ref(node);
+    } else {
+      (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    }
+  }, [ref]);
+  const shouldRegisterBody = usePanelSurfaceBackground && renderBody && !isCollapsed;
+  React.useEffect(() => {
+    if (!shouldRegisterBody || !registerSurface) return;
+    const node = bodyRef.current;
+    if (!node) return;
+    registerSurface(node);
+    return () => {
+      if (unregisterSurface) unregisterSurface(node);
+    };
+  }, [isCollapsed, registerSurface, renderBody, shouldRegisterBody, unregisterSurface]);
 
   const commitCollapse = (next: boolean) => {
     if (!isControlled) {
@@ -99,7 +154,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
 
   return (
     <div
-      ref={ref}
+      ref={setRefs}
       className={className}
       style={{
         display: "flex",
@@ -187,6 +242,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
       </div>
       {renderBody && (
         <div
+          ref={bodyRef}
           style={{
             paddingLeft: resolveSize(padding),
             paddingRight: resolveSize(padding),
@@ -195,7 +251,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
             display: isCollapsed ? "none" : "flex",
             flexDirection: "column",
             gap: bodyGap,
-            background: headerTextColor,
+            background: bodyBackground,
           }}
           aria-hidden={isCollapsed}
         >

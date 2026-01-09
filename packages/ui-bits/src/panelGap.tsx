@@ -3,6 +3,14 @@ import React from "react";
 export const DEFAULT_VERTICAL_GAP_PX = 8;
 
 export const VerticalGapContext = React.createContext<number | null>(null);
+export type PanelSurfaceContextValue = {
+  opacity: number;
+  blur: number;
+  registerSurface?: (node: HTMLElement) => void;
+  unregisterSurface?: (node: HTMLElement) => void;
+};
+
+export const PanelSurfaceContext = React.createContext<PanelSurfaceContextValue | null>(null);
 
 export const PanelEdgeBorderContext = React.createContext<{ left: boolean; right: boolean } | null>(null);
 
@@ -19,4 +27,8 @@ export function useVerticalGap(explicit?: number) {
 
 export function usePanelEdgeBorders() {
   return React.useContext(PanelEdgeBorderContext);
+}
+
+export function usePanelSurface() {
+  return React.useContext(PanelSurfaceContext);
 }

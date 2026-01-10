@@ -71,14 +71,8 @@ export default function DocsBrandCanvas({
   const uniformBufferRef = useRef<GPUBuffer | null>(null);
   const sceneBindGroupRef = useRef<GPUBindGroup | null>(null);
   const sceneBindGroupTexturesRef = useRef<{ grid?: GPUTexture } | null>(null);
-  const blurSourceBindGroupRef = useRef<GPUBindGroup | null>(null);
-  const blurSourceBindGroupTexturesRef = useRef<{ grid?: GPUTexture } | null>(null);
-  const blurBindGroupsRef = useRef<{
-    scene?: GPUTexture;
-    blurA?: GPUTexture;
-    horizontal?: GPUBindGroup;
-    vertical?: GPUBindGroup;
-  } | null>(null);
+  const blurBindGroupRef = useRef<GPUBindGroup | null>(null);
+  const blurBindGroupTexturesRef = useRef<{ grid?: GPUTexture } | null>(null);
   const compositeBindGroupRef = useRef<GPUBindGroup | null>(null);
   const compositeBindGroupTexturesRef = useRef<{
     atlas?: GPUTexture;
@@ -93,7 +87,6 @@ export default function DocsBrandCanvas({
     blurB: GPUTexture;
   } | null>(null);
   const gridSamplerRef = useRef<GPUSampler | null>(null);
-  const gridBlurSamplerRef = useRef<GPUSampler | null>(null);
   const blurSamplerRef = useRef<GPUSampler | null>(null);
   const paramsRef = useRef({
     backgroundColor,
@@ -365,8 +358,7 @@ struct Uniforms {
 };
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
-@group(0) @binding(1) var blurSampler : sampler;
-@group(0) @binding(2) var sourceTex : texture_2d<f32>;
+@group(0) @binding(1) var gridAtlas : texture_2d<f32>;
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
@@ -394,27 +386,48 @@ fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
 
 @fragment
 fn fs_blur(in: VertexOutput) -> @location(0) vec4<f32> {
-  let blurPx = max(uniforms.screenParams.z, 0.0);
-  if (blurPx <= 0.0) {
-    return textureSample(sourceTex, blurSampler, in.uv);
-  }
+  let div = max(uniforms.params.x, 1.0);
+  let offscreen = ${OFFSCREEN_ROWS}.0;
+  let totalRows = div + offscreen;
   let screenSize = max(uniforms.screenParams.xy, vec2<f32>(1.0));
-  let dirY = step(0.5, uniforms.screenParams.w);
-  let direction = vec2<f32>(1.0 - dirY, dirY);
-  let stepUv = direction / screenSize;
-  let sigma = max(blurPx, 0.001);
-  let radius = min(blurPx, 64.0);
-  var color = textureSample(sourceTex, blurSampler, in.uv);
-  var weightSum = 1.0;
-  for (var i = 1u; i <= 64u; i = i + 1u) {
-    let x = f32(i);
-    let gate = step(x, radius);
-    let w = exp(-0.5 * (x * x) / (sigma * sigma)) * gate;
-    color = color + textureSample(sourceTex, blurSampler, in.uv + stepUv * x) * w;
-    color = color + textureSample(sourceTex, blurSampler, in.uv - stepUv * x) * w;
-    weightSum = weightSum + 2.0 * w;
+  let cellSizePx = vec2<f32>(screenSize.x / div, screenSize.y / div);
+  let radiusPx = max(uniforms.screenParams.z, 0.0);
+  let posCell = vec2<f32>(in.uv.x * div, in.uv.y * div + offscreen);
+  let radiusCellX = radiusPx / max(cellSizePx.x, 0.0001);
+  let radiusCellY = radiusPx / max(cellSizePx.y, 0.0001);
+  let minX = i32(floor(posCell.x - radiusCellX));
+  let maxX = i32(ceil(posCell.x + radiusCellX));
+  let minY = i32(floor(posCell.y - radiusCellY));
+  let maxY = i32(ceil(posCell.y + radiusCellY));
+  let divI = i32(div);
+  let rowsI = i32(totalRows);
+  var color = vec3<f32>(0.0);
+  var weightSum = 0.0;
+  for (var y = minY; y <= maxY; y = y + 1) {
+    let cy = f32(y) + 0.5;
+    let dyCell = abs(posCell.y - cy);
+    let dyPx = dyCell * cellSizePx.y;
+    for (var x = minX; x <= maxX; x = x + 1) {
+      let cx = f32(x) + 0.5;
+      let dxCell = abs(posCell.x - cx);
+      let dxPx = dxCell * cellSizePx.x;
+      let halfSize = cellSizePx * 0.5;
+      let delta = max(vec2<f32>(dxPx, dyPx) - halfSize, vec2<f32>(0.0));
+      let dist = length(delta);
+      let w = smoothstep(radiusPx, 0.0, dist);
+      if (w > 0.0) {
+        let wrapX = (x % divI + divI) % divI;
+        let wrapY = (y % rowsI + rowsI) % rowsI;
+        let sample = textureLoad(gridAtlas, vec2<i32>(wrapX, wrapY), 0);
+        let cellOn = step(0.5, sample.a);
+        let cellColor = uniforms.backgroundColor.xyz * (1.0 - cellOn) + sample.rgb * cellOn;
+        color = color + cellColor * w;
+        weightSum = weightSum + w;
+      }
+    }
   }
-  return color / weightSum;
+  let finalColor = color / max(weightSum, 0.0001);
+  return vec4<f32>(finalColor, 1.0);
 }
 `,
         });
@@ -596,8 +609,8 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
         };
         sceneBindGroupRef.current = null;
         sceneBindGroupTexturesRef.current = null;
-        blurSourceBindGroupRef.current = null;
-        blurSourceBindGroupTexturesRef.current = null;
+        blurBindGroupRef.current = null;
+        blurBindGroupTexturesRef.current = null;
       };
 
       const stepFall = (grid: NonNullable<typeof gridRef.current>, probability: number) => {
@@ -784,7 +797,8 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
             blurA: createTexture(),
             blurB: createTexture(),
           };
-          blurBindGroupsRef.current = null;
+          blurBindGroupRef.current = null;
+          blurBindGroupTexturesRef.current = null;
           compositeBindGroupRef.current = null;
           compositeBindGroupTexturesRef.current = null;
         };
@@ -820,14 +834,6 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
             addressModeV: "clamp-to-edge",
           });
         }
-        if (!gridBlurSamplerRef.current) {
-          gridBlurSamplerRef.current = device.createSampler({
-            magFilter: "linear",
-            minFilter: "linear",
-            addressModeU: "clamp-to-edge",
-            addressModeV: "clamp-to-edge",
-          });
-        }
         if (!blurSamplerRef.current) {
           blurSamplerRef.current = device.createSampler({
             magFilter: "linear",
@@ -848,40 +854,16 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
           });
           sceneBindGroupTexturesRef.current = { grid: grid.texture };
         }
-        const blurSourceTextures = blurSourceBindGroupTexturesRef.current;
-        if (!blurSourceBindGroupRef.current || !blurSourceTextures || blurSourceTextures.grid !== grid.texture) {
-          blurSourceBindGroupRef.current = device.createBindGroup({
-            layout: scenePipelineRef.current!.getBindGroupLayout(0),
+        const blurTextures = blurBindGroupTexturesRef.current;
+        if (!blurBindGroupRef.current || !blurTextures || blurTextures.grid !== grid.texture) {
+          blurBindGroupRef.current = device.createBindGroup({
+            layout: blurPipelineRef.current!.getBindGroupLayout(0),
             entries: [
               { binding: 0, resource: { buffer: uniformBufferRef.current! } },
-              { binding: 1, resource: gridBlurSamplerRef.current! },
-              { binding: 2, resource: grid.texture.createView() },
+              { binding: 1, resource: grid.texture.createView() },
             ],
           });
-          blurSourceBindGroupTexturesRef.current = { grid: grid.texture };
-        }
-        const blurGroups = blurBindGroupsRef.current;
-        if (!blurGroups || blurGroups.scene !== offscreen.blurA || blurGroups.blurA !== offscreen.blurB) {
-          blurBindGroupsRef.current = {
-            scene: offscreen.blurA,
-            blurA: offscreen.blurB,
-            horizontal: device.createBindGroup({
-              layout: blurPipelineRef.current!.getBindGroupLayout(0),
-              entries: [
-                { binding: 0, resource: { buffer: uniformBufferRef.current! } },
-                { binding: 1, resource: blurSamplerRef.current! },
-                { binding: 2, resource: offscreen.blurA.createView() },
-              ],
-            }),
-            vertical: device.createBindGroup({
-              layout: blurPipelineRef.current!.getBindGroupLayout(0),
-              entries: [
-                { binding: 0, resource: { buffer: uniformBufferRef.current! } },
-                { binding: 1, resource: blurSamplerRef.current! },
-                { binding: 2, resource: offscreen.blurB.createView() },
-              ],
-            }),
-          };
+          blurBindGroupTexturesRef.current = { grid: grid.texture };
         }
         const compositeTextures = compositeBindGroupTexturesRef.current;
         if (!compositeBindGroupRef.current
@@ -938,7 +920,7 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
         scenePass.draw(6, 1, 0, 0);
         scenePass.end();
 
-        const blurSourcePass = encoder.beginRenderPass({
+        const blurPass = encoder.beginRenderPass({
           colorAttachments: [
             {
               view: offscreen.blurA.createView(),
@@ -948,45 +930,11 @@ fn fs_composite(in: VertexOutput) -> @location(0) vec4<f32> {
             },
           ],
         });
-        blurSourcePass.setPipeline(scenePipelineRef.current!);
-        blurSourcePass.setBindGroup(0, blurSourceBindGroupRef.current!);
-        blurSourcePass.draw(6, 1, 0, 0);
-        blurSourcePass.end();
+        blurPass.setPipeline(blurPipelineRef.current!);
+        blurPass.setBindGroup(0, blurBindGroupRef.current!);
+        blurPass.draw(6, 1, 0, 0);
+        blurPass.end();
 
-        const blurPassH = encoder.beginRenderPass({
-          colorAttachments: [
-            {
-              view: offscreen.blurB.createView(),
-              loadOp: "clear",
-              storeOp: "store",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 },
-            },
-          ],
-        });
-        blurPassH.setPipeline(blurPipelineRef.current!);
-        blurPassH.setBindGroup(0, blurBindGroupsRef.current!.horizontal!);
-        blurPassH.draw(6, 1, 0, 0);
-        blurPassH.end();
-
-        screenParams[3] = 1;
-        device.queue.writeBuffer(uniformBufferRef.current!, screenParamsOffset, screenParams);
-        const blurPassV = encoder.beginRenderPass({
-          colorAttachments: [
-            {
-              view: offscreen.blurA.createView(),
-              loadOp: "clear",
-              storeOp: "store",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 },
-            },
-          ],
-        });
-        blurPassV.setPipeline(blurPipelineRef.current!);
-        blurPassV.setBindGroup(0, blurBindGroupsRef.current!.vertical!);
-        blurPassV.draw(6, 1, 0, 0);
-        blurPassV.end();
-
-        screenParams[3] = 0;
-        device.queue.writeBuffer(uniformBufferRef.current!, screenParamsOffset, screenParams);
         const pass = encoder.beginRenderPass({
           colorAttachments: [
             {

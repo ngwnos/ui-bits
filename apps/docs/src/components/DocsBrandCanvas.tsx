@@ -461,11 +461,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
           grid.target.copyWithin(dst, src, src + rowBytes);
         }
         const paletteColors = paletteRef.current.length ? paletteRef.current : [[255, 255, 255]];
+        const leftColor = paletteColors[0] ?? [255, 255, 255];
+        const rightColor = paletteColors[1] ?? leftColor;
+        const splitAt = grid.size / 2;
         for (let x = 0; x < grid.size; x += 1) {
           const base = x * 4;
           const on = Math.random() < probability;
           if (on) {
-            const color = paletteColors[Math.floor(Math.random() * paletteColors.length)];
+            const color = x < splitAt ? leftColor : rightColor;
             grid.target[base] = color[0];
             grid.target[base + 1] = color[1];
             grid.target[base + 2] = color[2];

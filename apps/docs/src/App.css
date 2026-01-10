@@ -114,6 +114,12 @@
   align-items: center;
 }
 
+.docs-icon-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .docs-icon-item .docs-code {
   align-self: stretch;
   width: 100%;

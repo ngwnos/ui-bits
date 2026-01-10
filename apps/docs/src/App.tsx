@@ -14,7 +14,10 @@ import {
   CloudDrizzle,
   CloudLightning,
   CloudSnow,
+  MoonStar,
   Paintbrush,
+  Power,
+  PowerOff,
   Square,
   SquareCheckBig,
   Sun,
@@ -84,7 +87,9 @@ function App() {
   const [brandColorRelease, setBrandColorRelease] = useState(5)
   const [loadingBarValue, setLoadingBarValue] = useState(0.6)
   const [iconToggled, setIconToggled] = useState(false)
+  const [powerToggled, setPowerToggled] = useState(false)
   const [weatherMode, setWeatherMode] = useState('drizzle')
+  const [themeMode, setThemeMode] = useState('dark')
   const [iconSizeColors, setIconSizeColors] = useState(() => (
     buildRandomCombos(sliderColorCombos, 4)
   ))
@@ -191,6 +196,22 @@ function App() {
       colorA: flexoki.orange['600'],
       colorB: flexoki.orange['150'],
       ariaLabel: 'Sun',
+    },
+  ]), [])
+  const themeOptions = useMemo(() => ([
+    {
+      value: 'dark',
+      icon: <MoonStar />,
+      colorA: flexoki.purple['600'],
+      colorB: flexoki.purple['150'],
+      ariaLabel: 'Dark mode',
+    },
+    {
+      value: 'light',
+      icon: <Sun />,
+      colorA: flexoki.yellow['600'],
+      colorB: flexoki.yellow['150'],
+      ariaLabel: 'Light mode',
     },
   ]), [])
   const activeRoute = useMemo(
@@ -591,35 +612,59 @@ function App() {
                   >
                     <Paintbrush />
                   </IconButton>
-                  <CodeBlock code={`<IconButton fontSize={16} colorA={flexoki.orange["600"]} colorB={flexoki.orange["150"]}>\n  <Paintbrush />\n</IconButton>`} />
+                  <CodeBlock code={`<IconButton behavior="momentary">\n  <Paintbrush />\n</IconButton>`} />
                 </div>
                 <div className="docs-icon-item">
-                  <IconButton
-                    behavior="toggle"
-                    toggled={iconToggled}
-                    onToggle={setIconToggled}
-                    fontSize={16}
-                    colorA={flexoki.green['600']}
-                    colorB={flexoki.green['150']}
-                    borderStyle="a"
-                    aria-label="Checked"
-                  >
-                    {iconToggled ? <SquareCheckBig /> : <Square />}
-                  </IconButton>
-                  <CodeBlock code={`<IconButton behavior="toggle" toggled={checked} onToggle={setChecked}>\n  {checked ? <SquareCheckBig /> : <Square />}\n</IconButton>`} />
+                  <div className="docs-icon-row">
+                    <IconButton
+                      behavior="toggle"
+                      toggled={iconToggled}
+                      onToggle={setIconToggled}
+                      fontSize={16}
+                      colorA={flexoki.green['600']}
+                      colorB={flexoki.green['150']}
+                      borderStyle="a"
+                      aria-label="Checked"
+                    >
+                      {iconToggled ? <SquareCheckBig /> : <Square />}
+                    </IconButton>
+                    <IconButton
+                      behavior="toggle"
+                      toggled={powerToggled}
+                      onToggle={setPowerToggled}
+                      fontSize={16}
+                      colorA={flexoki.red['600']}
+                      colorB={flexoki.red['150']}
+                      borderStyle="a"
+                      aria-label="Power"
+                    >
+                      {powerToggled ? <Power /> : <PowerOff />}
+                    </IconButton>
+                  </div>
+                  <CodeBlock code={`<IconButton behavior="toggle">\n  {toggled ? <SquareCheckBig /> : <Square />}\n</IconButton>`} />
                 </div>
                 <div className="docs-icon-item">
-                  <IconButton
-                    behavior="cycle"
-                    options={weatherOptions}
-                    value={weatherMode}
-                    onChange={(value) => setWeatherMode(value)}
-                    fontSize={16}
-                    borderStyle="a"
-                    colorA={flexoki.blue['600']}
-                    colorB={flexoki.blue['150']}
-                  />
-                  <CodeBlock code={`<IconButton behavior="cycle" options={weatherOptions} value={weather} onChange={setWeather} />`} />
+                  <div className="docs-icon-row">
+                    <IconButton
+                      behavior="cycle"
+                      options={weatherOptions}
+                      value={weatherMode}
+                      onChange={(value) => setWeatherMode(value)}
+                      fontSize={16}
+                      borderStyle="a"
+                      colorA={flexoki.blue['600']}
+                      colorB={flexoki.blue['150']}
+                    />
+                    <IconButton
+                      behavior="cycle"
+                      options={themeOptions}
+                      value={themeMode}
+                      onChange={(value) => setThemeMode(value)}
+                      fontSize={16}
+                      borderStyle="a"
+                    />
+                  </div>
+                  <CodeBlock code={`<IconButton behavior="cycle">\n  <CloudDrizzle />\n  <CloudLightning />\n  <CloudSnow />\n  <Sun />\n</IconButton>\n\n<IconButton behavior="cycle">\n  <MoonStar />\n  <Sun />\n</IconButton>`} />
                 </div>
               </div>
               <div className="docs-icon-grid docs-icon-grid--four">

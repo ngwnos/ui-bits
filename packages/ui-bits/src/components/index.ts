@@ -30,6 +30,7 @@ export { default as Folder, type FolderProps, type FolderBorderStyle } from "./F
 export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./FloatingPanel";
 export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./Dropdown";
+export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./LoadingBar";
 export {
   default as SegmentBar,
   type SegmentBarProps,

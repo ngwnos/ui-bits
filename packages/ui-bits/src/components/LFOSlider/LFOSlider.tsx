@@ -173,7 +173,7 @@ function SliderCore({
   max = 100,
   step = 1,
   variant = 'full',
-  barStyle = 'discrete',
+  barStyle = 'step-aligned',
   barSegmentCount = 32,
   defaultValue,
   value,
@@ -886,7 +886,7 @@ function SliderCore({
     onUserChange?.(snapped);
     editingRef.current = true;
   };
-  const applyWaveValue = useCallback((value: number, nowSec?: number) => {
+  const applyWaveValue = useCallback((value: number, nowSec?: number, forceTextSync: boolean = false) => {
     const lower = drawerValueMin;
     const upper = drawerValueMax;
     if (!Number.isFinite(lower) || !Number.isFinite(upper)) return;
@@ -895,7 +895,7 @@ function SliderCore({
     const snapped = snapToStep(raw, min, step);
     const formatted = snapped.toFixed(precision);
     const caretPos = formatted.length;
-    const shouldSyncText = focused || editingRef.current;
+    const shouldSyncText = focused || editingRef.current || forceTextSync;
     reflectValueToDom(snapped, formatted);
     if (shouldSyncText) {
       if (textRef.current !== formatted) {
@@ -939,7 +939,7 @@ function SliderCore({
       if (isAudioWaveform) {
         const sampled = sampleAudioBinValue(audioSampleValue);
         if (sampled !== null) {
-          applyWaveValue(sampled, nowSec);
+          applyWaveValue(sampled, nowSec, true);
         }
         return;
       }
@@ -958,7 +958,7 @@ function SliderCore({
       }
     }
     if (nextVal === undefined) return;
-    applyWaveValue(nextVal, nowSec);
+    applyWaveValue(nextVal, nowSec, activeMode === 'lfo' && lfoEnabled);
   }, [
     activeWaveform,
     applyWaveValue,
@@ -1764,6 +1764,58 @@ function SliderCore({
           </div>
           <div
             style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+              gap: actionGap,
+              padding: `0 ${padRight} 0 ${actionGap}`,
+              background: bgRight,
+              borderTop: `1px solid ${bgLeft}`,
+              borderBottom: `1px solid ${bgRight}`,
+            }}
+          >
+            <LFOSlider
+              label={frequencyLabelText}
+              ariaLabel={frequencyAriaLabel}
+              showLabel={showFrequencyLabel}
+              variant="basic"
+              min={frequencyRange.min}
+              max={frequencyRange.max}
+              step={frequencyRange.step}
+              width="100%"
+              colorA={bgLeft}
+              colorB={bgRight}
+              border="left"
+              borderMask={{ top: false, bottom: false, right: true, left: true }}
+              fontSize={infoFontSize}
+              mode="external"
+              value={frequencySliderValue}
+              onUserChange={handleFrequencySliderChange}
+              formatDisplayValue={(value) => frequencyDisplayFormat(value)}
+              style={{ gap: 0 }}
+            />
+            <LFOSlider
+              label={phaseLabelText}
+              ariaLabel={phaseAriaLabel}
+              showLabel={showPhaseLabel}
+              variant="basic"
+              min={phaseSliderMin}
+              max={phaseSliderMax}
+              step={phaseSliderStep}
+              width="100%"
+              colorA={bgLeft}
+              colorB={bgRight}
+              border="left"
+              borderMask={{ top: false, bottom: false, right: true, left: true }}
+              fontSize={infoFontSize}
+              mode="external"
+              value={phaseSliderValue}
+              onUserChange={handlePhaseSliderChange}
+              formatDisplayValue={(value) => phaseDisplayFormat(value)}
+              style={{ gap: 0 }}
+            />
+          </div>
+          <div
+            style={{
               display: 'flex',
               alignItems: 'center',
               gap: actionGap,
@@ -1834,56 +1886,6 @@ function SliderCore({
                   </IconButton>
                 );
               })}
-            </div>
-            <div
-              style={{
-                flex: 1,
-                minWidth: 0,
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                gap: actionGap,
-              }}
-            >
-              <LFOSlider
-                label={frequencyLabelText}
-                ariaLabel={frequencyAriaLabel}
-                showLabel={showFrequencyLabel}
-                variant="basic"
-                min={frequencyRange.min}
-                max={frequencyRange.max}
-                step={frequencyRange.step}
-                width="100%"
-                colorA={bgLeft}
-                colorB={bgRight}
-                border="left"
-                borderMask={{ top: false, bottom: false, right: true, left: true }}
-                fontSize={infoFontSize}
-                mode="external"
-                value={frequencySliderValue}
-                onUserChange={handleFrequencySliderChange}
-                formatDisplayValue={(value) => frequencyDisplayFormat(value)}
-                style={{ gap: 0 }}
-              />
-              <LFOSlider
-                label={phaseLabelText}
-                ariaLabel={phaseAriaLabel}
-                showLabel={showPhaseLabel}
-                variant="basic"
-                min={phaseSliderMin}
-                max={phaseSliderMax}
-                step={phaseSliderStep}
-                width="100%"
-                colorA={bgLeft}
-                colorB={bgRight}
-                border="left"
-                borderMask={{ top: false, bottom: false, right: true, left: true }}
-                fontSize={infoFontSize}
-                mode="external"
-                value={phaseSliderValue}
-                onUserChange={handlePhaseSliderChange}
-                formatDisplayValue={(value) => phaseDisplayFormat(value)}
-                style={{ gap: 0 }}
-              />
             </div>
           </div>
         </div>

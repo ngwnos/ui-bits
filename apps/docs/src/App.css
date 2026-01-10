@@ -71,6 +71,42 @@
   font-size: 24px;
 }
 
+.docs-code-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 24px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.docs-code-section .docs-code {
+  grid-column: 2;
+}
+
+.docs-slider-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.docs-slider-grid .docs-code pre {
+  min-height: calc(2 * 1.5em);
+}
+
+.docs-slider-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.docs-slider-grid--five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.docs-slider-grid--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
 .docs-code pre {
   margin: 0;
   min-height: 140px;

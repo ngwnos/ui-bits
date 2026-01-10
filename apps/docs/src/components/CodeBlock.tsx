@@ -85,16 +85,18 @@ interface CodeBlockProps {
 export default function CodeBlock({ code, language = "tsx" }: CodeBlockProps) {
   const [html, setHtml] = useState<string | null>(null);
 
+  const normalizedCode = code.endsWith("\n") ? code : `${code}\n`;
+
   useEffect(() => {
     let isActive = true;
     highlighterPromise.then((highlighter) => {
-      const highlighted = highlighter.codeToHtml(code, { lang: language, theme: THEME_NAME });
+      const highlighted = highlighter.codeToHtml(normalizedCode, { lang: language, theme: THEME_NAME });
       if (isActive) setHtml(highlighted);
     });
     return () => {
       isActive = false;
     };
-  }, [code, language]);
+  }, [language, normalizedCode]);
 
   if (!html) {
     return (

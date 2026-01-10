@@ -43,6 +43,7 @@ export {
   phaseCaptureForTriangle,
 } from "./lfo";
 export { flexoki, flexokiShades, type FlexokiHue, type FlexokiPalette } from "./flexoki";
+export { sliderColorCombos, type SliderColorCombo } from "./sliderPalettes";
 export {
   MATPLOTLIB_GRADIENTS,
   buildPalette,
@@ -61,6 +62,7 @@ export {
 } from "./components/AudioControls";
 export { default as SelectionGrid, type SelectionGridProps } from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";
+export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./components/LoadingBar";
 export {
   default as SegmentBar,
   type SegmentBarProps,

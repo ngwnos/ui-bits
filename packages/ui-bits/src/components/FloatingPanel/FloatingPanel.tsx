@@ -10,6 +10,7 @@ export interface FloatingPanelProps extends Omit<React.HTMLAttributes<HTMLDivEle
   title?: React.ReactNode;
   collapsible?: boolean;
   showDockButton?: boolean;
+  dockOnMount?: boolean;
   colorA?: string;
   colorB?: string;
   borderStyle?: FloatingPanelBorderStyle;
@@ -83,8 +84,9 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const {
     header,
     title,
-    collapsible = false,
+    collapsible = true,
     showDockButton = false,
+    dockOnMount = false,
     colorA = FALLBACK_COLOR_A,
     colorB = FALLBACK_COLOR_B,
     borderStyle = "a",
@@ -273,6 +275,11 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       setDragPosition(nextPosition);
     }
   }, [onPositionChange, position]);
+  React.useLayoutEffect(() => {
+    if (!dockOnMount) return;
+    if (typeof window === "undefined") return;
+    handleDock();
+  }, [dockOnMount, handleDock]);
   const resolvedHeader = header ?? (
     <div style={{ display: "flex", alignItems: "center", justifyContent: showDock ? "space-between" : "flex-start", width: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

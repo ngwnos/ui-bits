@@ -4,11 +4,21 @@ import {
   FloatingPanel,
   Folder,
   FrameLoopProvider,
+  IconButton,
   LFOSlider,
   LoadingBar,
   flexoki,
   sliderColorCombos,
 } from 'ui-bits'
+import {
+  CloudDrizzle,
+  CloudLightning,
+  CloudSnow,
+  Paintbrush,
+  Square,
+  SquareCheckBig,
+  Sun,
+} from 'lucide-react'
 import CodeBlock from './components/CodeBlock'
 import DocsBrandCanvas, { type DocsBrandCanvasProps } from './components/DocsBrandCanvas'
 import './App.css'
@@ -34,6 +44,26 @@ const ROUTES = [
   { id: 'loading-bar', label: 'Loading Bar', title: 'Loading Bar', code: '' },
 ]
 
+const fallbackCombo = { colorA: flexoki.orange['600'], colorB: flexoki.orange['150'] }
+
+const buildRandomCombos = (
+  source: typeof sliderColorCombos,
+  count: number,
+  fallback = fallbackCombo,
+) => {
+  if (source.length === 0) {
+    return Array.from({ length: count }, () => fallback)
+  }
+  const combos = [...source]
+  for (let i = combos.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const temp = combos[i]
+    combos[i] = combos[j]
+    combos[j] = temp
+  }
+  return Array.from({ length: count }, (_, index) => combos[index] ?? fallback)
+}
+
 const getRouteFromHash = () => {
   if (typeof window === 'undefined') return ROUTES[0]
   const hash = window.location.hash.replace('#', '').replace('/', '')
@@ -53,6 +83,11 @@ function App() {
   const [brandColorAttack, setBrandColorAttack] = useState(15)
   const [brandColorRelease, setBrandColorRelease] = useState(5)
   const [loadingBarValue, setLoadingBarValue] = useState(0.6)
+  const [iconToggled, setIconToggled] = useState(false)
+  const [weatherMode, setWeatherMode] = useState('drizzle')
+  const [iconSizeColors, setIconSizeColors] = useState(() => (
+    buildRandomCombos(sliderColorCombos, 4)
+  ))
   const [exampleDrawerOpen, setExampleDrawerOpen] = useState(true)
   const [discreteDrawerOpen, setDiscreteDrawerOpen] = useState(false)
   const [continuousDrawerOpen, setContinuousDrawerOpen] = useState(false)
@@ -63,7 +98,7 @@ function App() {
   const [squareDrawerOpen, setSquareDrawerOpen] = useState(false)
   const [audioDrawerOpen, setAudioDrawerOpen] = useState(false)
   const randomizedSliderColors = useMemo(() => {
-    const fallback = { colorA: flexoki.orange['600'], colorB: flexoki.orange['150'] }
+    const fallback = fallbackCombo
     const source = sliderColorCombos
     if (source.length === 0) {
       return {
@@ -128,6 +163,36 @@ function App() {
   )
   const brandBackground = 'rgb(16, 15, 15)'
   const brandTextColor = flexoki.base['50']
+  const weatherOptions = useMemo(() => ([
+    {
+      value: 'drizzle',
+      icon: <CloudDrizzle />,
+      colorA: flexoki.blue['600'],
+      colorB: flexoki.blue['150'],
+      ariaLabel: 'Drizzle',
+    },
+    {
+      value: 'lightning',
+      icon: <CloudLightning />,
+      colorA: flexoki.yellow['600'],
+      colorB: flexoki.yellow['150'],
+      ariaLabel: 'Lightning',
+    },
+    {
+      value: 'snow',
+      icon: <CloudSnow />,
+      colorA: flexoki.base['800'],
+      colorB: flexoki.base['150'],
+      ariaLabel: 'Snow',
+    },
+    {
+      value: 'sun',
+      icon: <Sun />,
+      colorA: flexoki.orange['600'],
+      colorB: flexoki.orange['150'],
+      ariaLabel: 'Sun',
+    },
+  ]), [])
   const activeRoute = useMemo(
     () => ROUTES.find((route) => route.id === activeRouteId) ?? ROUTES[0],
     [activeRouteId],
@@ -510,6 +575,71 @@ function App() {
                   />
                   <CodeBlock code={`fontSize={16}\n`} />
                 </div>
+              </div>
+            </>
+          ) : activeRouteId === 'icon-button' ? (
+            <>
+              <div className="docs-icon-grid">
+                <div className="docs-icon-item">
+                  <IconButton
+                    fontSize={16}
+                    colorA={flexoki.orange['600']}
+                    colorB={flexoki.orange['150']}
+                    borderStyle="a"
+                    aria-label="Paint"
+                    onClick={() => setIconSizeColors(buildRandomCombos(sliderColorCombos, 4))}
+                  >
+                    <Paintbrush />
+                  </IconButton>
+                  <CodeBlock code={`<IconButton fontSize={16} colorA={flexoki.orange["600"]} colorB={flexoki.orange["150"]}>\n  <Paintbrush />\n</IconButton>`} />
+                </div>
+                <div className="docs-icon-item">
+                  <IconButton
+                    behavior="toggle"
+                    toggled={iconToggled}
+                    onToggle={setIconToggled}
+                    fontSize={16}
+                    colorA={flexoki.green['600']}
+                    colorB={flexoki.green['150']}
+                    borderStyle="a"
+                    aria-label="Checked"
+                  >
+                    {iconToggled ? <SquareCheckBig /> : <Square />}
+                  </IconButton>
+                  <CodeBlock code={`<IconButton behavior="toggle" toggled={checked} onToggle={setChecked}>\n  {checked ? <SquareCheckBig /> : <Square />}\n</IconButton>`} />
+                </div>
+                <div className="docs-icon-item">
+                  <IconButton
+                    behavior="cycle"
+                    options={weatherOptions}
+                    value={weatherMode}
+                    onChange={(value) => setWeatherMode(value)}
+                    fontSize={16}
+                    borderStyle="a"
+                    colorA={flexoki.blue['600']}
+                    colorB={flexoki.blue['150']}
+                  />
+                  <CodeBlock code={`<IconButton behavior="cycle" options={weatherOptions} value={weather} onChange={setWeather} />`} />
+                </div>
+              </div>
+              <div className="docs-icon-grid docs-icon-grid--four">
+                {[10, 12, 14, 16].map((size, index) => {
+                  const colors = iconSizeColors[index] ?? fallbackCombo
+                  return (
+                    <div key={size} className="docs-icon-item">
+                      <IconButton
+                        fontSize={size}
+                        colorA={colors.colorA}
+                        colorB={colors.colorB}
+                        borderStyle="a"
+                        aria-label={`Paint size ${size}`}
+                      >
+                        <Paintbrush />
+                      </IconButton>
+                      <CodeBlock code={`fontSize={${size}}\n`} />
+                    </div>
+                  )
+                })}
               </div>
             </>
           ) : activeRouteId === 'loading-bar' ? (

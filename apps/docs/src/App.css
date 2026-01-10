@@ -100,6 +100,33 @@
   margin-top: 16px;
 }
 
+.docs-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.docs-icon-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.docs-icon-item .docs-code {
+  align-self: stretch;
+  width: 100%;
+}
+
+.docs-icon-item .docs-code pre {
+  width: 100%;
+}
+
+.docs-icon-grid--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .docs-slider-grid--five {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
@@ -114,6 +141,9 @@
   border-radius: 6px;
   border: 1px solid var(--flexoki-base-800);
   overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .docs-code-empty {

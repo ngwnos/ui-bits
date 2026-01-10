@@ -423,11 +423,11 @@ function ConnectedSlider({
       showLfoControls={definition.drawerHandle && state.drawerFeatureEnabled}
       drawerOpen={state.drawerOpen}
       lfoRunning={state.lfoEnabled}
-      initialWaveform={state.waveform}
-      initialFrequency={state.frequency}
-      initialPhase={state.phase}
-      initialAudioResponse={state.audioResponse}
-      initialAudioSamplePosition={state.audioSamplePosition}
+      defaultWaveform={state.waveform}
+      defaultFrequency={state.frequency}
+      defaultPhase={state.phase}
+      defaultAudioResponse={state.audioResponse}
+      defaultAudioSamplePosition={state.audioSamplePosition}
       onUserChange={(value: number) => actions.setSliderValue(sliderId, value)}
       onAnimatedUpdate={(value: number) => actions.setSliderValue(sliderId, value)}
       onDrawerOpenChange={(open: boolean) => actions.setSliderDrawerOpen(sliderId, open)}

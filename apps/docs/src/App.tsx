@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BasicButton,
   FloatingPanel,
@@ -7,6 +7,7 @@ import {
   IconButton,
   LFOSlider,
   LoadingBar,
+  useFrame,
   flexoki,
   sliderColorCombos,
 } from 'ui-bits'
@@ -29,23 +30,25 @@ import './App.css'
 const ROUTES = [
   {
     id: 'slider',
-    label: 'Slider',
-    title: 'Slider',
-    code: `const exampleSlider = {
-  label: "Example Slider",
-  min: 0,
-  max: 100,
-  step: 1,
-  defaultValue: 50,
-  colorA: flexoki.orange["500"],
-  colorB: flexoki.orange["100"],
-  showLfoControls: true,
-  drawerOpen: true,
-};`,
+    label: 'LFO Slider',
+    title: 'LFO Slider',
+    code: `<LFOSlider
+  label="Example Slider"
+  min={0}
+  max={100}
+  step={1}
+  defaultValue={50}
+  colorA={flexoki.orange["500"]}
+  colorB={flexoki.orange["100"]}
+  showLfoControls
+  drawerOpen
+/>`,
   },
   { id: 'icon-button', label: 'Icon Button', title: 'Icon Button', code: '' },
   { id: 'loading-bar', label: 'Loading Bar', title: 'Loading Bar', code: '' },
 ]
+
+const AUDIO_BIN_COUNT = 128
 
 const fallbackCombo = { colorA: flexoki.orange['600'], colorB: flexoki.orange['150'] }
 
@@ -65,6 +68,13 @@ const buildRandomCombos = (
     combos[j] = temp
   }
   return Array.from({ length: count }, (_, index) => combos[index] ?? fallback)
+}
+
+const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
+
+const AudioBinsDriver = ({ onFrame }: { onFrame: (nowSec: number, dtSec: number) => void }) => {
+  useFrame(onFrame)
+  return null
 }
 
 const getRouteFromHash = () => {
@@ -90,6 +100,7 @@ function App() {
   const [powerToggled, setPowerToggled] = useState(false)
   const [weatherMode, setWeatherMode] = useState('drizzle')
   const [themeMode, setThemeMode] = useState('dark')
+  const audioBinsRef = useRef<number[]>(Array.from({ length: AUDIO_BIN_COUNT }, () => 0))
   const [iconSizeColors, setIconSizeColors] = useState(() => (
     buildRandomCombos(sliderColorCombos, 4)
   ))
@@ -248,6 +259,28 @@ function App() {
     brandColorCycleMs,
   ])
 
+  const updateAudioBins = useCallback((nowSec: number, _dtSec: number) => {
+    const bins = audioBinsRef.current
+    const t = nowSec
+    const phaseA = t * 4.5
+    const phaseB = t * 8
+    const phaseC = t * 14
+    const drift = t * 2
+    const count = bins.length
+    if (!count) return
+    const span = count - 1
+    for (let i = 0; i < count; i += 1) {
+      const ratio = span > 0 ? i / span : 0
+      const x = ratio * Math.PI * 2
+      const waveA = Math.sin(x * 1.1 + phaseA)
+      const waveB = Math.sin(x * 2.7 + phaseB + Math.sin(drift) * 0.6)
+      const waveC = Math.sin(x * 4.5 - phaseC + ratio * 1.4)
+      const envelope = 0.6 + 0.4 * Math.sin(x * 0.35 - drift)
+      const value = 0.5 + (0.28 * waveA + 0.18 * waveB + 0.12 * waveC) * envelope
+      bins[i] = clampUnit(value)
+    }
+  }, [])
+
   useEffect(() => {
     const handleHashChange = () => {
       setActiveRouteId(getRouteFromHash().id)
@@ -267,6 +300,7 @@ function App() {
 
   return (
     <FrameLoopProvider>
+      <AudioBinsDriver onFrame={updateAudioBins} />
       <div className="docs-layout">
         <aside className="docs-sidebar">
           <div className="docs-brand">
@@ -328,6 +362,7 @@ function App() {
                 />
                 <CodeBlock code={activeRoute.code} />
               </div>
+              <h2 className="docs-section-title">Bar Style</h2>
               <div className="docs-slider-grid">
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -344,9 +379,9 @@ function App() {
                     showLfoControls
                     drawerOpen={discreteDrawerOpen}
                     onDrawerOpenChange={setDiscreteDrawerOpen}
-                    lfoRunning
-                    initialWaveform="triangle"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="triangle"
+                    defaultFrequency={0.1}
                     barStyle="discrete"
                     barSegmentCount={32}
                   />
@@ -367,9 +402,9 @@ function App() {
                     showLfoControls
                     drawerOpen={stepAlignedDrawerOpen}
                     onDrawerOpenChange={setStepAlignedDrawerOpen}
-                    lfoRunning
-                    initialWaveform="triangle"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="triangle"
+                    defaultFrequency={0.1}
                     barStyle="step-aligned"
                   />
                   <CodeBlock code={`barStyle="step-aligned"\n`} />
@@ -389,14 +424,15 @@ function App() {
                     showLfoControls
                     drawerOpen={continuousDrawerOpen}
                     onDrawerOpenChange={setContinuousDrawerOpen}
-                    lfoRunning
-                    initialWaveform="triangle"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="triangle"
+                    defaultFrequency={0.1}
                     barStyle="continuous"
                   />
                   <CodeBlock code={`barStyle="continuous"\n`} />
                 </div>
               </div>
+              <h2 className="docs-section-title">LFO Waveforms</h2>
               <div className="docs-slider-grid docs-slider-grid--five">
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -411,15 +447,15 @@ function App() {
                     border="left"
                     fontSize={12}
                     showLfoControls
-                    lfoRange={[20, 80]}
+                    defaultLfoRange={[20, 80]}
                     drawerOpen={sineDrawerOpen}
                     onDrawerOpenChange={setSineDrawerOpen}
-                    lfoRunning
-                    initialWaveform="sine"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="sine"
+                    defaultFrequency={0.2}
                     barStyle="continuous"
                   />
-                  <CodeBlock code={`initialWaveform="sine"\n`} />
+                  <CodeBlock code={`defaultWaveform="sine"\ndefaultFrequency={0.2}\ndefaultLfoRange={[20, 80]}`} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -434,15 +470,15 @@ function App() {
                     border="left"
                     fontSize={12}
                     showLfoControls
-                    lfoRange={[20, 80]}
+                    defaultLfoRange={[20, 80]}
                     drawerOpen={triangleDrawerOpen}
                     onDrawerOpenChange={setTriangleDrawerOpen}
-                    lfoRunning
-                    initialWaveform="triangle"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="triangle"
+                    defaultFrequency={0.2}
                     barStyle="continuous"
                   />
-                  <CodeBlock code={`initialWaveform="triangle"\n`} />
+                  <CodeBlock code={`defaultWaveform="triangle"\ndefaultFrequency={0.2}\ndefaultLfoRange={[20, 80]}`} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -457,16 +493,16 @@ function App() {
                     border="left"
                     fontSize={12}
                     showLfoControls
-                    lfoRange={[20, 80]}
+                    defaultLfoRange={[20, 80]}
                     drawerOpen={sawDrawerOpen}
                     onDrawerOpenChange={setSawDrawerOpen}
-                    lfoRunning
-                    initialWaveform="saw"
-                    initialFrequency={0.2}
-                    initialPhase={0.5}
+                    defaultLfoRunning
+                    defaultWaveform="saw"
+                    defaultFrequency={0.4}
+                    defaultPhase={0.5}
                     barStyle="continuous"
                   />
-                  <CodeBlock code={`initialWaveform="saw"\n`} />
+                  <CodeBlock code={`defaultWaveform="saw"\ndefaultFrequency={0.4}\ndefaultPhase={0.5}\ndefaultLfoRange={[20, 80]}`} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -481,15 +517,15 @@ function App() {
                     border="left"
                     fontSize={12}
                     showLfoControls
-                    lfoRange={[20, 80]}
+                    defaultLfoRange={[20, 80]}
                     drawerOpen={squareDrawerOpen}
                     onDrawerOpenChange={setSquareDrawerOpen}
-                    lfoRunning
-                    initialWaveform="square"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="square"
+                    defaultFrequency={0.4}
                     barStyle="continuous"
                   />
-                  <CodeBlock code={`initialWaveform="square"\n`} />
+                  <CodeBlock code={`defaultWaveform="square"\ndefaultFrequency={0.4}\ndefaultLfoRange={[20, 80]}`} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -504,17 +540,21 @@ function App() {
                     border="left"
                     fontSize={12}
                     showLfoControls
-                    lfoRange={[20, 80]}
+                    defaultLfoRange={[20, 80]}
                     drawerOpen={audioDrawerOpen}
                     onDrawerOpenChange={setAudioDrawerOpen}
-                    lfoRunning
-                    initialWaveform="audio"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="audio"
+                    defaultFrequency={0.2}
                     barStyle="continuous"
+                    audioBins={audioBinsRef.current}
+                    audioBinCount={AUDIO_BIN_COUNT}
+                    audioMaxMagnitude={1}
                   />
-                  <CodeBlock code={`initialWaveform="audio"\n`} />
+                  <CodeBlock code={`defaultWaveform="audio"\ndefaultFrequency={0.2}\ndefaultLfoRange={[20, 80]}`} />
                 </div>
               </div>
+              <h2 className="docs-section-title">Font Size</h2>
               <div className="docs-slider-grid docs-slider-grid--four">
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -529,9 +569,9 @@ function App() {
                     border="left"
                     fontSize={10}
                     showLfoControls
-                    lfoRunning
-                    initialWaveform="triangle"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="triangle"
+                    defaultFrequency={0.1}
                     barStyle="continuous"
                   />
                   <CodeBlock code={`fontSize={10}\n`} />
@@ -549,9 +589,9 @@ function App() {
                     border="left"
                     fontSize={12}
                     showLfoControls
-                    lfoRunning
-                    initialWaveform="triangle"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="triangle"
+                    defaultFrequency={0.1}
                     barStyle="continuous"
                   />
                   <CodeBlock code={`fontSize={12}\n`} />
@@ -569,9 +609,9 @@ function App() {
                     border="left"
                     fontSize={14}
                     showLfoControls
-                    lfoRunning
-                    initialWaveform="triangle"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="triangle"
+                    defaultFrequency={0.1}
                     barStyle="continuous"
                   />
                   <CodeBlock code={`fontSize={14}\n`} />
@@ -589,9 +629,9 @@ function App() {
                     border="left"
                     fontSize={16}
                     showLfoControls
-                    lfoRunning
-                    initialWaveform="triangle"
-                    initialFrequency={0.1}
+                    defaultLfoRunning
+                    defaultWaveform="triangle"
+                    defaultFrequency={0.1}
                     barStyle="continuous"
                   />
                   <CodeBlock code={`fontSize={16}\n`} />
@@ -600,6 +640,29 @@ function App() {
             </>
           ) : activeRouteId === 'icon-button' ? (
             <>
+              <div className="docs-code-section">
+                <div className="docs-icon-hero">
+                  <IconButton
+                    behavior="cycle"
+                    options={themeOptions}
+                    value={themeMode}
+                    onChange={(value) => setThemeMode(value)}
+                    fontSize={16}
+                    borderStyle="a"
+                  />
+                </div>
+                <CodeBlock
+                  code={`<IconButton
+  behavior="cycle"
+  options={[
+    { value: "dark", icon: <MoonStar /> },
+    { value: "light", icon: <Sun /> },
+  ]}
+  value="dark"
+  onChange={(value) => setThemeMode(value)}
+/>`}
+                />
+              </div>
               <div className="docs-icon-grid">
                 <div className="docs-icon-item">
                   <IconButton
@@ -612,7 +675,7 @@ function App() {
                   >
                     <Paintbrush />
                   </IconButton>
-                  <CodeBlock code={`<IconButton behavior="momentary">\n  <Paintbrush />\n</IconButton>`} />
+                  <CodeBlock code={`behavior="momentary"`} />
                 </div>
                 <div className="docs-icon-item">
                   <div className="docs-icon-row">
@@ -641,7 +704,7 @@ function App() {
                       {powerToggled ? <Power /> : <PowerOff />}
                     </IconButton>
                   </div>
-                  <CodeBlock code={`<IconButton behavior="toggle">\n  {toggled ? <SquareCheckBig /> : <Square />}\n</IconButton>`} />
+                  <CodeBlock code={`behavior="toggle"`} />
                 </div>
                 <div className="docs-icon-item">
                   <div className="docs-icon-row">
@@ -655,16 +718,8 @@ function App() {
                       colorA={flexoki.blue['600']}
                       colorB={flexoki.blue['150']}
                     />
-                    <IconButton
-                      behavior="cycle"
-                      options={themeOptions}
-                      value={themeMode}
-                      onChange={(value) => setThemeMode(value)}
-                      fontSize={16}
-                      borderStyle="a"
-                    />
                   </div>
-                  <CodeBlock code={`<IconButton behavior="cycle">\n  <CloudDrizzle />\n  <CloudLightning />\n  <CloudSnow />\n  <Sun />\n</IconButton>\n\n<IconButton behavior="cycle">\n  <MoonStar />\n  <Sun />\n</IconButton>`} />
+                  <CodeBlock code={`behavior="cycle"`} />
                 </div>
               </div>
               <div className="docs-icon-grid docs-icon-grid--four">

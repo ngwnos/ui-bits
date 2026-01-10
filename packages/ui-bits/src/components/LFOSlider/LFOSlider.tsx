@@ -114,6 +114,7 @@ export interface LFOSliderProps {
   value?: number;
   width?: number | string;
   drawerLines?: [number, number];
+  defaultLfoRange?: [number, number];
   lfoRange?: [number, number];
   lfoFrequencyMin?: number;
   lfoFrequencyMax?: number;
@@ -128,6 +129,7 @@ export interface LFOSliderProps {
   showLfoControls?: boolean;
   phase?: number;
   mode?: LFOSliderMode;
+  defaultLfo?: LfoSettings;
   lfo?: LfoSettings;
   readExternal?: () => number | undefined | null;
   mirrorToStore?: MirrorFn;
@@ -141,10 +143,12 @@ export interface LFOSliderProps {
   onWaveformChange?: (waveform: Waveform) => void;
   onFrequencyChange?: (frequency: number) => void;
   onPhaseChange?: (phase: number) => void;
-  initialWaveform?: Waveform;
-  initialFrequency?: number;
-  initialPhase?: number;
+  defaultWaveform?: Waveform;
+  defaultFrequency?: number;
+  defaultPhase?: number;
+  defaultDrawerOpen?: boolean;
   drawerOpen?: boolean;
+  defaultLfoRunning?: boolean;
   lfoRunning?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -157,9 +161,9 @@ export interface LFOSliderProps {
   audioBins?: readonly number[];
   audioBinCount?: number;
   audioMaxMagnitude?: number;
-  initialAudioResponse?: number;
+  defaultAudioResponse?: number;
   onAudioResponseChange?: (value: number) => void;
-  initialAudioSamplePosition?: number;
+  defaultAudioSamplePosition?: number;
   onAudioSamplePositionChange?: (value: number) => void;
   borderMask?: Partial<Record<'top' | 'right' | 'bottom' | 'left', boolean>>;
   suspended?: boolean;
@@ -179,6 +183,7 @@ function SliderCore({
   value,
   width,
   drawerLines,
+  defaultLfoRange,
   lfoRange,
   lfoFrequencyMin,
   lfoFrequencyMax,
@@ -193,6 +198,7 @@ function SliderCore({
   showLfoControls = false,
   phase = 0,
   mode = 'auto',
+  defaultLfo,
   lfo: lfoProp,
   readExternal,
   mirrorToStore,
@@ -206,10 +212,12 @@ function SliderCore({
   onWaveformChange,
   onFrequencyChange,
   onPhaseChange,
-  initialWaveform,
-  initialFrequency,
-  initialPhase,
+  defaultWaveform,
+  defaultFrequency,
+  defaultPhase,
+  defaultDrawerOpen,
   drawerOpen: controlledDrawerOpen,
+  defaultLfoRunning,
   lfoRunning,
   className,
   style,
@@ -222,9 +230,9 @@ function SliderCore({
   audioBins,
   audioBinCount,
   audioMaxMagnitude,
-  initialAudioResponse,
+  defaultAudioResponse,
   onAudioResponseChange,
-  initialAudioSamplePosition,
+  defaultAudioSamplePosition,
   onAudioSamplePositionChange,
   borderMask,
   suspended,
@@ -246,21 +254,22 @@ function SliderCore({
     ? value
     : (defaultValue !== undefined ? defaultValue : 0);
   const [text, setText] = useState<string>(() => Number(initialNumeric).toFixed(precInit));
+  const lfoDefaults = defaultLfo ?? lfoProp;
   const lfoSettings = useMemo<LfoSettings>(() => {
     const defaults: LfoSettings = {
       enabled: true,
-      frequency: initialFrequency ?? 0.5,
+      frequency: defaultFrequency ?? 0.5,
       depth: 1,
       offset: 0.5,
-      waveform: initialWaveform ?? 'sine',
+      waveform: defaultWaveform ?? 'sine',
       phase: normalizePhaseFraction(phase),
       invert: false,
     };
-    const merged = { ...defaults, ...(lfoProp ?? {}) };
+    const merged = { ...defaults, ...(lfoDefaults ?? {}) };
     const resolvedPhase = normalizePhaseFraction(merged.phase ?? defaults.phase ?? 0);
     return { ...merged, phase: resolvedPhase };
-  }, [initialFrequency, initialWaveform, lfoProp, phase]);
-  const defaultWaveform = initialWaveform ?? lfoSettings.waveform ?? 'sine';
+  }, [defaultFrequency, defaultWaveform, lfoDefaults, phase]);
+  const resolvedWaveform = defaultWaveform ?? lfoSettings.waveform ?? 'sine';
   const resolvedShowLfoControls = !isBasic && showLfoControls;
   const drawerHandleActive = resolvedShowLfoControls;
 
@@ -272,18 +281,22 @@ function SliderCore({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [hoverInside, setHoverInside] = useState<boolean>(false);
   const [overHandle, setOverHandle] = useState<boolean>(false);
-  const [drawerOpen, setDrawerOpen] = useState<boolean>(() => controlledDrawerOpen ?? false);
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(() => (
+    controlledDrawerOpen ?? defaultDrawerOpen ?? false
+  ));
   const [drawerHeight, setDrawerHeight] = useState<number>(0);
-  const [activeWaveform, setActiveWaveform] = useState<Waveform>(defaultWaveform);
-  const initialLfoEnabled = isBasic ? false : (lfoRunning ?? lfoProp?.enabled ?? false);
+  const [activeWaveform, setActiveWaveform] = useState<Waveform>(resolvedWaveform);
+  const initialLfoEnabled = isBasic ? false : (
+    lfoRunning ?? defaultLfoRunning ?? lfoDefaults?.enabled ?? false
+  );
   const [lfoEnabled, setLfoEnabled] = useState<boolean>(initialLfoEnabled);
   const [knobFrequency, setKnobFrequency] = useState<number>(() => clamp(
-    initialFrequency ?? lfoSettings.frequency ?? 0.5,
+    defaultFrequency ?? lfoSettings.frequency ?? 0.5,
     resolvedLfoFrequencyMin,
     resolvedLfoFrequencyMax,
   ));
   const [phaseDial, setPhaseDial] = useState<number>(() => (
-    normalizePhaseFraction(initialPhase ?? lfoSettings.phase ?? 0)
+    normalizePhaseFraction(defaultPhase ?? lfoSettings.phase ?? 0)
   ));
 
   useEffect(() => {
@@ -295,8 +308,8 @@ function SliderCore({
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const draggingDrawerLineRef = useRef<number | null>(null);
   const drawerPointerCaptureRef = useRef<{ id: number; node: Element | null }>({ id: -1, node: null });
-  const rangeProp = lfoRange ?? drawerLines;
-  const isDrawerControlled = Boolean(rangeProp && onDrawerLinesChange);
+  const rangeProp = lfoRange ?? defaultLfoRange ?? drawerLines;
+  const isDrawerControlled = lfoRange !== undefined;
   const initialDrawerRange = rangeProp ?? [min, max];
   const [drawerLineValues, setDrawerLineValues] = useState<[number, number]>(() => (
     [...initialDrawerRange] as [number, number]
@@ -408,23 +421,23 @@ function SliderCore({
   const lastEmitMsRef = useRef(0);
   const lastNowSecRef = useRef(0);
   const [audioResponse, setAudioResponse] = useState<number>(() => clamp(
-    initialAudioResponse ?? 0,
+    defaultAudioResponse ?? 0,
     AUDIO_RESPONSE_MIN,
     AUDIO_RESPONSE_MAX,
   ));
   useEffect(() => {
-    if (initialAudioResponse === undefined) return;
-    setAudioResponse(clamp(initialAudioResponse, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX));
-  }, [initialAudioResponse]);
+    if (defaultAudioResponse === undefined) return;
+    setAudioResponse(clamp(defaultAudioResponse, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX));
+  }, [defaultAudioResponse]);
   const [audioSamplePosition, setAudioSamplePosition] = useState<number>(() => clamp(
-    initialAudioSamplePosition ?? 0.5,
+    defaultAudioSamplePosition ?? 0.5,
     resolvedAudioFrequencyMin,
     resolvedAudioFrequencyMax,
   ));
   useEffect(() => {
-    if (initialAudioSamplePosition === undefined) return;
-    setAudioSamplePosition(clamp(initialAudioSamplePosition, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax));
-  }, [initialAudioSamplePosition, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
+    if (defaultAudioSamplePosition === undefined) return;
+    setAudioSamplePosition(clamp(defaultAudioSamplePosition, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax));
+  }, [defaultAudioSamplePosition, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
 
   // DOM refs
   const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
@@ -1029,8 +1042,8 @@ function SliderCore({
   }, [isAudioWaveform, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
 
   useEffect(() => {
-    setPhaseDial(normalizePhaseFraction(initialPhase ?? lfoSettings.phase ?? 0));
-  }, [initialPhase, lfoSettings.phase]);
+    setPhaseDial(normalizePhaseFraction(defaultPhase ?? lfoSettings.phase ?? 0));
+  }, [defaultPhase, lfoSettings.phase]);
   useEffect(() => {
     if (isBasic || lfoRunning === undefined) return;
     setLfoEnabled(lfoRunning);

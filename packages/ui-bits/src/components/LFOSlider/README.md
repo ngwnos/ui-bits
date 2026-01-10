@@ -45,10 +45,16 @@ const Example = () => {
 | `barSegmentCount` | `number` | Visual segment count used when `barStyle="discrete"`. |
 | `defaultValue` | `number` | Initial numerical value; the component keeps its own local text buffer. |
 | `value` | `number` | Controlled value used for external mode; overrides `defaultValue` for initial display. |
-| `lfoRange` | `[number, number]` | Optional min/max markers shown in the drawer track. Falls back to randomised handles when omitted. |
+| `defaultLfoRange` | `[number, number]` | Initial min/max markers shown in the drawer track. |
+| `lfoRange` | `[number, number]` | Controlled min/max markers shown in the drawer track. |
 | `colorA`, `colorB` | `string` | Hex colours for the segmented background. When omitted the slider falls back to neutral grey/white. |
 | `showLfoControls` | `boolean` | Enables the drawer UI (waveform toggles + min/max handles). |
-| `initialWaveform`, `initialFrequency`, `initialPhase` | Numbers describing the starting LFO (phase uses 0-1 to represent a full cycle). |
+| `defaultWaveform`, `defaultFrequency`, `defaultPhase` | Numbers describing the starting LFO (phase uses 0-1 to represent a full cycle). |
+| `defaultLfo` | `LfoSettings` | Optional defaults for LFO settings (frequency, depth, offset, phase, invert). |
+| `defaultDrawerOpen` | `boolean` | Initial drawer open state. |
+| `drawerOpen` | `boolean` | Controlled drawer open state. |
+| `defaultLfoRunning` | `boolean` | Initial LFO running state. |
+| `lfoRunning` | `boolean` | Controlled LFO running state. |
 | `onUserChange` | `(value: number) => void` | Fired for direct user edits (dragging, typing). |
 | `onAnimatedUpdate` | `(value: number) => void` | Fired for automated updates (frame loop, external source). |
 | `onDrawerOpenChange`, `onDrawerLinesChange` | Callbacks for synchronising drawer state with your store. |

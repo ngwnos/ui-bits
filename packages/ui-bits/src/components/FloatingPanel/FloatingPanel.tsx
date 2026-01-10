@@ -156,7 +156,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const resolvedPaddingLeftValue = resolveSize(resolvedPaddingLeft) ?? "0px";
   const resolvedPaddingRightValue = resolveSize(resolvedPaddingRight) ?? "0px";
   const resolvedPaddingBottomValue = resolveSize(resolvedPaddingBottom) ?? "0px";
-  const resolvedRadius = radius ?? Math.max(4, Math.round(resolvedFontSize * 0.4));
+  const resolvedRadius = radius ?? 3;
   const resolvedShadow = shadow ?? DEFAULT_SHADOW;
   const resolvedBorderColor = borderStyle === "a"
     ? colorA

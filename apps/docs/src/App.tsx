@@ -5,7 +5,75 @@ import DocsBrandCanvas, { type DocsBrandCanvasProps } from './components/DocsBra
 import './App.css'
 
 const ROUTES = [
-  { id: 'slider', label: 'Slider', title: 'Slider', code: '' },
+  {
+    id: 'slider',
+    label: 'Slider',
+    title: 'Slider',
+    code: `export interface LFOSliderProps {
+  label: string;
+  ariaLabel?: string;
+  showLabel?: boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  variant?: SliderVariant;
+  barStyle?: SliderBarStyle;
+  barSegmentCount?: number;
+  defaultValue?: number;
+  value?: number;
+  width?: number | string;
+  drawerLines?: [number, number];
+  lfoRange?: [number, number];
+  lfoFrequencyMin?: number;
+  lfoFrequencyMax?: number;
+  lfoFrequencyStep?: number;
+  audioFrequencyMin?: number;
+  audioFrequencyMax?: number;
+  audioFrequencyStep?: number;
+  colorA?: string;
+  colorB?: string;
+  border?: SliderBorder;
+  fontSize?: number;
+  showLfoControls?: boolean;
+  phase?: number;
+  mode?: LFOSliderMode;
+  lfo?: LfoSettings;
+  readExternal?: () => number | undefined | null;
+  mirrorToStore?: MirrorFn;
+  mirrorEveryMs?: number;
+  epsilon?: number;
+  onUserChange?: (v: number) => void;
+  onAnimatedUpdate?: (v: number) => void;
+  onDrawerOpenChange?: (open: boolean) => void;
+  onDrawerLinesChange?: (lines: [number, number]) => void;
+  onLfoEnabledChange?: (enabled: boolean) => void;
+  onWaveformChange?: (waveform: Waveform) => void;
+  onFrequencyChange?: (frequency: number) => void;
+  onPhaseChange?: (phase: number) => void;
+  initialWaveform?: Waveform;
+  initialFrequency?: number;
+  initialPhase?: number;
+  drawerOpen?: boolean;
+  lfoRunning?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  formatDisplayValue?: FormatDisplayValueFn;
+  parseDisplayValue?: ParseDisplayValueFn;
+  valuePrefix?: string;
+  valueSuffix?: string;
+  displayFormatterPreset?: DisplayValueFormatterPreset;
+  displayFormatterPresetOptions?: DisplayFormatterPresetOptions;
+  audioBins?: readonly number[];
+  audioBinCount?: number;
+  audioMaxMagnitude?: number;
+  initialAudioResponse?: number;
+  onAudioResponseChange?: (value: number) => void;
+  initialAudioSamplePosition?: number;
+  onAudioSamplePositionChange?: (value: number) => void;
+  borderMask?: Partial<Record<'top' | 'right' | 'bottom' | 'left', boolean>>;
+  suspended?: boolean;
+};`,
+  },
   { id: 'icon-button', label: 'Icon Button', title: 'Icon Button', code: '' },
 ]
 

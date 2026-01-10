@@ -91,6 +91,19 @@
   height: 100%;
 }
 
+.docs-audio-wrap {
+  width: 100%;
+  max-width: 720px;
+}
+
+.docs-audio-stack {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .docs-slider-item {
   display: flex;
   flex-direction: column;
@@ -99,6 +112,10 @@
 }
 
 .docs-slider-grid .docs-code pre {
+  min-height: calc(2 * 1.5em);
+}
+
+.docs-icon-grid .docs-code pre {
   min-height: calc(2 * 1.5em);
 }
 

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BasicButton,
+  AudioAnalysisProvider,
+  AudioControls,
   FloatingPanel,
   Folder,
   FrameLoopProvider,
   IconButton,
   LFOSlider,
   LoadingBar,
+  SegmentBar,
   useFrame,
   flexoki,
   sliderColorCombos,
@@ -46,6 +49,44 @@ const ROUTES = [
   },
   { id: 'icon-button', label: 'Icon Button', title: 'Icon Button', code: '' },
   { id: 'loading-bar', label: 'Loading Bar', title: 'Loading Bar', code: '' },
+  {
+    id: 'audio-controls',
+    label: 'Audio Controls',
+    title: 'Audio Controls',
+    code: `<AudioControls
+  audioSrc="/audio/credits.mp3"
+  colorA={flexoki.red["600"]}
+  colorB={flexoki.red["100"]}
+    borderStyle="a"
+    fontSize={12}
+/>`,
+  },
+  {
+    id: 'segment-bar',
+    label: 'Segment Bar',
+    title: 'Segment Bar',
+    code: `<SegmentBar
+  options={[
+    { value: "low", label: "Low" },
+    { value: "mid", label: "Mid" },
+    { value: "high", label: "High" },
+  ]}
+  defaultValue="mid"
+  colorA={flexoki.purple["600"]}
+  colorB={flexoki.purple["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>`,
+  },
+]
+
+const SIDEBAR_COLORS = [
+  { colorA: flexoki.red['100'], colorB: flexoki.red['600'] },
+  { colorA: flexoki.orange['100'], colorB: flexoki.orange['600'] },
+  { colorA: flexoki.yellow['100'], colorB: flexoki.yellow['600'] },
+  { colorA: flexoki.green['100'], colorB: flexoki.green['600'] },
+  { colorA: flexoki.blue['100'], colorB: flexoki.blue['600'] },
+  { colorA: flexoki.purple['100'], colorB: flexoki.purple['600'] },
 ]
 
 const AUDIO_BIN_COUNT = 128
@@ -209,6 +250,11 @@ function App() {
       ariaLabel: 'Sun',
     },
   ]), [])
+  const segmentOptions = useMemo(() => ([
+    { value: 'low', label: 'Low' },
+    { value: 'mid', label: 'Mid' },
+    { value: 'high', label: 'High' },
+  ]), [])
   const themeOptions = useMemo(() => ([
     {
       value: 'dark',
@@ -300,8 +346,9 @@ function App() {
 
   return (
     <FrameLoopProvider>
-      <AudioBinsDriver onFrame={updateAudioBins} />
-      <div className="docs-layout">
+      <AudioAnalysisProvider>
+        <AudioBinsDriver onFrame={updateAudioBins} />
+        <div className="docs-layout">
         <aside className="docs-sidebar">
           <div className="docs-brand">
             <DocsBrandCanvas {...brandCanvasProps} />
@@ -309,35 +356,30 @@ function App() {
           <Folder
             className="docs-folder"
             label="Components"
-            colorA="#AF3029"
-            colorB="#FFCABB"
+            colorA={flexoki.base['100']}
+            colorB={flexoki.base['800']}
             borderStyle="none"
             transparent
             fontSize={16}
             padding={6}
             verticalGap={6}
           >
-            {ROUTES.map((route) => (
-              <BasicButton
-                key={route.id}
-                className="docs-button"
-                colorA={route.id === 'icon-button'
-                  ? '#F6E2A0'
-                  : route.id === 'loading-bar'
-                    ? flexoki.green['100']
-                    : '#FED3AF'}
-                colorB={route.id === 'icon-button'
-                  ? '#AD8301'
-                  : route.id === 'loading-bar'
-                    ? flexoki.green['600']
-                    : '#BC5215'}
-                borderStyle="none"
-                fontSize={16}
-                onClick={() => handleNavClick(route.id)}
-              >
-                {route.label}
-              </BasicButton>
-            ))}
+            {ROUTES.map((route, index) => {
+              const palette = SIDEBAR_COLORS[index % SIDEBAR_COLORS.length]
+              return (
+                <BasicButton
+                  key={route.id}
+                  className="docs-button"
+                  colorA={palette.colorA}
+                  colorB={palette.colorB}
+                  borderStyle="none"
+                  fontSize={16}
+                  onClick={() => handleNavClick(route.id)}
+                >
+                  {route.label}
+                </BasicButton>
+              )
+            })}
           </Folder>
         </aside>
         <main className="docs-main">
@@ -663,6 +705,7 @@ function App() {
 />`}
                 />
               </div>
+              <h2 className="docs-section-title">Behavior</h2>
               <div className="docs-icon-grid">
                 <div className="docs-icon-item">
                   <IconButton
@@ -722,6 +765,7 @@ function App() {
                   <CodeBlock code={`behavior="cycle"`} />
                 </div>
               </div>
+              <h2 className="docs-section-title">Font Size</h2>
               <div className="docs-icon-grid docs-icon-grid--four">
                 {[10, 12, 14, 16].map((size, index) => {
                   const colors = iconSizeColors[index] ?? fallbackCombo
@@ -769,6 +813,66 @@ function App() {
                 onUserChange={setLoadingBarValue}
                 onAnimatedUpdate={setLoadingBarValue}
                 formatDisplayValue={(value) => value.toFixed(2)}
+              />
+              <CodeBlock code={activeRoute.code} />
+            </div>
+          ) : activeRouteId === 'audio-controls' ? (
+            <div className="docs-code-section">
+              <div className="docs-audio-stack">
+                <AudioControls
+                  audioSrc="/audio/credits.mp3"
+                  colorA={flexoki.red['600']}
+                  colorB={flexoki.red['100']}
+                  borderStyle="a"
+                  fontSize={12}
+                />
+                <LFOSlider
+                  label="Audio LFO"
+                  min={0}
+                  max={100}
+                  step={1}
+                  defaultValue={50}
+                  width="100%"
+                  colorA={flexoki.red['600']}
+                  colorB={flexoki.red['100']}
+                  border="left"
+                  fontSize={12}
+                  showLfoControls
+                  defaultLfoRunning
+                  defaultWaveform="audio"
+                />
+              </div>
+              <CodeBlock
+                code={`<AudioAnalysisProvider>
+  <AudioControls
+    audioSrc="/audio/credits.mp3"
+    colorA={flexoki.red["600"]}
+    colorB={flexoki.red["100"]}
+    borderStyle="a"
+    fontSize={12}
+  />
+  <LFOSlider
+    label="Audio LFO"
+    min={0}
+    max={100}
+    step={1}
+    defaultValue={50}
+    showLfoControls
+    defaultLfoRunning
+    defaultWaveform="audio"
+  />
+</AudioAnalysisProvider>`}
+              />
+            </div>
+          ) : activeRouteId === 'segment-bar' ? (
+            <div className="docs-code-section">
+              <SegmentBar
+                options={segmentOptions}
+                defaultValue="mid"
+                colorA={flexoki.purple['600']}
+                colorB={flexoki.purple['100']}
+                borderStyle="a"
+                fontSize={12}
               />
               <CodeBlock code={activeRoute.code} />
             </div>
@@ -966,7 +1070,8 @@ function App() {
           formatDisplayValue={(value) => value.toFixed(1)}
         />
       </FloatingPanel>
-      </div>
+        </div>
+      </AudioAnalysisProvider>
     </FrameLoopProvider>
   )
 }

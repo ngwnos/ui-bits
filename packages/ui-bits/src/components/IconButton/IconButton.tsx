@@ -25,6 +25,9 @@ export interface IconButtonProps
   toggled?: boolean;
   defaultToggled?: boolean;
   onToggle?: (next: boolean) => void;
+  pressed?: boolean;
+  defaultPressed?: boolean;
+  onPressChange?: (pressed: boolean) => void;
   options?: IconButtonCycleOption[];
   value?: string;
   defaultValue?: string;
@@ -53,6 +56,9 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     toggled,
     defaultToggled = false,
     onToggle,
+    pressed,
+    defaultPressed = false,
+    onPressChange,
     options,
     value,
     defaultValue,
@@ -75,7 +81,15 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
   } = props;
   const resolvedBehavior: IconButtonBehavior = behavior ?? (options?.length ? "cycle" : "momentary");
   const cycleOptions = options ?? [];
-  const [isPressed, setIsPressed] = React.useState(false);
+  const [uncontrolledPressed, setUncontrolledPressed] = React.useState(defaultPressed);
+  const isPressedControlled = pressed !== undefined;
+  const resolvedPressed = isPressedControlled ? pressed : uncontrolledPressed;
+  const setPressed = React.useCallback((next: boolean) => {
+    if (!isPressedControlled) {
+      setUncontrolledPressed(next);
+    }
+    onPressChange?.(next);
+  }, [isPressedControlled, onPressChange]);
   const [uncontrolledToggled, setUncontrolledToggled] = React.useState(defaultToggled);
   const isToggleControlled = toggled !== undefined;
   const resolvedToggled = isToggleControlled ? toggled : uncontrolledToggled;
@@ -102,7 +116,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     ? (activeOption?.colorB ?? colorB)
     : colorB;
   const shouldInvert = (resolvedBehavior === "toggle" && resolvedToggled)
-    || (resolvedBehavior === "momentary" && isPressed);
+    || (resolvedBehavior === "momentary" && resolvedPressed);
   const [resolvedColorA, resolvedColorB] = shouldInvert
     ? [optionColorB, optionColorA]
     : [optionColorA, optionColorB];
@@ -193,43 +207,43 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
   };
   const handlePointerDown: React.PointerEventHandler<HTMLButtonElement> = (event) => {
     if (!disabled && resolvedBehavior === "momentary") {
-      setIsPressed(true);
+      setPressed(true);
     }
     onPointerDown?.(event);
   };
   const handlePointerUp: React.PointerEventHandler<HTMLButtonElement> = (event) => {
     if (resolvedBehavior === "momentary") {
-      setIsPressed(false);
+      setPressed(false);
     }
     onPointerUp?.(event);
   };
   const handlePointerLeave: React.PointerEventHandler<HTMLButtonElement> = (event) => {
     if (resolvedBehavior === "momentary") {
-      setIsPressed(false);
+      setPressed(false);
     }
     onPointerLeave?.(event);
   };
   const handlePointerCancel: React.PointerEventHandler<HTMLButtonElement> = (event) => {
     if (resolvedBehavior === "momentary") {
-      setIsPressed(false);
+      setPressed(false);
     }
     onPointerCancel?.(event);
   };
   const handleKeyDown: React.KeyboardEventHandler<HTMLButtonElement> = (event) => {
     if (!disabled && resolvedBehavior === "momentary" && (event.key === " " || event.key === "Enter")) {
-      setIsPressed(true);
+      setPressed(true);
     }
     onKeyDown?.(event);
   };
   const handleKeyUp: React.KeyboardEventHandler<HTMLButtonElement> = (event) => {
     if (resolvedBehavior === "momentary" && (event.key === " " || event.key === "Enter")) {
-      setIsPressed(false);
+      setPressed(false);
     }
     onKeyUp?.(event);
   };
   const handleBlur: React.FocusEventHandler<HTMLButtonElement> = (event) => {
     if (resolvedBehavior === "momentary") {
-      setIsPressed(false);
+      setPressed(false);
     }
     onBlur?.(event);
   };

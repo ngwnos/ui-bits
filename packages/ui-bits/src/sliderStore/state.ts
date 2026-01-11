@@ -14,7 +14,7 @@ const AUDIO_RESPONSE_MAX = 1;
 export type SliderId = string;
 export type SelectionGridId = string;
 export type SelectionGridAlignment = "left" | "center" | "right";
-export type SelectionGridPreviewMode = "gradient" | "terrainHeight" | "terrainHillshade";
+export type SelectionGridPreviewMode = "gradient" | "terrainHeight";
 
 export interface SelectionGridState {
   selectedIndex: number | null;
@@ -149,14 +149,17 @@ export function normalizeSelectionGridState(base: SelectionGridState): Selection
     if (value === "center" || value === "right") return value;
     return "left";
   };
-  const normalizePreviewMode = (value: SelectionGridPreviewMode | boolean | undefined): SelectionGridPreviewMode => {
-    if (value === "gradient" || value === "terrainHeight" || value === "terrainHillshade") {
+  const normalizePreviewMode = (value: SelectionGridPreviewMode | boolean | undefined | "terrainHillshade"): SelectionGridPreviewMode => {
+    if (value === "gradient" || value === "terrainHeight") {
       return value;
     }
-    if (typeof value === "boolean") {
-      return value ? "terrainHillshade" : "gradient";
+    if (value === "terrainHillshade") {
+      return "terrainHeight";
     }
-    return "terrainHillshade";
+    if (typeof value === "boolean") {
+      return value ? "terrainHeight" : "gradient";
+    }
+    return "terrainHeight";
   };
   const rawPreviewMode = (base as SelectionGridState & { previewMode?: SelectionGridPreviewMode }).previewMode;
   const legacyUseTerrain = (base as { useTerrainTiles?: boolean }).useTerrainTiles;

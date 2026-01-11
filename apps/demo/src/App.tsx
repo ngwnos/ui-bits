@@ -9,7 +9,6 @@ import {
   Minus,
   Plus,
   Mountain,
-  MountainSnow,
   Moon,
   Pause,
   Play,
@@ -59,16 +58,14 @@ const BORDER_ICONS: Record<SliderBorder, React.ComponentType<{ size?: number; st
   right: SquareDashed,
   none: X,
 };
-const SELECTION_PREVIEW_MODE_SEQUENCE: SelectionGridPreviewMode[] = ["gradient", "terrainHeight", "terrainHillshade"];
+const SELECTION_PREVIEW_MODE_SEQUENCE: SelectionGridPreviewMode[] = ["gradient", "terrainHeight"];
 const SELECTION_PREVIEW_MODE_ICON: Record<SelectionGridPreviewMode, React.ComponentType<{ size?: number; strokeWidth?: number }>> = {
   gradient: Columns4,
   terrainHeight: Mountain,
-  terrainHillshade: MountainSnow,
 };
 const SELECTION_PREVIEW_MODE_TITLE: Record<SelectionGridPreviewMode, string> = {
   gradient: "Gradient previews",
   terrainHeight: "Terrain height previews",
-  terrainHillshade: "Terrain hillshade previews",
 };
 
 const DROPDOWN_OPTIONS = [
@@ -1659,7 +1656,7 @@ function EditableRectPOC() {
                   colorA={flexoki.red['600']}
                   colorB={flexoki.red['100']}
                   borderStyle={audioBorderStyle}
-                  audioSrc="/audio/credits.mp3"
+                  source={{ type: "buffer", src: "/audio/credits.mp3" }}
                 />
               </div>
               <div style={{ width: '100%', maxWidth: `min(720px, ${audioControlMaxWidth}vw)`, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
@@ -1760,7 +1757,7 @@ function EditableRectPOC() {
                 colorA={floatingPanelColorA}
                 colorB={floatingPanelColorB}
                 borderStyle="a"
-                audioSrc="/audio/credits.mp3"
+                source={{ type: "buffer", src: "/audio/credits.mp3" }}
               />
             </div>
             <div>

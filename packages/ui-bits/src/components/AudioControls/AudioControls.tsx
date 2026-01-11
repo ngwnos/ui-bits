@@ -8,7 +8,12 @@ import {
   VolumeX,
 } from "lucide-react";
 import { AnimationSuspensionProvider, useAnimationSuspended } from "../../animationSuspension";
-import { useAudioAnalysisActions } from "../../audioAnalysis";
+import {
+  createAudioAnalysisStore,
+  useAudioAnalysisStore,
+  type AudioAnalysisActions,
+  type AudioAnalysisStore,
+} from "../../audioAnalysis";
 import { useFrame } from "../../frameLoop";
 import { flexoki } from "../../flexoki";
 import IconButton from "../IconButton";
@@ -16,19 +21,51 @@ import LFOSlider from "../LFOSlider";
 import AudioFFTWindow from "./AudioFFTWindow";
 
 export type AudioControlsBorder = 'a' | 'b' | 'none';
+export type AudioControlsBinInterpolation = 'discrete' | 'interpolated';
+export type AudioControlsSource =
+  | { type: "buffer"; src: string; loop?: boolean }
+  | { type: "mediaStream"; stream: MediaStream; context?: AudioContext }
+  | { type: "audioNode"; node: AudioNode & { context: AudioContext } };
 
 export interface AudioControlsProps {
   fontSize?: number;
   colorA?: string;
   colorB?: string;
   borderStyle?: AudioControlsBorder;
-  audioSrc: string;
+  source: AudioControlsSource;
   heightUnits?: number;
-  fftAttack?: number;
-  fftRelease?: number;
-  fftBlurSigma?: number;
-  analyserSmoothing?: number;
   suspended?: boolean;
+  audioAnalysisStore?: AudioAnalysisStore | null;
+  defaultPlaying?: boolean;
+  playing?: boolean;
+  onPlayingChange?: (playing: boolean) => void;
+  defaultMuted?: boolean;
+  muted?: boolean;
+  onMutedChange?: (muted: boolean) => void;
+  defaultBinCount?: number;
+  binCount?: number;
+  onBinCountChange?: (count: number) => void;
+  defaultBinInterpolation?: AudioControlsBinInterpolation;
+  binInterpolation?: AudioControlsBinInterpolation;
+  onBinInterpolationChange?: (mode: AudioControlsBinInterpolation) => void;
+  defaultFrequencyMin?: number;
+  frequencyMin?: number;
+  onFrequencyMinChange?: (frequencyHz: number) => void;
+  defaultFrequencyMax?: number;
+  frequencyMax?: number;
+  onFrequencyMaxChange?: (frequencyHz: number) => void;
+  defaultFftAttack?: number;
+  fftAttack?: number;
+  onFftAttackChange?: (value: number) => void;
+  defaultFftRelease?: number;
+  fftRelease?: number;
+  onFftReleaseChange?: (value: number) => void;
+  defaultFftBlurSigma?: number;
+  fftBlurSigma?: number;
+  onFftBlurSigmaChange?: (value: number) => void;
+  defaultAnalyserSmoothing?: number;
+  analyserSmoothing?: number;
+  onAnalyserSmoothingChange?: (value: number) => void;
 }
 
 function resolveColors(colorA?: string, colorB?: string) {
@@ -62,6 +99,31 @@ const weightFromTimeMs = (ms: number, dtSec: number) => {
   return clamp01(1 - Math.exp(-dt / tau));
 };
 
+function normalizeBinInterpolation(
+  value: AudioControlsBinInterpolation | undefined,
+  fallback: AudioControlsBinInterpolation,
+) {
+  if (value === "discrete" || value === "interpolated") return value;
+  return fallback;
+}
+
+function useControllableState<T>(
+  value: T | undefined,
+  defaultValue: T,
+  onChange?: (next: T) => void,
+) {
+  const [internal, setInternal] = React.useState(defaultValue);
+  const isControlled = value !== undefined;
+  const resolved = isControlled ? value : internal;
+  const setValue = React.useCallback((next: T) => {
+    if (!isControlled) {
+      setInternal(next);
+    }
+    onChange?.(next);
+  }, [isControlled, onChange]);
+  return [resolved, setValue, isControlled] as const;
+}
+
 function computeSliderUnitPx(fontSize?: number) {
   const previewFontSize = fontSize || 16;
   const previewPaddingEm = 0.35;
@@ -85,68 +147,139 @@ export default function AudioControls({
   colorA,
   colorB,
   borderStyle = 'a',
-  audioSrc,
+  source,
   heightUnits = 6,
-  fftAttack = DEFAULT_ATTACK_MS,
-  fftRelease = DEFAULT_RELEASE_MS,
-  fftBlurSigma = 0,
-  analyserSmoothing = 0.8,
   suspended,
+  audioAnalysisStore,
+  defaultPlaying = false,
+  playing,
+  onPlayingChange,
+  defaultMuted = true,
+  muted,
+  onMutedChange,
+  defaultBinCount = 256,
+  binCount,
+  onBinCountChange,
+  defaultBinInterpolation = "discrete",
+  binInterpolation,
+  onBinInterpolationChange,
+  defaultFrequencyMin = 0,
+  frequencyMin,
+  onFrequencyMinChange,
+  defaultFrequencyMax = DEFAULT_NYQUIST,
+  frequencyMax,
+  onFrequencyMaxChange,
+  defaultFftAttack = DEFAULT_ATTACK_MS,
+  fftAttack,
+  onFftAttackChange,
+  defaultFftRelease = DEFAULT_RELEASE_MS,
+  fftRelease,
+  onFftReleaseChange,
+  defaultFftBlurSigma = 0,
+  fftBlurSigma,
+  onFftBlurSigmaChange,
+  defaultAnalyserSmoothing = 0.8,
+  analyserSmoothing,
+  onAnalyserSmoothingChange,
 }: AudioControlsProps) {
   const isSuspended = useAnimationSuspended(suspended);
-  const analyserSmoothingDefault = clamp01(analyserSmoothing ?? 0.8);
-  const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
-  const [isMuted, setIsMuted] = React.useState<boolean>(true);
+  const contextStore = useAudioAnalysisStore();
+  const localStoreRef = React.useRef<AudioAnalysisStore | null>(null);
+  const localStore = localStoreRef.current ?? createAudioAnalysisStore({
+    bins: [],
+    binCount: 0,
+    maxMagnitude: 1,
+  });
+  if (!localStoreRef.current) {
+    localStoreRef.current = localStore;
+  }
+  const resolvedStore = audioAnalysisStore ?? contextStore ?? localStore;
+  const analysisActions = React.useMemo<AudioAnalysisActions>(() => ({
+    setAudioBins: resolvedStore.setAudioBins,
+    setAudioBinCount: resolvedStore.setAudioBinCount,
+    setAudioMaxMagnitude: resolvedStore.setAudioMaxMagnitude,
+  }), [resolvedStore]);
+  const isBufferSource = source.type === "buffer";
+  const [isPlaying, setIsPlaying] = useControllableState(playing, defaultPlaying, onPlayingChange);
+  const [isMuted, setIsMuted] = useControllableState(muted, defaultMuted, onMutedChange);
   const [playheadRatio, setPlayheadRatio] = React.useState<number>(0);
   const [isScrubbing, setIsScrubbing] = React.useState<boolean>(false);
   const [seekCommand, setSeekCommand] = React.useState<{ ratio: number; token: number } | null>(null);
   const seekTokenRef = React.useRef<number>(0);
-  const [binSliderValue, setBinSliderValue] = React.useState<number>(256);
-  const [smoothingValue, setSmoothingValue] = React.useState<number>(() => roundUnit(analyserSmoothingDefault));
-  const [attackMs, setAttackMs] = React.useState<number>(() => roundMs(fftAttack));
-  const [releaseMs, setReleaseMs] = React.useState<number>(() => roundMs(fftRelease));
-  const [blurValue, setBlurValue] = React.useState<number>(() => roundSigma(fftBlurSigma ?? 0));
-  const [useDiscreteBins, setUseDiscreteBins] = React.useState<boolean>(true);
+  const clampBins = React.useCallback((value: number) => clampBetween(Math.round(value || 0), 1, 1024), []);
+  const [binCountValue, setBinCountValue] = useControllableState(
+    binCount,
+    clampBins(defaultBinCount),
+    onBinCountChange,
+  );
+  const [smoothingValueRaw, setSmoothingValueRaw] = useControllableState(
+    analyserSmoothing,
+    roundUnit(clamp01(defaultAnalyserSmoothing)),
+    onAnalyserSmoothingChange,
+  );
+  const [attackMsRaw, setAttackMsRaw] = useControllableState(
+    fftAttack,
+    roundMs(defaultFftAttack),
+    onFftAttackChange,
+  );
+  const [releaseMsRaw, setReleaseMsRaw] = useControllableState(
+    fftRelease,
+    roundMs(defaultFftRelease),
+    onFftReleaseChange,
+  );
+  const [blurValueRaw, setBlurValueRaw] = useControllableState(
+    fftBlurSigma,
+    roundSigma(defaultFftBlurSigma),
+    onFftBlurSigmaChange,
+  );
+  const [binInterpolationValue, setBinInterpolationValue] = useControllableState(
+    binInterpolation,
+    normalizeBinInterpolation(defaultBinInterpolation, "discrete"),
+    onBinInterpolationChange,
+  );
   const [nyquistHz, setNyquistHz] = React.useState<number>(DEFAULT_NYQUIST);
-  const [freqMinRatio, setFreqMinRatio] = React.useState<number>(0);
-  const [freqMaxRatio, setFreqMaxRatio] = React.useState<number>(1);
+  const [frequencyMinValue, setFrequencyMinValue] = useControllableState(
+    frequencyMin,
+    defaultFrequencyMin,
+    onFrequencyMinChange,
+  );
+  const [frequencyMaxValue, setFrequencyMaxValue] = useControllableState(
+    frequencyMax,
+    defaultFrequencyMax,
+    onFrequencyMaxChange,
+  );
   const rawFftRef = React.useRef<Uint8Array | null>(null);
   const [rawFftMeta, setRawFftMeta] = React.useState<{ version: number; binCount: number }>({ version: 0, binCount: 0 });
-  const clampBins = React.useCallback((value: number) => clampBetween(Math.round(value || 0), 1, 1024), []);
-  const minGapRatio = React.useMemo(
-    () => Math.min(0.5, MIN_FREQ_HZ_GAP / Math.max(nyquistHz, MIN_FREQ_HZ_GAP)),
-    [nyquistHz],
-  );
-  const freqMinHz = React.useMemo(() => freqMinRatio * nyquistHz, [freqMinRatio, nyquistHz]);
-  const freqMaxHz = React.useMemo(() => freqMaxRatio * nyquistHz, [freqMaxRatio, nyquistHz]);
+  const resolvedBinCount = clampBins(binCountValue);
+  const smoothingValue = roundUnit(clamp01(smoothingValueRaw));
+  const attackMs = roundMs(attackMsRaw);
+  const releaseMs = roundMs(releaseMsRaw);
+  const blurValue = roundSigma(blurValueRaw);
+  const resolvedBinInterpolation = normalizeBinInterpolation(binInterpolationValue, "discrete");
+  const useDiscreteBins = resolvedBinInterpolation === "discrete";
+  const minGapHz = React.useMemo(() => Math.min(MIN_FREQ_HZ_GAP, nyquistHz), [nyquistHz]);
+  const { freqMinHz, freqMaxHz } = React.useMemo(() => {
+    const safeMin = Number.isFinite(frequencyMinValue ?? Number.NaN) ? frequencyMinValue : 0;
+    const safeMax = Number.isFinite(frequencyMaxValue ?? Number.NaN) ? frequencyMaxValue : nyquistHz;
+    const boundedMax = clampBetween(safeMax, minGapHz, nyquistHz);
+    const boundedMin = clampBetween(safeMin, 0, Math.max(0, boundedMax - minGapHz));
+    const clampedMax = clampBetween(boundedMax, boundedMin + minGapHz, nyquistHz);
+    return { freqMinHz: boundedMin, freqMaxHz: clampedMax };
+  }, [frequencyMinValue, frequencyMaxValue, minGapHz, nyquistHz]);
+  const freqMinRatio = nyquistHz > 0 ? freqMinHz / nyquistHz : 0;
+  const freqMaxRatio = nyquistHz > 0 ? freqMaxHz / nyquistHz : 1;
   const freqMinRatioClamped = clampBetween(freqMinRatio, 0, 1);
   const freqMaxRatioClamped = clampBetween(freqMaxRatio, 0, 1);
 
   const handleFreqMinChange = React.useCallback((value: number) => {
-    const ratio = nyquistHz > 0 ? value / nyquistHz : 0;
-    const maxAllowed = Math.max(0, freqMaxRatio - minGapRatio);
-    setFreqMinRatio(clampBetween(ratio, 0, maxAllowed));
-  }, [freqMaxRatio, minGapRatio, nyquistHz]);
+    const next = clampBetween(value, 0, Math.max(0, freqMaxHz - minGapHz));
+    setFrequencyMinValue(next);
+  }, [freqMaxHz, minGapHz, setFrequencyMinValue]);
 
   const handleFreqMaxChange = React.useCallback((value: number) => {
-    const ratio = nyquistHz > 0 ? value / nyquistHz : 1;
-    const minAllowed = Math.min(1, freqMinRatio + minGapRatio);
-    setFreqMaxRatio(clampBetween(ratio, minAllowed, 1));
-  }, [freqMinRatio, minGapRatio, nyquistHz]);
-
-  React.useEffect(() => {
-    setFreqMinRatio((prev) => {
-      const maxAllowed = Math.max(0, freqMaxRatio - minGapRatio);
-      return prev > maxAllowed ? maxAllowed : prev;
-    });
-  }, [freqMaxRatio, minGapRatio]);
-
-  React.useEffect(() => {
-    setFreqMaxRatio((prev) => {
-      const minAllowed = Math.min(1, freqMinRatio + minGapRatio);
-      return prev < minAllowed ? minAllowed : prev;
-    });
-  }, [freqMinRatio, minGapRatio]);
+    const next = clampBetween(value, Math.min(nyquistHz, freqMinHz + minGapHz), nyquistHz);
+    setFrequencyMaxValue(next);
+  }, [freqMinHz, minGapHz, nyquistHz, setFrequencyMaxValue]);
 
   const handleSampleRateChange = React.useCallback((sampleRate: number) => {
     setNyquistHz(Math.max(1, sampleRate / 2));
@@ -218,36 +351,39 @@ export default function AudioControls({
   }, []);
 
   const handleProgress = React.useCallback((ratio: number) => {
+    if (!isBufferSource) return;
     const clamped = clamp01(ratio);
     if (!isScrubbing) {
       setPlayheadRatio(clamped);
     }
-  }, [isScrubbing]);
+  }, [isBufferSource, isScrubbing]);
 
   const handleScrubStart = React.useCallback(() => {
+    if (!isBufferSource) return;
     setIsScrubbing(true);
-  }, []);
+  }, [isBufferSource]);
 
   const handleScrubMove = React.useCallback((ratio: number) => {
+    if (!isBufferSource) return;
     const clamped = clamp01(ratio);
     setPlayheadRatio(clamped);
     issueSeek(clamped);
-  }, [issueSeek]);
+  }, [isBufferSource, issueSeek]);
 
   const handleScrubEnd = React.useCallback((ratio: number) => {
+    if (!isBufferSource) return;
     const clamped = clamp01(ratio);
     setPlayheadRatio(clamped);
     issueSeek(clamped);
     setIsScrubbing(false);
-  }, [issueSeek]);
+  }, [isBufferSource, issueSeek]);
 
   React.useEffect(() => {
-    setSmoothingValue(roundUnit(analyserSmoothingDefault));
-  }, [analyserSmoothingDefault]);
-
-  React.useEffect(() => {
-    setBlurValue(roundSigma(fftBlurSigma ?? 0));
-  }, [fftBlurSigma]);
+    if (isBufferSource) return;
+    setPlayheadRatio(0);
+    setIsScrubbing(false);
+    setSeekCommand(null);
+  }, [isBufferSource]);
 
   return (
     <AnimationSuspensionProvider suspended={isSuspended}>
@@ -286,7 +422,7 @@ export default function AudioControls({
               behavior="cycle"
               value={interpolationCycleValue}
               options={interpolationCycleOptions}
-              onChange={(nextValue) => setUseDiscreteBins(nextValue === "discrete")}
+              onChange={(nextValue) => setBinInterpolationValue(nextValue === "discrete" ? "discrete" : "interpolated")}
               borderStyle="none"
               fontSize={fontSize}
               colorA={safeA}
@@ -309,18 +445,12 @@ export default function AudioControls({
                 colorB={safeB}
                 fontSize={fontSize}
                 mode="external"
-                readExternal={() => binSliderValue}
+                readExternal={() => resolvedBinCount}
                 onUserChange={(value: number) => {
-                  setBinSliderValue((prev) => {
-                    const next = clampBins(value);
-                    return prev === next ? prev : next;
-                  });
+                  setBinCountValue(clampBins(value));
                 }}
                 onAnimatedUpdate={(value: number) => {
-                  setBinSliderValue((prev) => {
-                    const next = clampBins(value);
-                    return prev === next ? prev : next;
-                  });
+                  setBinCountValue(clampBins(value));
                 }}
                 style={{ gap: 0 }}
               />
@@ -367,23 +497,44 @@ export default function AudioControls({
             />
           </div>
         </div>
-      <AudioPlaybackEngine
-        src={audioSrc}
-        playing={isPlaying}
-        onProgress={handleProgress}
-        seekTarget={seekCommand}
-        analyserSmoothing={smoothingValue}
-        attackMs={attackMsClamped}
-        releaseMs={releaseMsClamped}
-        blurSigma={blurValue}
-        targetBins={clampBins(binSliderValue)}
-        onRawFftFrame={handleRawFftData}
-        frequencyMin={freqMinRatioClamped}
-        frequencyMax={freqMaxRatioClamped}
-        onSampleRateChange={handleSampleRateChange}
-        muted={isMuted}
-        suspended={isSuspended}
-      />
+      {source.type === "buffer" ? (
+        <AudioBufferEngine
+          src={source.src}
+          loop={source.loop}
+          playing={isPlaying}
+          analysisActions={analysisActions}
+          onProgress={handleProgress}
+          seekTarget={seekCommand}
+          analyserSmoothing={smoothingValue}
+          attackMs={attackMsClamped}
+          releaseMs={releaseMsClamped}
+          blurSigma={blurValue}
+          targetBins={resolvedBinCount}
+          onRawFftFrame={handleRawFftData}
+          frequencyMin={freqMinRatioClamped}
+          frequencyMax={freqMaxRatioClamped}
+          onSampleRateChange={handleSampleRateChange}
+          muted={isMuted}
+          suspended={isSuspended}
+        />
+      ) : (
+        <AudioLiveEngine
+          source={source}
+          playing={isPlaying}
+          analysisActions={analysisActions}
+          analyserSmoothing={smoothingValue}
+          attackMs={attackMsClamped}
+          releaseMs={releaseMsClamped}
+          blurSigma={blurValue}
+          targetBins={resolvedBinCount}
+          onRawFftFrame={handleRawFftData}
+          frequencyMin={freqMinRatioClamped}
+          frequencyMax={freqMaxRatioClamped}
+          onSampleRateChange={handleSampleRateChange}
+          muted={isMuted}
+          suspended={isSuspended}
+        />
+      )}
       <div
         style={{
           borderTop: `1px solid ${seamColor}`,
@@ -399,12 +550,12 @@ export default function AudioControls({
           heightUnits={heightUnits}
           unitSizePx={sliderUnitPx}
           maxWidth="100%"
-          maxBins={binSliderValue}
+          maxBins={resolvedBinCount}
           peakDecay={peakDecayRate}
-          playbackRatio={playheadRatio}
-          onScrubStart={handleScrubStart}
-          onScrub={handleScrubMove}
-          onScrubEnd={handleScrubEnd}
+          playbackRatio={isBufferSource ? playheadRatio : 0}
+          onScrubStart={isBufferSource ? handleScrubStart : undefined}
+          onScrub={isBufferSource ? handleScrubMove : undefined}
+          onScrubEnd={isBufferSource ? handleScrubEnd : undefined}
           activeColor={safeA}
           inactiveColor={safeB}
           rawFftDataRef={rawFftRef}
@@ -475,8 +626,8 @@ export default function AudioControls({
             fontSize={fontSize}
             mode="external"
             readExternal={() => attackMsClamped}
-            onUserChange={(value: number) => setAttackMs(roundMs(value))}
-            onAnimatedUpdate={(value: number) => setAttackMs(roundMs(value))}
+            onUserChange={(value: number) => setAttackMsRaw(roundMs(value))}
+            onAnimatedUpdate={(value: number) => setAttackMsRaw(roundMs(value))}
             formatDisplayValue={(value) => `${Math.round(value)}`}
             style={{ gap: 0 }}
           />
@@ -495,8 +646,8 @@ export default function AudioControls({
             fontSize={fontSize}
             mode="external"
             readExternal={() => releaseMsClamped}
-            onUserChange={(value: number) => setReleaseMs(roundMs(value))}
-            onAnimatedUpdate={(value: number) => setReleaseMs(roundMs(value))}
+            onUserChange={(value: number) => setReleaseMsRaw(roundMs(value))}
+            onAnimatedUpdate={(value: number) => setReleaseMsRaw(roundMs(value))}
             formatDisplayValue={(value) => `${Math.round(value)}`}
             style={{ gap: 0 }}
           />
@@ -515,8 +666,8 @@ export default function AudioControls({
             fontSize={fontSize}
             mode="external"
             readExternal={() => smoothingValue}
-            onUserChange={(value: number) => setSmoothingValue(roundUnit(value))}
-            onAnimatedUpdate={(value: number) => setSmoothingValue(roundUnit(value))}
+            onUserChange={(value: number) => setSmoothingValueRaw(roundUnit(value))}
+            onAnimatedUpdate={(value: number) => setSmoothingValueRaw(roundUnit(value))}
             formatDisplayValue={(value) => value.toFixed(1)}
             style={{ gap: 0 }}
           />
@@ -535,8 +686,8 @@ export default function AudioControls({
             fontSize={fontSize}
             mode="external"
             readExternal={() => blurValue}
-            onUserChange={(value: number) => setBlurValue(roundSigma(value))}
-            onAnimatedUpdate={(value: number) => setBlurValue(roundSigma(value))}
+            onUserChange={(value: number) => setBlurValueRaw(roundSigma(value))}
+            onAnimatedUpdate={(value: number) => setBlurValueRaw(roundSigma(value))}
             formatDisplayValue={(value) => value.toFixed(1)}
             style={{ gap: 0 }}
           />
@@ -547,9 +698,11 @@ export default function AudioControls({
   );
 }
 
-interface AudioPlaybackEngineProps {
+interface AudioBufferEngineProps {
   src: string;
+  loop?: boolean;
   playing: boolean;
+  analysisActions: AudioAnalysisActions;
   seekTarget?: { ratio: number; token: number } | null;
   onProgress?: (ratio: number) => void;
   analyserSmoothing?: number;
@@ -565,9 +718,11 @@ interface AudioPlaybackEngineProps {
   suspended?: boolean;
 }
 
-function AudioPlaybackEngine({
+function AudioBufferEngine({
   src,
+  loop = true,
   playing,
+  analysisActions,
   seekTarget,
   onProgress,
   analyserSmoothing = 0.8,
@@ -581,13 +736,9 @@ function AudioPlaybackEngine({
   onSampleRateChange,
   muted = true,
   suspended,
-}: AudioPlaybackEngineProps) {
+}: AudioBufferEngineProps) {
   const isSuspended = useAnimationSuspended(suspended);
-  const {
-    setAudioBins,
-    setAudioBinCount,
-    setAudioMaxMagnitude,
-  } = useAudioAnalysisActions();
+  const { setAudioBins, setAudioBinCount, setAudioMaxMagnitude } = analysisActions;
   const audioContextRef = React.useRef<AudioContext | null>(null);
   const analyserRef = React.useRef<AnalyserNode | null>(null);
   const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
@@ -748,7 +899,7 @@ function AudioPlaybackEngine({
     stopSourceImmediate();
     const source = audioContext.createBufferSource();
     source.buffer = audioBufferRef.current;
-    source.loop = true;
+    source.loop = loop;
     const silentGain = audioContext.createGain();
     silentGain.gain.value = mutedRef.current ? 0 : 1;
     source.connect(analyser);
@@ -761,7 +912,7 @@ function AudioPlaybackEngine({
       bufferRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
       setAudioBinCount(analyser.frequencyBinCount);
     }
-  }, [getCurrentPlaybackSeconds, setAudioBinCount, stopSourceImmediate, wrapOffset]);
+  }, [getCurrentPlaybackSeconds, loop, setAudioBinCount, stopSourceImmediate, wrapOffset]);
 
   React.useEffect(() => {
     if (playing) {
@@ -823,6 +974,265 @@ function AudioPlaybackEngine({
     if (duration > 0) {
       const ratio = getCurrentPlaybackSeconds() / duration;
       onProgressRef.current?.(ratio);
+    }
+  });
+
+  return null;
+}
+
+type AudioLiveSource = Extract<AudioControlsSource, { type: "mediaStream" | "audioNode" }>;
+
+interface AudioLiveEngineProps {
+  source: AudioLiveSource;
+  playing: boolean;
+  analysisActions: AudioAnalysisActions;
+  analyserSmoothing?: number;
+  attackMs?: number;
+  releaseMs?: number;
+  blurSigma?: number;
+  targetBins?: number;
+  onRawFftFrame?: (data: Uint8Array) => void;
+  frequencyMin?: number;
+  frequencyMax?: number;
+  onSampleRateChange?: (sampleRate: number) => void;
+  muted?: boolean;
+  suspended?: boolean;
+}
+
+function AudioLiveEngine({
+  source,
+  playing,
+  analysisActions,
+  analyserSmoothing = 0.8,
+  attackMs = DEFAULT_ATTACK_MS,
+  releaseMs = DEFAULT_RELEASE_MS,
+  blurSigma = 0,
+  targetBins = 1024,
+  onRawFftFrame,
+  frequencyMin = 0,
+  frequencyMax = 1,
+  onSampleRateChange,
+  muted = true,
+  suspended,
+}: AudioLiveEngineProps) {
+  const isSuspended = useAnimationSuspended(suspended);
+  const { setAudioBins, setAudioBinCount, setAudioMaxMagnitude } = analysisActions;
+  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const analyserRef = React.useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = React.useRef<AudioNode | null>(null);
+  const monitorGainRef = React.useRef<GainNode | null>(null);
+  const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const analyserSmoothingRef = React.useRef<number>(clamp01(analyserSmoothing ?? 0.8));
+  const onSampleRateChangeRef = React.useRef<typeof onSampleRateChange>(onSampleRateChange);
+  const mutedRef = React.useRef<boolean>(muted);
+  const ownsContextRef = React.useRef<boolean>(false);
+  const connectedRef = React.useRef<boolean>(false);
+  const clearedRef = React.useRef<boolean>(false);
+  const smoothingStateRef = React.useRef<SmoothingState>({
+    previous: null,
+    scratch: null,
+    length: 0,
+    hasHistory: false,
+  });
+  const blurBufferRef = React.useRef<Float32Array | null>(null);
+  const resampleBufferRef = React.useRef<Float32Array | null>(null);
+  const gaussianKernelCacheRef = React.useRef<Map<number, GaussianKernel>>(new Map());
+  const lastBinCountRef = React.useRef<number | null>(null);
+  const sourceStream = source.type === "mediaStream" ? source.stream : null;
+  const sourceContext = source.type === "mediaStream" ? source.context : undefined;
+  const sourceNodeValue = source.type === "audioNode" ? source.node : null;
+
+  React.useEffect(() => {
+    onSampleRateChangeRef.current = onSampleRateChange;
+  }, [onSampleRateChange]);
+
+  React.useEffect(() => {
+    mutedRef.current = muted;
+    const gain = monitorGainRef.current;
+    const audioContext = audioContextRef.current;
+    if (gain && audioContext) {
+      gain.gain.setTargetAtTime(muted ? 0 : 1, audioContext.currentTime, 0.01);
+    }
+  }, [muted]);
+
+  React.useEffect(() => {
+    const clamped = clamp01(analyserSmoothing ?? 0.8);
+    analyserSmoothingRef.current = clamped;
+    if (analyserRef.current) {
+      analyserRef.current.smoothingTimeConstant = clamped;
+    }
+  }, [analyserSmoothing]);
+
+  const connectChain = React.useCallback(() => {
+    if (connectedRef.current) return;
+    const sourceNode = sourceNodeRef.current;
+    const analyser = analyserRef.current;
+    const monitorGain = monitorGainRef.current;
+    const audioContext = audioContextRef.current;
+    if (!sourceNode || !analyser || !monitorGain || !audioContext) return;
+    sourceNode.connect(analyser);
+    analyser.connect(monitorGain);
+    monitorGain.connect(audioContext.destination);
+    connectedRef.current = true;
+  }, []);
+
+  const disconnectChain = React.useCallback(() => {
+    if (!connectedRef.current) return;
+    try {
+      const sourceNode = sourceNodeRef.current;
+      const analyser = analyserRef.current;
+      if (sourceNode && analyser) {
+        sourceNode.disconnect(analyser);
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      analyserRef.current?.disconnect();
+    } catch {
+      // ignore
+    }
+    try {
+      monitorGainRef.current?.disconnect();
+    } catch {
+      // ignore
+    }
+    connectedRef.current = false;
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function setup() {
+      let context: AudioContext;
+      let sourceNode: AudioNode;
+      let ownsContext = false;
+      if (source.type === "mediaStream") {
+        context = sourceContext ?? new AudioContext();
+        ownsContext = !sourceContext;
+        if (!sourceStream) return;
+        sourceNode = context.createMediaStreamSource(sourceStream);
+      } else {
+        if (!sourceNodeValue) return;
+        sourceNode = sourceNodeValue;
+        context = sourceNodeValue.context;
+      }
+      if (cancelled) {
+        if (ownsContext) safeCloseAudioContext(context);
+        return;
+      }
+      ownsContextRef.current = ownsContext;
+      audioContextRef.current = context;
+      sourceNodeRef.current = sourceNode;
+      onSampleRateChangeRef.current?.(context.sampleRate);
+
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = analyserSmoothingRef.current;
+      analyserRef.current = analyser;
+
+      bufferRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
+      lastBinCountRef.current = analyser.frequencyBinCount;
+      setAudioBinCount(analyser.frequencyBinCount);
+      setAudioMaxMagnitude(1);
+
+      const monitorGain = context.createGain();
+      monitorGain.gain.value = mutedRef.current ? 0 : 1;
+      monitorGainRef.current = monitorGain;
+      connectedRef.current = false;
+      clearedRef.current = false;
+
+    }
+    setup();
+    return () => {
+      cancelled = true;
+      disconnectChain();
+      analyserRef.current = null;
+      bufferRef.current = null;
+      sourceNodeRef.current = null;
+      monitorGainRef.current = null;
+      if (ownsContextRef.current) {
+        safeCloseAudioContext(audioContextRef.current);
+      }
+      audioContextRef.current = null;
+      ownsContextRef.current = false;
+      smoothingStateRef.current = {
+        previous: null,
+        scratch: null,
+        length: 0,
+        hasHistory: false,
+      };
+      blurBufferRef.current = null;
+      resampleBufferRef.current = null;
+      gaussianKernelCacheRef.current.clear();
+      lastBinCountRef.current = null;
+      clearedRef.current = false;
+    };
+  }, [
+    connectChain,
+    disconnectChain,
+    setAudioBinCount,
+    setAudioMaxMagnitude,
+    source.type,
+    sourceContext,
+    sourceStream,
+    sourceNodeValue,
+  ]);
+
+  React.useEffect(() => {
+    const context = audioContextRef.current;
+    if (playing) {
+      if (context?.state === "suspended") {
+        context.resume().catch(() => {});
+      }
+      connectChain();
+      clearedRef.current = false;
+    } else {
+      disconnectChain();
+      clearedRef.current = false;
+    }
+  }, [connectChain, disconnectChain, playing]);
+
+  useFrame(isSuspended ? null : (_, dtSec) => {
+    if (!playing || !connectedRef.current) {
+      if (!clearedRef.current) {
+        const length = lastBinCountRef.current ?? 0;
+        if (length > 0) {
+          setAudioBins(new Array(length).fill(0));
+          setAudioBinCount(length);
+        }
+        clearedRef.current = true;
+      }
+      return;
+    }
+    const analyser = analyserRef.current;
+    const data = bufferRef.current;
+    if (analyser && data) {
+      analyser.getByteFrequencyData(data);
+      if (onRawFftFrame) {
+        onRawFftFrame(data);
+      }
+      const processed = processBinsFromBytes(
+        data,
+        {
+          attackMs: clampBetween(attackMs, 0, MAX_ENVELOPE_MS),
+          releaseMs: clampBetween(releaseMs, 0, MAX_ENVELOPE_MS),
+          dtSec,
+          blurSigma: Math.max(0, blurSigma || 0),
+          targetBins: clampBetween(Math.round(targetBins || data.length), 1, data.length),
+          frequencyMin,
+          frequencyMax,
+        },
+        smoothingStateRef.current,
+        blurBufferRef,
+        resampleBufferRef,
+        gaussianKernelCacheRef.current,
+      );
+      const finalBins = processed.resampled;
+      setAudioBins(Array.from(finalBins));
+      if (lastBinCountRef.current !== finalBins.length) {
+        lastBinCountRef.current = finalBins.length;
+        setAudioBinCount(finalBins.length);
+      }
     }
   });
 

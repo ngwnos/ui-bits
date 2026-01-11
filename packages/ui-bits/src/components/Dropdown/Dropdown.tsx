@@ -6,7 +6,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { flexoki } from "../../flexoki";
 import "./dropdown.css";
 
 export interface DropdownOption {
@@ -23,10 +22,14 @@ export interface DropdownProps {
   defaultValue?: string;
   placeholder?: string;
   onChange?: (value: string, option: DropdownOption) => void;
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
   colorA?: string;
   colorB?: string;
   borderStyle?: "a" | "b" | "none";
-  isDarkMode?: boolean;
+  borderMask?: Partial<Record<"top" | "right" | "bottom" | "left", boolean>>;
+  borderRadius?: number;
   width?: number | string;
   fontSize?: number;
   disabled?: boolean;
@@ -57,6 +60,9 @@ function colorWithAlpha(color: string, alpha: number, fallback = "0,0,0"): strin
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+const FALLBACK_COLOR_A = "#2f2f2f";
+const FALLBACK_COLOR_B = "#f0f0f0";
+
 export default function Dropdown({
   label,
   options,
@@ -64,10 +70,14 @@ export default function Dropdown({
   defaultValue,
   placeholder = "Select an option",
   onChange,
+  open,
+  defaultOpen = false,
+  onOpenChange,
   colorA,
   colorB,
   borderStyle = "a",
-  isDarkMode = false,
+  borderMask,
+  borderRadius,
   width,
   fontSize,
   disabled = false,
@@ -109,19 +119,27 @@ export default function Dropdown({
 
   const activeIndex = options.findIndex((option) => option.value === currentValue);
   const activeOption = activeIndex >= 0 ? options[activeIndex] : undefined;
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isOpenControlled = open !== undefined;
+  const resolvedOpen = isOpenControlled ? open : internalOpen;
+  const setOpen = useCallback((next: boolean) => {
+    if (!isOpenControlled) {
+      setInternalOpen(next);
+    }
+    onOpenChange?.(next);
+  }, [isOpenControlled, onOpenChange]);
   const [virtualFocusIndex, setVirtualFocusIndex] = useState(() => (
     activeIndex >= 0 ? activeIndex : Math.max(0, firstEnabledIndex)
   ));
 
   useEffect(() => {
-    if (!open) return;
+    if (!resolvedOpen) return;
     const fallback = activeIndex >= 0 ? activeIndex : firstEnabledIndex;
     setVirtualFocusIndex(fallback >= 0 ? fallback : 0);
-  }, [activeIndex, firstEnabledIndex, open]);
+  }, [activeIndex, firstEnabledIndex, resolvedOpen]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!resolvedOpen) return;
     const handlePointer = (event: PointerEvent) => {
       if (!rootRef.current) return;
       if (rootRef.current.contains(event.target as Node)) return;
@@ -129,7 +147,7 @@ export default function Dropdown({
     };
     window.addEventListener("pointerdown", handlePointer);
     return () => window.removeEventListener("pointerdown", handlePointer);
-  }, [open]);
+  }, [resolvedOpen, setOpen]);
 
   const moveFocus = useCallback((direction: 1 | -1) => {
     if (!options.length) return;
@@ -154,7 +172,7 @@ export default function Dropdown({
   }, [disabled, isControlled, onChange]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!resolvedOpen) return;
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -196,36 +214,35 @@ export default function Dropdown({
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [firstEnabledIndex, moveFocus, open, options, selectOption, virtualFocusIndex]);
+  }, [firstEnabledIndex, moveFocus, options, resolvedOpen, selectOption, setOpen, virtualFocusIndex]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!resolvedOpen) return;
     const node = optionRefs.current[virtualFocusIndex];
     if (node && node.scrollIntoView) {
       node.scrollIntoView({ block: "nearest" });
     }
-  }, [open, virtualFocusIndex]);
+  }, [resolvedOpen, virtualFocusIndex]);
 
   const handleTriggerKey = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === " ") {
       event.preventDefault();
-      if (!open) {
+      if (!resolvedOpen) {
         setOpen(true);
       }
     }
   };
 
-  const appliedFontSize = fontSize ?? 16;
-  const fallbackA = isDarkMode ? flexoki.base["50"] : flexoki.base["900"];
-  const fallbackB = isDarkMode ? flexoki.base["900"] : flexoki.base["50"];
-  const resolvedColorA = colorA ?? fallbackA;
-  const resolvedColorB = colorB ?? fallbackB;
+  const appliedFontSize = fontSize ?? 12;
+  const resolvedColorA = colorA ?? FALLBACK_COLOR_A;
+  const resolvedColorB = colorB ?? FALLBACK_COLOR_B;
   const borderColor = borderStyle === "none"
     ? "transparent"
     : borderStyle === "a"
       ? resolvedColorA
       : resolvedColorB;
   const surfaceColor = borderStyle === "b" ? resolvedColorA : resolvedColorB;
+  const maskedBorderColor = borderStyle === "none" ? "transparent" : surfaceColor;
   const textColor = borderStyle === "b" ? resolvedColorB : resolvedColorA;
   const mutedColor = colorWithAlpha(textColor, 0.7);
   const highlightShadow = colorWithAlpha(textColor, 0.25);
@@ -234,9 +251,20 @@ export default function Dropdown({
   const inverseText = borderStyle === "b" ? resolvedColorA : resolvedColorB;
   const focusOverlay = colorWithAlpha(textColor, 0.2, "16,15,15");
 
+  const resolvedBorderMask = {
+    top: borderMask?.top ?? true,
+    right: borderMask?.right ?? true,
+    bottom: borderMask?.bottom ?? true,
+    left: borderMask?.left ?? true,
+  };
+  const resolvedRadius = Math.max(0, borderRadius ?? 3);
   const themeVars: React.CSSProperties = {
     "--dropdown-surface": surfaceColor,
     "--dropdown-border": borderColor,
+    "--dropdown-border-top": resolvedBorderMask.top ? borderColor : maskedBorderColor,
+    "--dropdown-border-right": resolvedBorderMask.right ? borderColor : maskedBorderColor,
+    "--dropdown-border-bottom": resolvedBorderMask.bottom ? borderColor : maskedBorderColor,
+    "--dropdown-border-left": resolvedBorderMask.left ? borderColor : maskedBorderColor,
     "--dropdown-text": textColor,
     "--dropdown-muted": mutedColor,
     "--dropdown-placeholder": placeholderColor,
@@ -245,6 +273,7 @@ export default function Dropdown({
     "--dropdown-inverse-text": inverseText,
     "--dropdown-focus-overlay": focusOverlay,
     "--dropdown-font-size": `${appliedFontSize}px`,
+    "--dropdown-radius": `${resolvedRadius}px`,
   } as React.CSSProperties;
 
   const rootClass = ["dropdown-root", className].filter(Boolean).join(" ");
@@ -261,7 +290,7 @@ export default function Dropdown({
     <div
       ref={rootRef}
       className={rootClass}
-      data-open={open ? "true" : "false"}
+      data-open={resolvedOpen ? "true" : "false"}
       data-disabled={disabled ? "true" : "false"}
       style={{
         width: "100%",
@@ -282,13 +311,13 @@ export default function Dropdown({
           type="button"
           className="dropdown-trigger"
           aria-haspopup="listbox"
-          aria-expanded={open}
+          aria-expanded={resolvedOpen}
           aria-labelledby={`${labelId} ${buttonId}`}
-          aria-controls={open ? listboxId : undefined}
-          onClick={() => setOpen((prev) => !prev)}
+          aria-controls={resolvedOpen ? listboxId : undefined}
+          onClick={() => setOpen(!resolvedOpen)}
           onKeyDown={handleTriggerKey}
           disabled={disabled}
-          data-open={open ? "true" : "false"}
+          data-open={resolvedOpen ? "true" : "false"}
         >
           <span className={`dropdown-value${showPlaceholder ? " dropdown-placeholder" : ""}`}>
             {displayLabel}
@@ -305,7 +334,7 @@ export default function Dropdown({
             </svg>
           </span>
         </button>
-        {open && (
+        {resolvedOpen && (
           <div
             className="dropdown-menu"
             role="listbox"

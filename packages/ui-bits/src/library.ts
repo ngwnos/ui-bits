@@ -26,10 +26,12 @@ export {
 } from "./animationSuspension";
 export {
   AudioAnalysisProvider,
+  createAudioAnalysisStore,
   useAudioAnalysisActions,
   useAudioAnalysisState,
   useAudioAnalysisStore,
   type AudioAnalysisActions,
+  type AudioAnalysisStore,
   type AudioAnalysisState,
 } from "./audioAnalysis";
 
@@ -58,11 +60,18 @@ export {
   AudioFFTWindow,
   type AudioControlsProps,
   type AudioControlsBorder,
+  type AudioControlsBinInterpolation,
+  type AudioControlsSource,
   type AudioFFTWindowProps,
 } from "./components/AudioControls";
 export { default as SelectionGrid, type SelectionGridProps } from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";
 export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./components/LoadingBar";
+export {
+  default as VirtualKeyboard,
+  type VirtualKeyboardProps,
+  type VirtualKeyboardKey,
+} from "./components/VirtualKeyboard";
 export {
   default as SegmentBar,
   type SegmentBarProps,

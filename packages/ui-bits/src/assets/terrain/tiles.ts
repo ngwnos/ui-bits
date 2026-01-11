@@ -3,9 +3,16 @@ export type TerrainTileAsset = {
   url: string;
 };
 
-const baseUrl = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
-const manifestUrl = `${baseUrl}/terrain/dem_tiles.json`;
-const tileBasePath = `${baseUrl}/terrain/dem_tiles`;
+const TILE_MODULES: Record<string, string> = import.meta.glob(
+  "./tiles/*.png",
+  { eager: true, query: "?url", import: "default" },
+) as Record<string, string>;
+const EMBEDDED_ASSETS: TerrainTileAsset[] = Object.entries(TILE_MODULES)
+  .map(([path, url]) => ({
+    name: path.split("/").pop() ?? path,
+    url,
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 let cachedAssets: TerrainTileAsset[] | null = null;
 let inFlight: Promise<TerrainTileAsset[]> | null = null;
@@ -13,33 +20,12 @@ let inFlight: Promise<TerrainTileAsset[]> | null = null;
 async function fetchTerrainTileAssets(): Promise<TerrainTileAsset[]> {
   if (cachedAssets) return cachedAssets;
   if (inFlight) return inFlight;
-
-  if (typeof fetch === "undefined") {
-    console.warn("Terrain tiles cannot load because fetch is unavailable in this environment.");
-    cachedAssets = [];
-    return cachedAssets;
-  }
-
-  inFlight = fetch(manifestUrl)
-    .then(async (response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to load terrain tile manifest (${response.status})`);
-      }
-      const names = (await response.json()) as string[];
-      cachedAssets = names
-        .map((name) => ({ name, url: `${tileBasePath}/${name}` }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      return cachedAssets;
-    })
-    .catch((error) => {
-      console.error("Unable to load terrain tiles", error);
-      cachedAssets = [];
-      return cachedAssets;
-    })
-    .finally(() => {
-      inFlight = null;
-    });
-
+  inFlight = Promise.resolve(EMBEDDED_ASSETS).then((assets) => {
+    cachedAssets = assets;
+    return assets;
+  }).finally(() => {
+    inFlight = null;
+  });
   return inFlight;
 }
 

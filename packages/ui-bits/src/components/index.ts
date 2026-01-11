@@ -37,3 +37,8 @@ export {
   type SegmentBarOption,
   type SegmentBarBorderStyle,
 } from "./SegmentBar";
+export {
+  default as VirtualKeyboard,
+  type VirtualKeyboardProps,
+  type VirtualKeyboardKey,
+} from "./VirtualKeyboard";

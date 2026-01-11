@@ -1,6 +1,6 @@
 import React from "react";
 import tgpu from "typegpu";
-import { Columns4, Mountain, MountainSnow } from "lucide-react";
+import { Columns4, Mountain } from "lucide-react";
 import { SliderStoreProvider } from "../../sliderStore";
 import { SliderStoreContext } from "../../sliderStore/context";
 import {
@@ -18,6 +18,7 @@ import {
 } from "../../gradients/matplotlib";
 import { loadHeightTexture, type HeightTextureEntry } from "../../utils/loadHeightTexture";
 import { loadTerrainTileAssets, type TerrainTileAsset } from "../../assets/terrain/tiles";
+import IconButton from "../IconButton";
 import "./selectionGrid.css";
 
 type PaletteInfo = {
@@ -55,16 +56,14 @@ type TileAssignment = {
   name: string;
 };
 
-const PREVIEW_MODE_SEQUENCE: SelectionGridPreviewMode[] = ["gradient", "terrainHeight", "terrainHillshade"];
+const PREVIEW_MODE_SEQUENCE: SelectionGridPreviewMode[] = ["gradient", "terrainHeight"];
 const PREVIEW_MODE_ICON: Record<SelectionGridPreviewMode, typeof Columns4> = {
   gradient: Columns4,
   terrainHeight: Mountain,
-  terrainHillshade: MountainSnow,
 };
 const PREVIEW_MODE_TITLE: Record<SelectionGridPreviewMode, string> = {
   gradient: "Gradient previews",
   terrainHeight: "Terrain height previews",
-  terrainHillshade: "Terrain hillshade previews",
 };
 
 type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
@@ -78,6 +77,7 @@ let sharedPipeline: {
   device: GPUDevice;
 } | null = null;
 let sharedLinearHeightTexture: HeightTextureEntry | null = null;
+let sharedFallbackHeightTexture: HeightTextureEntry | null = null;
 
 async function getSharedRoot(): Promise<TypeGpuRoot | null> {
   if (!navigator.gpu) return null;
@@ -160,39 +160,12 @@ fn safeSample(uv : vec2<f32>) -> vec2<f32> {
 
 @fragment
 fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
-  let useHillshade = uniforms.params0.x;
   let texelSize = uniforms.params0.yz;
-  let heightScale = uniforms.params0.w;
-  let lightDir = normalize(uniforms.params1.xyz);
   let heightMin = uniforms.params1.w;
   let heightRange = max(uniforms.params2.x, 1e-6);
-  let ambient = uniforms.params2.y;
-  let contrast = uniforms.params2.z;
   let uv = safeSample(in.uv);
 
-  let offset = vec2<f32>(texelSize.x, texelSize.y);
-
   let hC = sampleHeight(uv, texelSize);
-  let hN = sampleHeight(safeSample(vec2<f32>(uv.x, uv.y + offset.y)), texelSize);
-  let hS = sampleHeight(safeSample(vec2<f32>(uv.x, uv.y - offset.y)), texelSize);
-  let hE = sampleHeight(safeSample(vec2<f32>(uv.x + offset.x, uv.y)), texelSize);
-  let hW = sampleHeight(safeSample(vec2<f32>(uv.x - offset.x, uv.y)), texelSize);
-  let hNE = sampleHeight(safeSample(vec2<f32>(uv.x + offset.x, uv.y + offset.y)), texelSize);
-  let hNW = sampleHeight(safeSample(vec2<f32>(uv.x - offset.x, uv.y + offset.y)), texelSize);
-  let hSE = sampleHeight(safeSample(vec2<f32>(uv.x + offset.x, uv.y - offset.y)), texelSize);
-  let hSW = sampleHeight(safeSample(vec2<f32>(uv.x - offset.x, uv.y - offset.y)), texelSize);
-
-  let dzdx = ((hNE + 2.0 * hE + hSE) - (hNW + 2.0 * hW + hSW)) * heightScale;
-  let dzdy = ((hSW + 2.0 * hS + hSE) - (hNW + 2.0 * hN + hNE)) * heightScale;
-
-  let normal = normalize(vec3<f32>(-dzdx, -dzdy, 1.0));
-  let shade = clamp(ambient + dot(normal, lightDir) * contrast, 0.0, 1.0);
-
-  let hillshadeColor = textureSample(gradientTexture, tileSampler, vec2<f32>(shade, 0.5));
-  if (useHillshade > 0.5) {
-    return hillshadeColor;
-  }
-
   let normalizedHeight = clamp((hC - heightMin) / heightRange, 0.0, 1.0);
   let remapped = textureSample(gradientTexture, tileSampler, vec2<f32>(normalizedHeight, 0.5));
   return remapped;
@@ -246,6 +219,49 @@ function getLinearHeightTexture(device: GPUDevice): HeightTextureEntry {
     max: 1,
   };
   return sharedLinearHeightTexture;
+}
+
+function getFallbackHeightTexture(device: GPUDevice): HeightTextureEntry {
+  if (sharedFallbackHeightTexture) return sharedFallbackHeightTexture;
+  const size = 128;
+  const data = new Float32Array(size * size);
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  const tau = Math.PI * 2;
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const nx = x / (size - 1);
+      const ny = y / (size - 1);
+      const value = 0.5 + 0.5 * (
+        Math.sin(nx * tau * 2) * 0.6
+        + Math.cos(ny * tau * 3) * 0.4
+        + Math.sin((nx + ny) * tau * 1.5) * 0.3
+      );
+      const clamped = Math.min(1, Math.max(0, value));
+      data[y * size + x] = clamped;
+      if (clamped < min) min = clamped;
+      if (clamped > max) max = clamped;
+    }
+  }
+  const texture = device.createTexture({
+    size: [size, size, 1],
+    format: "r32float",
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  device.queue.writeTexture(
+    { texture },
+    data,
+    { bytesPerRow: size * Float32Array.BYTES_PER_ELEMENT },
+    [size, size, 1],
+  );
+  sharedFallbackHeightTexture = {
+    texture,
+    width: size,
+    height: size,
+    min: Number.isFinite(min) ? min : 0,
+    max: Number.isFinite(max) ? max : 1,
+  };
+  return sharedFallbackHeightTexture;
 }
 
 function uploadGradientToTexture(device: GPUDevice, texture: GPUTexture, stops: GradientDefinition['stops'], invert: boolean) {
@@ -312,15 +328,9 @@ function SelectionGridContent({
     invertGradients,
     allowEmptySelection: stateAllowEmptySelection,
     previewMode,
-    sunAltitudeDeg,
-    sunAzimuthDeg,
   } = selectionGridState;
 
-  const renderMode: "plain" | "height" | "hillshade" = previewMode === "gradient"
-    ? "plain"
-    : previewMode === "terrainHeight"
-      ? "height"
-      : "hillshade";
+  const renderMode: "plain" | "height" = previewMode === "gradient" ? "plain" : "height";
   const usesTerrainTiles = renderMode !== "plain";
 
   React.useEffect(() => {
@@ -558,8 +568,6 @@ function SelectionGridContent({
             size={cellSizePx}
             borderRadius={borderRadiusValue}
             fallbackBackground={fallbackBackground}
-            sunAltitudeDeg={sunAltitudeDeg}
-            sunAzimuthDeg={sunAzimuthDeg}
           />
         ) : null}
         {isSelected ? (
@@ -589,41 +597,34 @@ function SelectionGridContent({
     alignItems: "stretch",
   };
 
-  const previewModeIndex = PREVIEW_MODE_SEQUENCE.indexOf(previewMode);
-  const nextPreviewMode = PREVIEW_MODE_SEQUENCE[(previewModeIndex + 1) % PREVIEW_MODE_SEQUENCE.length];
-  const PreviewModeIcon = PREVIEW_MODE_ICON[previewMode];
-  const previewModeTitle = PREVIEW_MODE_TITLE[previewMode];
-  const nextModeTitle = PREVIEW_MODE_TITLE[nextPreviewMode];
 
-  const terrainToggleButtonSize = Math.max(Math.round(baseCellSize - 4), Math.round(previewFontSize + previewPaddingPx));
-  const terrainToggleIconSize = Math.max(Math.round(terrainToggleButtonSize * 0.6), 12);
   const previewTextShadow = [
     "0 0 4px rgba(0, 0, 0, 0.7)",
     "0 1px 3px rgba(0, 0, 0, 0.85)",
   ].join(", ");
-  const previewIconFilter = previewDarkMode
-    ? [
-      "drop-shadow(0 0 1px rgba(255, 255, 255, 0.45))",
-      "drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5))",
-    ].join(" ")
-    : [
-      "drop-shadow(0 0 1px rgba(0, 0, 0, 0.6))",
-      "drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7))",
-    ].join(" ");
-
-  const terrainToggleButtonStyle: React.CSSProperties = {
-    width: terrainToggleButtonSize,
-    height: terrainToggleButtonSize,
-    borderRadius: 3,
-    border: "none",
+  const previewIconFilter = [
+    "drop-shadow(0 0 4px rgba(0, 0, 0, 0.7))",
+    "drop-shadow(0 1px 3px rgba(0, 0, 0, 0.85))",
+  ].join(" ");
+  const previewButtonSize = Math.max(Math.round(baseCellSize - 4), Math.round(previewFontSize + previewPaddingPx));
+  const previewButtonFontSize = Math.max(8, Math.round((previewButtonSize - 2) / (1 + previewPaddingEm * 2)));
+  const previewIconSize = Math.max(Math.round(previewButtonSize * 0.6), 12);
+  const previewModeIndex = PREVIEW_MODE_SEQUENCE.indexOf(previewMode);
+  const nextPreviewMode = PREVIEW_MODE_SEQUENCE[(previewModeIndex + 1) % PREVIEW_MODE_SEQUENCE.length];
+  const previewButtonStyle: React.CSSProperties = {
+    position: "absolute",
+    left: 8,
+    top: "50%",
+    transform: "translateY(-50%)",
     background: "transparent",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    padding: 0,
-    transition: "color 120ms ease",
+    filter: previewIconFilter,
   };
+  const previewModeOptions = PREVIEW_MODE_SEQUENCE.map((mode) => ({
+    value: mode,
+    icon: React.createElement(PREVIEW_MODE_ICON[mode], { size: previewIconSize, strokeWidth: 2 }),
+    ariaLabel: PREVIEW_MODE_TITLE[mode],
+    title: PREVIEW_MODE_TITLE[mode],
+  }));
 
   const resolvedMaxHeightUnits = typeof maxHeightUnits === "number" && Number.isFinite(maxHeightUnits) && maxHeightUnits > 0
     ? maxHeightUnits
@@ -684,17 +685,15 @@ function SelectionGridContent({
               }
             }}
           >
-            <button
-              type="button"
-              aria-label={`Switch to ${nextModeTitle.toLowerCase()}`}
-              title={`${previewModeTitle} (click to switch to ${nextModeTitle.toLowerCase()})`}
-              style={{
-                ...terrainToggleButtonStyle,
-                position: "absolute",
-                left: 8,
-                top: "50%",
-                transform: "translateY(-50%)",
-              }}
+            <IconButton
+              behavior="cycle"
+              options={previewModeOptions}
+              value={previewMode}
+              fontSize={previewButtonFontSize}
+              colorA={colorA}
+              colorB="transparent"
+              borderStyle="none"
+              style={previewButtonStyle}
               onClick={(event) => {
                 event.stopPropagation();
                 selectionGridActions.setSelectionGridPreviewMode(gridId, nextPreviewMode);
@@ -704,16 +703,7 @@ function SelectionGridContent({
                   event.stopPropagation();
                 }
               }}
-            >
-              <PreviewModeIcon
-                size={terrainToggleIconSize}
-                strokeWidth={2}
-                style={{
-                  color: colorA,
-                  filter: previewIconFilter,
-                }}
-              />
-            </button>
+            />
             <div
               ref={labelRef}
               style={{
@@ -765,18 +755,14 @@ function GradientTileCanvas({
   size,
   borderRadius,
   fallbackBackground,
-  sunAltitudeDeg,
-  sunAzimuthDeg,
 }: {
-  mode: "plain" | "height" | "hillshade";
+  mode: "plain" | "height";
   tileUrl?: string;
   stops: GradientDefinition['stops'];
   invert: boolean;
   size: number;
   borderRadius: string;
   fallbackBackground: string;
-  sunAltitudeDeg: number;
-  sunAzimuthDeg: number;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const hasRenderedRef = React.useRef(false);
@@ -855,12 +841,13 @@ function GradientTileCanvas({
       }
 
       let heightEntry: HeightTextureEntry | null = null;
-      if (mode === "height" || mode === "hillshade") {
-        if (!tileUrl) return;
-        heightEntry = await loadHeightTexture(device, tileUrl);
-      } else {
-        heightEntry = getLinearHeightTexture(device);
-      }
+  if (mode === "height") {
+    heightEntry = tileUrl
+      ? await loadHeightTexture(device, tileUrl)
+      : getFallbackHeightTexture(device);
+  } else {
+    heightEntry = getLinearHeightTexture(device);
+  }
       if (!heightEntry || disposed) return;
 
       const { renderPipeline, sampler } = getSharedPipeline(device, format);
@@ -881,28 +868,13 @@ function GradientTileCanvas({
       const cellSizeMeters = 3;
       const verticalExaggeration = 8;
       const heightScale = verticalExaggeration / (cellSizeMeters * 8);
-      const altitude = (sunAltitudeDeg * Math.PI) / 180;
-      const azimuth = (sunAzimuthDeg * Math.PI) / 180;
-      const lightDir = [
-        Math.sin(azimuth) * Math.cos(altitude),
-        Math.cos(azimuth) * Math.cos(altitude),
-        Math.sin(altitude),
-      ];
-      const ambient = 0.2;
-      const contrast = 0.9;
-      const hillshadeFlag = mode === "hillshade" ? 1 : 0;
       const uniformArray = new Float32Array(16);
-      uniformArray[0] = hillshadeFlag;
+      uniformArray[0] = 0;
       uniformArray[1] = texelSizeX;
       uniformArray[2] = texelSizeY;
       uniformArray[3] = heightScale;
-      uniformArray[4] = lightDir[0];
-      uniformArray[5] = lightDir[1];
-      uniformArray[6] = lightDir[2];
       uniformArray[7] = heightMin;
       uniformArray[8] = heightRange;
-      uniformArray[9] = ambient;
-      uniformArray[10] = contrast;
       const uniformData = uniformArray;
       let resources = resourcesRef.current;
       if (!resources || resources.uniformSize !== uniformData.byteLength) {
@@ -976,7 +948,7 @@ function GradientTileCanvas({
         resourcesRef.current = null;
       }
     };
-  }, [mode, tileUrl, stops, invert, size, isPlainMode, sunAltitudeDeg, sunAzimuthDeg]);
+  }, [mode, tileUrl, stops, invert, size, isPlainMode]);
 
   if (isPlainMode) {
     return null;

@@ -16,8 +16,14 @@
 
 .dropdown-field {
   position: relative;
-  border: 1px solid var(--dropdown-border);
-  border-radius: 3px;
+  border-style: solid;
+  border-width: 1px;
+  border-color: var(--dropdown-border);
+  border-top-color: var(--dropdown-border-top, var(--dropdown-border));
+  border-right-color: var(--dropdown-border-right, var(--dropdown-border));
+  border-bottom-color: var(--dropdown-border-bottom, var(--dropdown-border));
+  border-left-color: var(--dropdown-border-left, var(--dropdown-border));
+  border-radius: var(--dropdown-radius, 3px);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -26,13 +32,13 @@
 .dropdown-root[data-open="true"] .dropdown-field {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-  border-bottom: none;
+  border-bottom-width: 0;
 }
 
 .dropdown-trigger {
   font-family: inherit;
   width: 100%;
-  border-radius: 3px;
+  border-radius: var(--dropdown-radius, 3px);
   border: none;
   background: var(--dropdown-surface);
   color: var(--dropdown-text);
@@ -86,8 +92,14 @@
   right: 0;
   box-sizing: border-box;
   background: transparent;
-  border: 1px solid var(--dropdown-border);
-  border-radius: 0 0 3px 3px;
+  border-style: solid;
+  border-width: 1px;
+  border-color: var(--dropdown-border);
+  border-top-width: 0;
+  border-right-color: var(--dropdown-border-right, var(--dropdown-border));
+  border-bottom-color: var(--dropdown-border-bottom, var(--dropdown-border));
+  border-left-color: var(--dropdown-border-left, var(--dropdown-border));
+  border-radius: 0 0 var(--dropdown-radius, 3px) var(--dropdown-radius, 3px);
   box-shadow: none;
   padding: 0;
   display: flex;
@@ -151,8 +163,8 @@
 }
 
 .dropdown-option:last-of-type {
-  border-bottom-left-radius: 3px;
-  border-bottom-right-radius: 3px;
+  border-bottom-left-radius: var(--dropdown-radius, 3px);
+  border-bottom-right-radius: var(--dropdown-radius, 3px);
 }
 
 .dropdown-empty {

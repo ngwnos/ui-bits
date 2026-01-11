@@ -2,14 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BasicButton,
   AudioAnalysisProvider,
+  createAudioAnalysisStore,
   AudioControls,
+  Dropdown,
   FloatingPanel,
   Folder,
   FrameLoopProvider,
   IconButton,
   LFOSlider,
   LoadingBar,
+  SliderStoreProvider,
+  SelectionGrid,
   SegmentBar,
+  VirtualKeyboard,
   useFrame,
   flexoki,
   sliderColorCombos,
@@ -54,11 +59,11 @@ const ROUTES = [
     label: 'Audio Controls',
     title: 'Audio Controls',
     code: `<AudioControls
-  audioSrc="/audio/credits.mp3"
+  source={{ type: "buffer", src: "/audio/credits.mp3" }}
   colorA={flexoki.red["600"]}
   colorB={flexoki.red["100"]}
-    borderStyle="a"
-    fontSize={12}
+  borderStyle="a"
+  fontSize={12}
 />`,
   },
   {
@@ -78,6 +83,36 @@ const ROUTES = [
   fontSize={12}
 />`,
   },
+  {
+    id: 'selection-grid',
+    label: 'Selection Grid',
+    title: 'Selection Grid',
+    code: `<SelectionGrid
+  previewDarkMode
+  layoutGap="6px"
+  colorA={flexoki.base["50"]}
+  colorB={flexoki.base["100"]}
+/>`,
+  },
+  {
+    id: 'dropdown',
+    label: 'Dropdown',
+    title: 'Dropdown',
+    code: `<Dropdown
+  label="Waveform"
+  options={[
+    { value: "sine", label: "Sine", description: "Smooth, periodic waveform" },
+    { value: "triangle", label: "Triangle", description: "Linear rise and fall" },
+    { value: "square", label: "Square", description: "Hard-edged gate", disabled: true },
+  ]}
+  value="sine"
+  onChange={(value) => setWaveformValue(value)}
+  colorA={flexoki.blue["600"]}
+  colorB={flexoki.blue["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>`,
+  },
 ]
 
 const SIDEBAR_COLORS = [
@@ -88,6 +123,26 @@ const SIDEBAR_COLORS = [
   { colorA: flexoki.blue['100'], colorB: flexoki.blue['600'] },
   { colorA: flexoki.purple['100'], colorB: flexoki.purple['600'] },
 ]
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+const WHITE_PITCHES = new Set([0, 2, 4, 5, 7, 9, 11])
+const WHITE_MIDI_VALUES = (() => {
+  const values: number[] = []
+  for (let midi = 36; midi <= 84; midi += 1) {
+    if (WHITE_PITCHES.has(((midi % 12) + 12) % 12)) {
+      values.push(midi)
+    }
+  }
+  return values
+})()
+
+const formatMidiNote = (value: number) => {
+  const rounded = Math.round(value)
+  const name = NOTE_NAMES[((rounded % 12) + 12) % 12]
+  const octave = Math.floor(rounded / 12) - 1
+  return `${name}${octave}`
+}
+
 
 const AUDIO_BIN_COUNT = 128
 
@@ -116,6 +171,20 @@ const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
 const AudioBinsDriver = ({ onFrame }: { onFrame: (nowSec: number, dtSec: number) => void }) => {
   useFrame(onFrame)
   return null
+}
+
+const SelectionGridDemo = () => {
+  return (
+    <>
+      <SelectionGrid
+        previewDarkMode
+        layoutGap="6px"
+        colorA={flexoki.base['50']}
+        colorB={flexoki.base['100']}
+        maxHeightUnits={20}
+      />
+    </>
+  )
 }
 
 const getRouteFromHash = () => {
@@ -255,6 +324,12 @@ function App() {
     { value: 'mid', label: 'Mid' },
     { value: 'high', label: 'High' },
   ]), [])
+  const dropdownOptions = useMemo(() => ([
+    { value: 'sine', label: 'Sine', description: 'Smooth, periodic waveform' },
+    { value: 'triangle', label: 'Triangle', description: 'Linear rise and fall' },
+    { value: 'square', label: 'Square', description: 'Hard-edged gate', disabled: true },
+  ]), [])
+  const [waveformValue, setWaveformValue] = useState('sine')
   const themeOptions = useMemo(() => ([
     {
       value: 'dark',
@@ -275,6 +350,11 @@ function App() {
     () => ROUTES.find((route) => route.id === activeRouteId) ?? ROUTES[0],
     [activeRouteId],
   )
+  const [keyboardNoteCount, setKeyboardNoteCount] = useState(24)
+  const defaultStartIndex = Math.max(0, WHITE_MIDI_VALUES.indexOf(60))
+  const [keyboardStartIndex, setKeyboardStartIndex] = useState(defaultStartIndex)
+  const [keyboardHeightUnits, setKeyboardHeightUnits] = useState(3)
+  const keyboardStartNote = WHITE_MIDI_VALUES[keyboardStartIndex] ?? WHITE_MIDI_VALUES[0] ?? 60
   const brandCanvasProps = useMemo<DocsBrandCanvasProps>(() => ({
     divisions: brandDivisions,
     palette: brandPalette,
@@ -324,6 +404,93 @@ function App() {
       const envelope = 0.6 + 0.4 * Math.sin(x * 0.35 - drift)
       const value = 0.5 + (0.28 * waveA + 0.18 * waveB + 0.12 * waveC) * envelope
       bins[i] = clampUnit(value)
+    }
+  }, [])
+
+  const liveAnalysisStore = useMemo(() => createAudioAnalysisStore({
+    bins: [],
+    binCount: 0,
+    maxMagnitude: 1,
+  }), [])
+  const [liveSource, setLiveSource] = useState<null | { type: "audioNode"; node: AudioNode & { context: AudioContext } }>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const masterGainRef = useRef<GainNode | null>(null)
+  const activeNotesRef = useRef(new Map<string, { osc: OscillatorNode; gain: GainNode }>())
+  const [activeNotes, setActiveNotes] = useState<Record<string, boolean>>({})
+
+  const startNote = useCallback((note: string, frequency: number) => {
+    const context = audioContextRef.current
+    const masterGain = masterGainRef.current
+    if (!context || !masterGain) return
+    if (activeNotesRef.current.has(note)) return
+    if (context.state === 'suspended') {
+      void context.resume().catch(() => {})
+    }
+    const osc = context.createOscillator()
+    const gain = context.createGain()
+    osc.type = 'triangle'
+    osc.frequency.value = frequency
+    gain.gain.value = 0
+    osc.connect(gain)
+    gain.connect(masterGain)
+    const now = context.currentTime
+    gain.gain.setValueAtTime(0, now)
+    gain.gain.linearRampToValueAtTime(0.25, now + 0.02)
+    osc.start()
+    activeNotesRef.current.set(note, { osc, gain })
+    setActiveNotes((prev) => ({ ...prev, [note]: true }))
+  }, [])
+
+  const stopNote = useCallback((note: string) => {
+    const context = audioContextRef.current
+    const entry = activeNotesRef.current.get(note)
+    if (!context || !entry) return
+    const now = context.currentTime
+    entry.gain.gain.cancelScheduledValues(now)
+    entry.gain.gain.setValueAtTime(entry.gain.gain.value, now)
+    entry.gain.gain.linearRampToValueAtTime(0, now + 0.08)
+    entry.osc.stop(now + 0.09)
+    entry.osc.disconnect()
+    entry.gain.disconnect()
+    activeNotesRef.current.delete(note)
+    setActiveNotes((prev) => {
+      const next = { ...prev }
+      delete next[note]
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    activeNotesRef.current.forEach((_entry, note) => {
+      stopNote(note)
+    })
+    setActiveNotes({})
+  }, [keyboardNoteCount, keyboardStartIndex, stopNote])
+
+
+  useEffect(() => {
+    if (typeof AudioContext === 'undefined') return undefined
+    const context = new AudioContext()
+    const masterGain = context.createGain()
+    masterGain.gain.value = 0.4
+    audioContextRef.current = context
+    masterGainRef.current = masterGain
+    setLiveSource({ type: "audioNode", node: masterGain as unknown as AudioNode & { context: AudioContext } })
+    return () => {
+      activeNotesRef.current.forEach((entry) => {
+        try {
+          entry.osc.stop()
+        } catch {
+          // ignore
+        }
+        entry.osc.disconnect()
+        entry.gain.disconnect()
+      })
+      activeNotesRef.current.clear()
+      masterGain.disconnect()
+      masterGainRef.current = null
+      audioContextRef.current = null
+      void context.close().catch(() => {})
     }
   }, [])
 
@@ -679,6 +846,21 @@ function App() {
                   <CodeBlock code={`fontSize={16}\n`} />
                 </div>
               </div>
+              <div className="docs-text-block">
+                <p>
+                  LFOSlider is designed to feel like an instrument: you can let it own its state with
+                  <code>defaultValue</code> and other <code>default*</code> props, or control it with{" "}
+                  <code>value</code> plus <code>onUserChange</code>/<code>onAnimatedUpdate</code> for
+                  app-driven state.
+                </p>
+                <p>
+                  LFO controls are opt-in via <code>showLfoControls</code>, and{" "}
+                  <code>defaultWaveform</code>, <code>defaultFrequency</code>, and{" "}
+                  <code>defaultLfoRange</code> give you expressive defaults without forcing control.
+                  Keep <code>colorA</code> for text/lines and <code>colorB</code> for the fill so the
+                  slider stacks cleanly with other controls.
+                </p>
+              </div>
             </>
           ) : activeRouteId === 'icon-button' ? (
             <>
@@ -785,67 +967,98 @@ function App() {
                   )
                 })}
               </div>
+              <div className="docs-text-block">
+                <p>
+                  IconButton matches slider sizing so it can live inside the same bars. Use{" "}
+                  <code>behavior="momentary"</code> for press-and-hold,{" "}
+                  <code>behavior="toggle"</code> for on/off, and{" "}
+                  <code>behavior="cycle"</code> with <code>options</code> for multi-state controls.
+                </p>
+                <p>
+                  For state, use <code>defaultToggled</code>/<code>defaultPressed</code> when the
+                  button can manage itself, or switch to controlled props like{" "}
+                  <code>toggled</code>/<code>pressed</code> with{" "}
+                  <code>onToggle</code>/<code>onPressChange</code>. Use{" "}
+                  <code>borderStyle</code> and <code>borderMask</code> to keep borders flush with
+                  neighboring controls.
+                </p>
+              </div>
             </>
           ) : activeRouteId === 'loading-bar' ? (
-            <div className="docs-code-section">
-              <LoadingBar
-                value={loadingBarValue}
-                width="100%"
-                colorA={flexoki.green['600']}
-                colorB={flexoki.green['100']}
-                border="left"
-                fontSize={12}
-                barStyle="discrete"
-                barSegmentCount={24}
-              />
-              <LFOSlider
-                label="Value"
-                min={0}
-                max={1}
-                step={0.01}
-                defaultValue={loadingBarValue}
-                value={loadingBarValue}
-                width="100%"
-                colorA={flexoki.green['600']}
-                colorB={flexoki.green['100']}
-                border="left"
-                fontSize={12}
-                onUserChange={setLoadingBarValue}
-                onAnimatedUpdate={setLoadingBarValue}
-                formatDisplayValue={(value) => value.toFixed(2)}
-              />
-              <CodeBlock code={activeRoute.code} />
-            </div>
-          ) : activeRouteId === 'audio-controls' ? (
-            <div className="docs-code-section">
-              <div className="docs-audio-stack">
-                <AudioControls
-                  audioSrc="/audio/credits.mp3"
-                  colorA={flexoki.red['600']}
-                  colorB={flexoki.red['100']}
-                  borderStyle="a"
-                  fontSize={12}
-                />
-                <LFOSlider
-                  label="Audio LFO"
-                  min={0}
-                  max={100}
-                  step={1}
-                  defaultValue={50}
+            <>
+              <div className="docs-code-section">
+                <LoadingBar
+                  value={loadingBarValue}
                   width="100%"
-                  colorA={flexoki.red['600']}
-                  colorB={flexoki.red['100']}
+                  colorA={flexoki.green['600']}
+                  colorB={flexoki.green['100']}
                   border="left"
                   fontSize={12}
-                  showLfoControls
-                  defaultLfoRunning
-                  defaultWaveform="audio"
+                  barStyle="discrete"
+                  barSegmentCount={24}
                 />
+                <LFOSlider
+                  label="Value"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  defaultValue={loadingBarValue}
+                  value={loadingBarValue}
+                  width="100%"
+                  colorA={flexoki.green['600']}
+                  colorB={flexoki.green['100']}
+                  border="left"
+                  fontSize={12}
+                  onUserChange={setLoadingBarValue}
+                  onAnimatedUpdate={setLoadingBarValue}
+                  formatDisplayValue={(value) => value.toFixed(2)}
+                />
+                <CodeBlock code={activeRoute.code} />
               </div>
-              <CodeBlock
-                code={`<AudioAnalysisProvider>
+              <div className="docs-text-block">
+                <p>
+                  LoadingBar is a display-only control: you drive <code>value</code> from your app,
+                  an animation loop, or an LFO. It intentionally has no input handling so it stays
+                  lightweight and predictable.
+                </p>
+                <p>
+                  Use <code>barStyle</code> and <code>barSegmentCount</code> to mirror slider
+                  visuals, and keep <code>colorA</code>/<code>colorB</code> consistent so it reads
+                  like part of the same instrument rack.
+                </p>
+              </div>
+            </>
+          ) : activeRouteId === 'audio-controls' ? (
+            <>
+              <div className="docs-code-section">
+                <div className="docs-audio-stack">
+                  <AudioControls
+                    source={{ type: "buffer", src: "/audio/credits.mp3" }}
+                    colorA={flexoki.red['600']}
+                    colorB={flexoki.red['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <LFOSlider
+                    label="Audio LFO"
+                    min={0}
+                    max={100}
+                    step={1}
+                    defaultValue={50}
+                    width="100%"
+                    colorA={flexoki.red['600']}
+                    colorB={flexoki.red['100']}
+                    border="left"
+                    fontSize={12}
+                    showLfoControls
+                    defaultLfoRunning
+                    defaultWaveform="audio"
+                  />
+                </div>
+                <CodeBlock
+                  code={`<AudioAnalysisProvider>
   <AudioControls
-    audioSrc="/audio/credits.mp3"
+    source={{ type: "buffer", src: "/audio/credits.mp3" }}
     colorA={flexoki.red["600"]}
     colorB={flexoki.red["100"]}
     borderStyle="a"
@@ -862,20 +1075,206 @@ function App() {
     defaultWaveform="audio"
   />
 </AudioAnalysisProvider>`}
-              />
-            </div>
+                />
+              </div>
+              <h3 className="docs-section-title">Live Input (MIDI Keyboard Placeholder)</h3>
+              <div className="docs-code-section">
+                <div className="docs-audio-stack">
+                  {liveSource ? (
+                    <AudioControls
+                      source={liveSource}
+                      audioAnalysisStore={liveAnalysisStore}
+                      colorA={flexoki.red['600']}
+                      colorB={flexoki.red['100']}
+                      borderStyle="a"
+                      fontSize={12}
+                      defaultPlaying
+                      defaultMuted={false}
+                    />
+                  ) : null}
+                  <VirtualKeyboard
+                    activeNotes={activeNotes}
+                    onNoteOn={startNote}
+                    onNoteOff={stopNote}
+                    startNote={keyboardStartNote}
+                    noteCount={keyboardNoteCount}
+                    heightUnits={keyboardHeightUnits}
+                    fontSize={12}
+                    header="Keyboard"
+                    colorA={flexoki.red['600']}
+                    colorB={flexoki.red['100']}
+                    whiteKeyColor={flexoki.paper}
+                    blackKeyColor={flexoki.black}
+                  />
+                  <LFOSlider
+                    label="Start"
+                    min={0}
+                    max={WHITE_MIDI_VALUES.length - 1}
+                    step={1}
+                    width="100%"
+                    colorA={flexoki.red['600']}
+                    colorB={flexoki.red['100']}
+                    border="left"
+                    fontSize={12}
+                    mode="external"
+                    readExternal={() => keyboardStartIndex}
+                    onUserChange={(value) => setKeyboardStartIndex(Math.round(value))}
+                    onAnimatedUpdate={(value) => setKeyboardStartIndex(Math.round(value))}
+                    formatDisplayValue={(value) => {
+                      const index = Math.round(value)
+                      const midi = WHITE_MIDI_VALUES[index] ?? WHITE_MIDI_VALUES[0] ?? 60
+                      return formatMidiNote(midi)
+                    }}
+                  />
+                  <LFOSlider
+                    label="Notes"
+                    min={4}
+                    max={24}
+                    step={1}
+                    width="100%"
+                    colorA={flexoki.red['600']}
+                    colorB={flexoki.red['100']}
+                    border="left"
+                    fontSize={12}
+                    mode="external"
+                    readExternal={() => keyboardNoteCount}
+                    onUserChange={(value) => setKeyboardNoteCount(Math.round(value))}
+                    onAnimatedUpdate={(value) => setKeyboardNoteCount(Math.round(value))}
+                    formatDisplayValue={(value) => `${Math.round(value)}`}
+                  />
+                  <LFOSlider
+                    label="Height"
+                    min={3}
+                    max={12}
+                    step={1}
+                    width="100%"
+                    colorA={flexoki.red['600']}
+                    colorB={flexoki.red['100']}
+                    border="left"
+                    fontSize={12}
+                    mode="external"
+                    readExternal={() => keyboardHeightUnits}
+                    onUserChange={(value) => setKeyboardHeightUnits(Math.round(value))}
+                    onAnimatedUpdate={(value) => setKeyboardHeightUnits(Math.round(value))}
+                    formatDisplayValue={(value) => `${Math.round(value)}`}
+                  />
+                </div>
+                <CodeBlock
+                  code={`const keyboardOutput = midiKeyboard.outputNode
+
+<AudioControls
+  source={{ type: "audioNode", node: keyboardOutput }}
+  audioAnalysisStore={analysisStore}
+  colorA={flexoki.red["600"]}
+  colorB={flexoki.red["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>
+<VirtualKeyboard
+  startNote={60}
+  noteCount={24}
+  heightUnits={3}
+  whiteKeyColor={flexoki.paper}
+  blackKeyColor={flexoki.black}
+  onNoteOn={midiKeyboard.noteOn}
+  onNoteOff={midiKeyboard.noteOff}
+/>`}
+                />
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  AudioControls can run standalone, but to share FFT data with sliders, wrap your
+                  UI in <code>AudioAnalysisProvider</code> or pass an{" "}
+                  <code>audioAnalysisStore</code> directly. Any slider using the{" "}
+                  <code>"audio"</code> waveform will read from the same analysis stream.
+                </p>
+                <p>
+                  Use <code>source</code> to choose buffer playback or live input (media stream or
+                  audio node). Use <code>default*</code> props for initial UI behavior, or controlled
+                  props like <code>playing</code>, <code>binCount</code>, and{" "}
+                  <code>binInterpolation</code> if you need to synchronize with app state. Frequency
+                  limits are in Hz, and the FFT controls are tuned for quick performance shaping.
+                </p>
+              </div>
+            </>
           ) : activeRouteId === 'segment-bar' ? (
-            <div className="docs-code-section">
-              <SegmentBar
-                options={segmentOptions}
-                defaultValue="mid"
-                colorA={flexoki.purple['600']}
-                colorB={flexoki.purple['100']}
-                borderStyle="a"
-                fontSize={12}
-              />
-              <CodeBlock code={activeRoute.code} />
-            </div>
+            <>
+              <div className="docs-code-section">
+                <SegmentBar
+                  options={segmentOptions}
+                  defaultValue="mid"
+                  colorA={flexoki.purple['600']}
+                  colorB={flexoki.purple['100']}
+                  borderStyle="a"
+                  fontSize={12}
+                />
+                <CodeBlock code={activeRoute.code} />
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  SegmentBar is a discrete selector: pass an array of{" "}
+                  <code>{`{ value, label }`}</code> options and let it manage selection with{" "}
+                  <code>defaultValue</code>, or control it with <code>value</code> and{" "}
+                  <code>onChange</code>.
+                </p>
+                <p>
+                  It supports keyboard navigation and keeps the same sizing rhythm as sliders. Use{" "}
+                  <code>borderStyle</code>, <code>colorA</code>, and <code>colorB</code> so it blends
+                  into stacked control rows.
+                </p>
+              </div>
+            </>
+          ) : activeRouteId === 'selection-grid' ? (
+            <>
+              <div className="docs-code-section">
+                <SliderStoreProvider>
+                  <div className="docs-selection-grid-stack">
+                    <SelectionGridDemo />
+                  </div>
+                </SliderStoreProvider>
+                <CodeBlock code={activeRoute.code} />
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  SelectionGrid is a rich palette selector with built-in gradient previews and
+                  optional terrain rendering. It manages its own store unless you supply one via the
+                  shared slider store context.
+                </p>
+                <p>
+                  Keep the layout gap and colors aligned with your other controls so the grid feels
+                  like part of the same instrument panel. Terrain previews are opt-in via the
+                  built-in preview mode toggle.
+                </p>
+              </div>
+            </>
+          ) : activeRouteId === 'dropdown' ? (
+            <>
+              <div className="docs-code-section">
+                <Dropdown
+                  label="Waveform"
+                  options={dropdownOptions}
+                  value={waveformValue}
+                  onChange={(value) => setWaveformValue(value)}
+                  colorA={flexoki.blue['600']}
+                  colorB={flexoki.blue['100']}
+                  borderStyle="a"
+                  fontSize={12}
+                />
+                <CodeBlock code={activeRoute.code} />
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  Dropdown favors compact, keyboard-friendly selection with a clear label and
+                  explicit option list. Use <code>defaultValue</code> for uncontrolled menus or
+                  <code>value</code> + <code>onChange</code> to bind it to application state.
+                </p>
+                <p>
+                  Keep <code>colorA</code> and <code>colorB</code> aligned with neighboring controls
+                  so the popover reads like part of the same UI system. Disabled options stay in the
+                  list to communicate unavailable modes without hiding them.
+                </p>
+              </div>
+            </>
           ) : (
             <CodeBlock code={activeRoute.code} />
           )}

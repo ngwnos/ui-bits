@@ -12,7 +12,7 @@ export interface AudioAnalysisActions {
   setAudioMaxMagnitude: (magnitude: number) => void;
 }
 
-interface AudioAnalysisStore extends AudioAnalysisActions {
+export interface AudioAnalysisStore extends AudioAnalysisActions {
   getSnapshot: () => AudioAnalysisState;
   subscribe: (listener: () => void) => () => void;
 }
@@ -43,7 +43,7 @@ function normalizeMaxMagnitude(magnitude: number | undefined) {
   return magnitude ?? DEFAULT_MAX_MAGNITUDE;
 }
 
-function createAudioAnalysisStore(initial: AudioAnalysisState): AudioAnalysisStore {
+export function createAudioAnalysisStore(initial: AudioAnalysisState): AudioAnalysisStore {
   let state = initial;
   const listeners = new Set<() => void>();
 

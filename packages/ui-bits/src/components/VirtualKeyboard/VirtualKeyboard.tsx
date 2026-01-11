@@ -632,6 +632,9 @@ export default function VirtualKeyboard({
             behavior="toggle"
             toggled={shortcutsEnabled}
             onToggle={setShortcutsEnabled}
+            onPointerDown={(event) => {
+              event.preventDefault();
+            }}
             borderStyle="none"
             fontSize={resolvedFontSize}
             colorA={safeColorB}

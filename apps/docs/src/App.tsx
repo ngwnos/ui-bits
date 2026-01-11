@@ -15,6 +15,7 @@ import {
   SelectionGrid,
   SegmentBar,
   VirtualKeyboard,
+  type VirtualKeyboardSoundfont,
   useFrame,
   flexoki,
   sliderColorCombos,
@@ -413,83 +414,24 @@ function App() {
     maxMagnitude: 1,
   }), [])
   const [liveSource, setLiveSource] = useState<null | { type: "audioNode"; node: AudioNode & { context: AudioContext } }>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const masterGainRef = useRef<GainNode | null>(null)
-  const activeNotesRef = useRef(new Map<string, { osc: OscillatorNode; gain: GainNode }>())
-  const [activeNotes, setActiveNotes] = useState<Record<string, boolean>>({})
-
-  const startNote = useCallback((note: string, frequency: number) => {
-    const context = audioContextRef.current
-    const masterGain = masterGainRef.current
-    if (!context || !masterGain) return
-    if (activeNotesRef.current.has(note)) return
-    if (context.state === 'suspended') {
-      void context.resume().catch(() => {})
+  const keyboardSoundfont = useMemo<VirtualKeyboardSoundfont | null>(() => {
+    if (!liveSource) return null
+    return {
+      instrument: 'acoustic_grand_piano',
+      soundfont: 'MusyngKite',
+      format: 'mp3',
+      destination: liveSource.node,
     }
-    const osc = context.createOscillator()
-    const gain = context.createGain()
-    osc.type = 'triangle'
-    osc.frequency.value = frequency
-    gain.gain.value = 0
-    osc.connect(gain)
-    gain.connect(masterGain)
-    const now = context.currentTime
-    gain.gain.setValueAtTime(0, now)
-    gain.gain.linearRampToValueAtTime(0.25, now + 0.02)
-    osc.start()
-    activeNotesRef.current.set(note, { osc, gain })
-    setActiveNotes((prev) => ({ ...prev, [note]: true }))
-  }, [])
-
-  const stopNote = useCallback((note: string) => {
-    const context = audioContextRef.current
-    const entry = activeNotesRef.current.get(note)
-    if (!context || !entry) return
-    const now = context.currentTime
-    entry.gain.gain.cancelScheduledValues(now)
-    entry.gain.gain.setValueAtTime(entry.gain.gain.value, now)
-    entry.gain.gain.linearRampToValueAtTime(0, now + 0.08)
-    entry.osc.stop(now + 0.09)
-    entry.osc.disconnect()
-    entry.gain.disconnect()
-    activeNotesRef.current.delete(note)
-    setActiveNotes((prev) => {
-      const next = { ...prev }
-      delete next[note]
-      return next
-    })
-  }, [])
-
-  useEffect(() => {
-    activeNotesRef.current.forEach((_entry, note) => {
-      stopNote(note)
-    })
-    setActiveNotes({})
-  }, [keyboardNoteCount, keyboardStartIndex, stopNote])
-
+  }, [liveSource])
 
   useEffect(() => {
     if (typeof AudioContext === 'undefined') return undefined
     const context = new AudioContext()
     const masterGain = context.createGain()
     masterGain.gain.value = 0.4
-    audioContextRef.current = context
-    masterGainRef.current = masterGain
     setLiveSource({ type: "audioNode", node: masterGain as unknown as AudioNode & { context: AudioContext } })
     return () => {
-      activeNotesRef.current.forEach((entry) => {
-        try {
-          entry.osc.stop()
-        } catch {
-          // ignore
-        }
-        entry.osc.disconnect()
-        entry.gain.disconnect()
-      })
-      activeNotesRef.current.clear()
       masterGain.disconnect()
-      masterGainRef.current = null
-      audioContextRef.current = null
       void context.close().catch(() => {})
     }
   }, [])
@@ -1093,9 +1035,6 @@ function App() {
                     />
                   ) : null}
                   <VirtualKeyboard
-                    activeNotes={activeNotes}
-                    onNoteOn={startNote}
-                    onNoteOff={stopNote}
                     startNote={keyboardStartNote}
                     noteCount={keyboardNoteCount}
                     heightUnits={keyboardHeightUnits}
@@ -1105,6 +1044,7 @@ function App() {
                     colorB={flexoki.red['100']}
                     whiteKeyColor={flexoki.paper}
                     blackKeyColor={flexoki.black}
+                    soundfont={keyboardSoundfont ?? undefined}
                   />
                   <LFOSlider
                     label="Start"
@@ -1160,7 +1100,7 @@ function App() {
                   />
                 </div>
                 <CodeBlock
-                  code={`const keyboardOutput = midiKeyboard.outputNode
+                  code={`const keyboardOutput = masterGain
 
 <AudioControls
   source={{ type: "audioNode", node: keyboardOutput }}
@@ -1174,10 +1114,15 @@ function App() {
   startNote={60}
   noteCount={24}
   heightUnits={3}
+  soundfont={{
+    instrument: "acoustic_grand_piano",
+    soundfont: "MusyngKite",
+    format: "mp3",
+    url: "https://gleitz.github.io/midi-js-soundfonts",
+    destination: keyboardOutput,
+  }}
   whiteKeyColor={flexoki.paper}
   blackKeyColor={flexoki.black}
-  onNoteOn={midiKeyboard.noteOn}
-  onNoteOff={midiKeyboard.noteOff}
 />`}
                 />
               </div>
@@ -1194,6 +1139,11 @@ function App() {
                   props like <code>playing</code>, <code>binCount</code>, and{" "}
                   <code>binInterpolation</code> if you need to synchronize with app state. Frequency
                   limits are in Hz, and the FFT controls are tuned for quick performance shaping.
+                </p>
+                <p>
+                  VirtualKeyboard can play soundfonts with the <code>soundfont</code> prop. Pass a
+                  custom <code>url</code> to host samples locally, or provide a destination node so
+                  the keyboard and AudioControls share the same analysis stream.
                 </p>
               </div>
             </>

@@ -1,5 +1,7 @@
 import React from "react";
 import { Keyboard } from "lucide-react";
+import * as Soundfont from "soundfont-player";
+import type { Player as SoundfontPlayer } from "soundfont-player";
 import IconButton from "../IconButton";
 import "./virtual-keyboard.css";
 
@@ -7,6 +9,22 @@ export interface VirtualKeyboardKey {
   note: string;
   frequency: number;
   position?: number;
+}
+
+export interface VirtualKeyboardSoundfont {
+  instrument: string;
+  soundfont?: string;
+  format?: "mp3" | "ogg";
+  url?: string;
+  monitor?: boolean;
+  gain?: number;
+  attack?: number;
+  decay?: number;
+  sustain?: number;
+  release?: number;
+  notes?: Array<string | number>;
+  destination?: AudioNode;
+  context?: AudioContext;
 }
 
 export interface VirtualKeyboardProps {
@@ -23,6 +41,7 @@ export interface VirtualKeyboardProps {
   blackKeyColor?: string;
   whiteKeyActiveColor?: string;
   blackKeyActiveColor?: string;
+  soundfont?: VirtualKeyboardSoundfont | string;
   keyboardShortcutsEnabled?: boolean;
   defaultKeyboardShortcutsEnabled?: boolean;
   onKeyboardShortcutsChange?: (enabled: boolean) => void;
@@ -130,19 +149,12 @@ function computeSliderUnitPx(fontSize: number) {
   );
 }
 
-function readKey(target: HTMLElement | null) {
-  const element = target?.closest("[data-note]") as HTMLElement | null;
-  if (!element) return null;
-  const note = element.getAttribute("data-note");
-  const frequency = Number(element.getAttribute("data-frequency"));
-  if (!note || !Number.isFinite(frequency)) return null;
-  return { note, frequency };
-}
-
 const KEYBOARD_SHORTCUTS = [
   "a", "w", "s", "e", "d", "f", "t", "g", "y", "h", "u", "j",
   "k", "o", "l", "p", ";", "'", "z", "x", "c", "v", "b", "n",
 ];
+
+type SoundfontNote = { stop?: (when?: number) => void };
 
 function shouldIgnoreKeyboardEvent(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -165,6 +177,7 @@ export default function VirtualKeyboard({
   blackKeyColor,
   whiteKeyActiveColor,
   blackKeyActiveColor,
+  soundfont,
   keyboardShortcutsEnabled,
   defaultKeyboardShortcutsEnabled = DEFAULT_KEYBOARD_SHORTCUTS_ENABLED,
   onKeyboardShortcutsChange,
@@ -184,6 +197,14 @@ export default function VirtualKeyboard({
     note: null,
   });
   const pressedKeysRef = React.useRef<Map<string, string>>(new Map());
+  const activeNoteKeysRef = React.useRef<Set<string>>(new Set());
+  const soundfontStateRef = React.useRef<{
+    instrument: SoundfontPlayer;
+    context: AudioContext;
+    destination: AudioNode;
+    ownsContext: boolean;
+  } | null>(null);
+  const soundfontNotesRef = React.useRef<Map<string, SoundfontNote>>(new Map());
   const [internalActive, setInternalActive] = React.useState<Record<string, boolean>>({});
   const resolvedActive = activeNotes ?? internalActive;
   const derivedKeys = React.useMemo<{
@@ -214,6 +235,26 @@ export default function VirtualKeyboard({
   const resolvedBlackKeyColor = blackKeyColor ?? safeColorA;
   const resolvedWhiteKeyActive = whiteKeyActiveColor ?? safeColorA;
   const resolvedBlackKeyActive = blackKeyActiveColor ?? safeColorA;
+  const resolvedSoundfont = React.useMemo(() => {
+    if (!soundfont) return null;
+    if (typeof soundfont === "string") {
+      return { instrument: soundfont };
+    }
+    return soundfont;
+  }, [soundfont]);
+  const soundfontInstrument = resolvedSoundfont?.instrument;
+  const soundfontName = resolvedSoundfont?.soundfont;
+  const soundfontFormat = resolvedSoundfont?.format;
+  const soundfontUrl = resolvedSoundfont?.url;
+  const soundfontMonitor = resolvedSoundfont?.monitor ?? true;
+  const soundfontGain = resolvedSoundfont?.gain;
+  const soundfontAttack = resolvedSoundfont?.attack;
+  const soundfontDecay = resolvedSoundfont?.decay;
+  const soundfontSustain = resolvedSoundfont?.sustain;
+  const soundfontRelease = resolvedSoundfont?.release;
+  const soundfontNotes = resolvedSoundfont?.notes;
+  const soundfontContext = resolvedSoundfont?.context;
+  const soundfontDestination = resolvedSoundfont?.destination;
   const setActive = React.useCallback((note: string, nextActive: boolean) => {
     if (activeNotes) return;
     setInternalActive((prev) => {
@@ -229,16 +270,53 @@ export default function VirtualKeyboard({
   }, [activeNotes]);
 
   const triggerOn = React.useCallback((note: string, frequency: number) => {
+    try {
+      const soundfontState = soundfontStateRef.current;
+      if (soundfontState) {
+        const { instrument, context } = soundfontState;
+        const existing = soundfontNotesRef.current.get(note);
+        if (existing?.stop) {
+          existing.stop(context.currentTime);
+        }
+        soundfontNotesRef.current.delete(note);
+        if (context.state === "suspended") {
+          void context.resume().catch(() => {});
+        }
+        const node = instrument.start(note, context.currentTime);
+        if (node && typeof node.stop === "function") {
+          soundfontNotesRef.current.set(note, node);
+        }
+      }
+    } catch {
+      // ignore soundfont playback errors
+    }
+    activeNoteKeysRef.current.add(note);
     onNoteOn?.(note, frequency);
     setActive(note, true);
   }, [onNoteOn, setActive]);
 
   const triggerOff = React.useCallback((note: string) => {
+    try {
+      const soundfontState = soundfontStateRef.current;
+      if (soundfontState) {
+        const { context } = soundfontState;
+        const existing = soundfontNotesRef.current.get(note);
+        if (existing?.stop) {
+          existing.stop(context.currentTime);
+        }
+        soundfontNotesRef.current.delete(note);
+      }
+    } catch {
+      // ignore soundfont playback errors
+    }
+    activeNoteKeysRef.current.delete(note);
     onNoteOff?.(note);
     setActive(note, false);
   }, [onNoteOff, setActive]);
   const triggerOnRef = React.useRef(triggerOn);
   const triggerOffRef = React.useRef(triggerOff);
+  const releasePointerNoteRef = React.useRef(() => {});
+  const clearAllNotesRef = React.useRef(() => {});
   const startMidiRef = React.useRef(startMidi);
   const noteCountRef = React.useRef(noteCount);
   React.useEffect(() => {
@@ -248,51 +326,190 @@ export default function VirtualKeyboard({
     triggerOffRef.current = triggerOff;
   }, [triggerOff]);
   React.useEffect(() => {
+    releasePointerNoteRef.current = () => {
+      const state = pointerStateRef.current;
+      if (state.note) {
+        triggerOffRef.current(state.note);
+      }
+      pointerStateRef.current = { pointerId: null, note: null };
+    };
+  }, []);
+  React.useEffect(() => {
+    clearAllNotesRef.current = () => {
+      const notes = Array.from(activeNoteKeysRef.current);
+      notes.forEach((note) => triggerOffRef.current(note));
+      activeNoteKeysRef.current.clear();
+    };
+  }, []);
+  React.useEffect(() => {
     startMidiRef.current = startMidi;
   }, [startMidi]);
   React.useEffect(() => {
     noteCountRef.current = noteCount;
   }, [noteCount]);
 
-  const handlePointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (pointerStateRef.current.pointerId !== null) return;
-    const key = readKey(event.target as HTMLElement | null);
-    if (!key) return;
+  React.useEffect(() => {
+    if (!soundfontInstrument) {
+      soundfontStateRef.current = null;
+      return undefined;
+    }
+    if (typeof AudioContext === "undefined" && !soundfontContext && !soundfontDestination) {
+      soundfontStateRef.current = null;
+      return undefined;
+    }
+    let cancelled = false;
+    const destination = soundfontDestination;
+    const destinationContext = destination?.context;
+    const resolvedContext = soundfontContext
+      ?? (destinationContext instanceof AudioContext ? destinationContext : null)
+      ?? new AudioContext();
+    const context = resolvedContext;
+    const ownsContext = !soundfontContext && !destination;
+    const baseUrl = soundfontUrl ? soundfontUrl.replace(/\/$/, "") : null;
+    const options: Record<string, unknown> = {};
+    if (soundfontName) {
+      options.soundfont = soundfontName;
+    }
+    if (soundfontFormat) {
+      options.format = soundfontFormat;
+    }
+    if (soundfontGain !== undefined) {
+      options.gain = soundfontGain;
+    }
+    if (soundfontAttack !== undefined) {
+      options.attack = soundfontAttack;
+    }
+    if (soundfontDecay !== undefined) {
+      options.decay = soundfontDecay;
+    }
+    if (soundfontSustain !== undefined) {
+      options.sustain = soundfontSustain;
+    }
+    if (soundfontRelease !== undefined) {
+      options.release = soundfontRelease;
+    }
+    if (soundfontNotes !== undefined) {
+      options.notes = soundfontNotes;
+    }
+    if (!soundfontMonitor && destination) {
+      options.destination = destination;
+    }
+    if (baseUrl) {
+      options.nameToUrl = (name: string, sf?: string, format?: string) => {
+        const resolvedSoundfont = sf ?? soundfontName ?? "MusyngKite";
+        const resolvedFormat = format === "ogg" ? "ogg" : (soundfontFormat ?? "mp3");
+        return `${baseUrl}/${resolvedSoundfont}/${name}-${resolvedFormat}.js`;
+      };
+    }
+    clearAllNotesRef.current();
+    soundfontNotesRef.current.forEach((entry) => {
+      if (entry?.stop) {
+        entry.stop(context.currentTime);
+      }
+    });
+    soundfontNotesRef.current.clear();
+    soundfontStateRef.current = null;
+    const instrumentName = soundfontInstrument as Parameters<typeof Soundfont.instrument>[1];
+    Soundfont.instrument(context, instrumentName, options)
+      .then((instrument) => {
+        if (cancelled) return;
+        if (destination && (soundfontMonitor || options.destination !== destination)) {
+          if (destination !== context.destination) {
+            instrument.connect(destination);
+          }
+        }
+        soundfontStateRef.current = {
+          instrument,
+          context,
+          destination: destination ?? context.destination,
+          ownsContext,
+        };
+      })
+      .catch(() => {
+        if (cancelled) return;
+        soundfontStateRef.current = null;
+      });
+    return () => {
+      cancelled = true;
+      clearAllNotesRef.current();
+      soundfontNotesRef.current.forEach((entry) => {
+        if (entry?.stop) {
+          entry.stop();
+        }
+      });
+      soundfontNotesRef.current.clear();
+      soundfontStateRef.current = null;
+      if (ownsContext) {
+        void context.close().catch(() => {});
+      }
+    };
+  }, [
+    soundfontInstrument,
+    soundfontName,
+    soundfontFormat,
+    soundfontUrl,
+    soundfontGain,
+    soundfontAttack,
+    soundfontDecay,
+    soundfontSustain,
+    soundfontRelease,
+    soundfontMonitor,
+    soundfontNotes,
+    soundfontContext,
+    soundfontDestination,
+  ]);
+
+  React.useEffect(() => {
+    if (!soundfontInstrument) return;
+    clearAllNotesRef.current();
+    soundfontNotesRef.current.forEach((entry) => {
+      if (entry?.stop) {
+        entry.stop();
+      }
+    });
+    soundfontNotesRef.current.clear();
+    if (!activeNotes) {
+      setInternalActive({});
+    }
+  }, [activeNotes, noteCount, soundfontInstrument, startMidi]);
+
+  const handleKeyPointerDown = React.useCallback((
+    event: React.PointerEvent<HTMLButtonElement>,
+    key: VirtualKeyboardKey,
+  ) => {
     pointerStateRef.current = { pointerId: event.pointerId, note: key.note };
-    event.currentTarget.setPointerCapture(event.pointerId);
     event.preventDefault();
     triggerOn(key.note, key.frequency);
   }, [triggerOn]);
 
-  const handlePointerMove = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+  const handleKeyPointerEnter = React.useCallback((
+    event: React.PointerEvent<HTMLButtonElement>,
+    key: VirtualKeyboardKey,
+  ) => {
     const state = pointerStateRef.current;
     if (state.pointerId !== event.pointerId) return;
-    const doc = event.currentTarget.ownerDocument ?? document;
-    const element = doc.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
-    const key = readKey(element);
-    if (!key) {
-      if (state.note) {
-        triggerOff(state.note);
-        pointerStateRef.current.note = null;
-      }
-      return;
-    }
-    if (key.note === state.note) return;
+    if (state.note === key.note) return;
     if (state.note) triggerOff(state.note);
     pointerStateRef.current.note = key.note;
     triggerOn(key.note, key.frequency);
   }, [triggerOff, triggerOn]);
 
-  const handlePointerUp = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+  const handleKeyPointerLeave = React.useCallback((
+    event: React.PointerEvent<HTMLButtonElement>,
+    key: VirtualKeyboardKey,
+  ) => {
+    const state = pointerStateRef.current;
+    if (state.pointerId !== event.pointerId) return;
+    if (state.note !== key.note) return;
+    triggerOff(key.note);
+    pointerStateRef.current.note = null;
+  }, [triggerOff]);
+
+  const handleKeyPointerUp = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     const state = pointerStateRef.current;
     if (state.pointerId !== event.pointerId) return;
     if (state.note) triggerOff(state.note);
     pointerStateRef.current = { pointerId: null, note: null };
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // ignore
-    }
   }, [triggerOff]);
 
   const combinedStyle: React.CSSProperties = { ...style };
@@ -316,6 +533,14 @@ export default function VirtualKeyboard({
     }
     onKeyboardShortcutsChange?.(next);
   }, [isShortcutsControlled, onKeyboardShortcutsChange]);
+  const getShortcutLabel = React.useCallback((note: string) => {
+    if (!shortcutsEnabled) return null;
+    const midi = parseNoteName(note);
+    if (midi == null) return null;
+    const index = midi - startMidi;
+    if (index < 0 || index >= noteCount || index >= KEYBOARD_SHORTCUTS.length) return null;
+    return KEYBOARD_SHORTCUTS[index];
+  }, [noteCount, shortcutsEnabled, startMidi]);
 
   React.useEffect(() => {
     if (!shortcutsEnabled) {
@@ -346,26 +571,60 @@ export default function VirtualKeyboard({
       pressedKeysRef.current.delete(key);
       event.preventDefault();
       triggerOffRef.current(note);
+      if (pressedKeysRef.current.size === 0) {
+        clearAllNotesRef.current();
+      }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
       pressedKeysRef.current.forEach((note) => triggerOffRef.current(note));
       pressedKeysRef.current.clear();
     };
   }, [shortcutsEnabled]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleWindowPointerUp = () => {
+      releasePointerNoteRef.current();
+      clearAllNotesRef.current();
+    };
+    window.addEventListener("pointerup", handleWindowPointerUp, true);
+    window.addEventListener("pointercancel", handleWindowPointerUp, true);
+    return () => {
+      window.removeEventListener("pointerup", handleWindowPointerUp, true);
+      window.removeEventListener("pointercancel", handleWindowPointerUp, true);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleWindowBlur = () => {
+      releasePointerNoteRef.current();
+      pressedKeysRef.current.forEach((note) => triggerOffRef.current(note));
+      pressedKeysRef.current.clear();
+      clearAllNotesRef.current();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        handleWindowBlur();
+      }
+    };
+    window.addEventListener("blur", handleWindowBlur);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("blur", handleWindowBlur);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   return (
     <div
       className={["ui-bits-virtual-keyboard", className].filter(Boolean).join(" ")}
       style={combinedStyle}
       aria-label={ariaLabel}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
     >
       <div className="ui-bits-virtual-keyboard__header">
         <div className="ui-bits-virtual-keyboard__header-inner">
@@ -399,8 +658,24 @@ export default function VirtualKeyboard({
               data-frequency={key.frequency}
               aria-label={`Play ${key.note}`}
               aria-pressed={Boolean(resolvedActive[key.note])}
+              onPointerDown={(event) => handleKeyPointerDown(event, key)}
+              onPointerEnter={(event) => handleKeyPointerEnter(event, key)}
+              onPointerLeave={(event) => handleKeyPointerLeave(event, key)}
+              onPointerUp={(event) => {
+                handleKeyPointerUp(event);
+              }}
+              onPointerCancel={(event) => {
+                handleKeyPointerUp(event);
+              }}
             >
-              {showLabels ? <span className="ui-bits-virtual-keyboard__label">{key.note}</span> : null}
+              {(() => {
+                const shortcutLabel = getShortcutLabel(key.note);
+                if (shortcutLabel) {
+                  return <span className="ui-bits-virtual-keyboard__label">{shortcutLabel}</span>;
+                }
+                if (!showLabels) return null;
+                return <span className="ui-bits-virtual-keyboard__label">{key.note}</span>;
+              })()}
             </button>
           ))}
         </div>
@@ -420,8 +695,24 @@ export default function VirtualKeyboard({
                 data-frequency={key.frequency}
                 aria-label={`Play ${key.note}`}
                 aria-pressed={Boolean(resolvedActive[key.note])}
+                onPointerDown={(event) => handleKeyPointerDown(event, key)}
+                onPointerEnter={(event) => handleKeyPointerEnter(event, key)}
+                onPointerLeave={(event) => handleKeyPointerLeave(event, key)}
+                onPointerUp={(event) => {
+                  handleKeyPointerUp(event);
+                }}
+                onPointerCancel={(event) => {
+                  handleKeyPointerUp(event);
+                }}
               >
-                {showLabels ? <span className="ui-bits-virtual-keyboard__label">{key.note}</span> : null}
+                {(() => {
+                  const shortcutLabel = getShortcutLabel(key.note);
+                  if (shortcutLabel) {
+                    return <span className="ui-bits-virtual-keyboard__label">{shortcutLabel}</span>;
+                  }
+                  if (!showLabels) return null;
+                  return <span className="ui-bits-virtual-keyboard__label">{key.note}</span>;
+                })()}
               </button>
             );
           })}

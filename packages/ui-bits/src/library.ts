@@ -71,6 +71,7 @@ export {
   default as VirtualKeyboard,
   type VirtualKeyboardProps,
   type VirtualKeyboardKey,
+  type VirtualKeyboardSoundfont,
 } from "./components/VirtualKeyboard";
 export {
   default as SegmentBar,

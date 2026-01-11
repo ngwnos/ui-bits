@@ -41,4 +41,5 @@ export {
   default as VirtualKeyboard,
   type VirtualKeyboardProps,
   type VirtualKeyboardKey,
+  type VirtualKeyboardSoundfont,
 } from "./VirtualKeyboard";

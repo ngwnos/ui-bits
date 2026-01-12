@@ -254,6 +254,7 @@ export default function DropdownBase({
 
   const appliedFontSize = fontSize ?? 12;
   const rowHeight = Math.round(appliedFontSize * (1 + 0.35 * 2) + 2);
+  const iconInset = Math.max(1, Math.round(appliedFontSize * 0.1));
   const resolvedColorA = colorA ?? FALLBACK_COLOR_A;
   const resolvedColorB = colorB ?? FALLBACK_COLOR_B;
   const borderColor = borderStyle === "none"
@@ -295,6 +296,7 @@ export default function DropdownBase({
     "--dropdown-font-size": `${appliedFontSize}px`,
     "--dropdown-radius": `${resolvedRadius}px`,
     "--dropdown-row-height": `${rowHeight}px`,
+    "--dropdown-icon-inset": `${iconInset}px`,
   } as React.CSSProperties;
 
   const rootClass = ["dropdown-root", className].filter(Boolean).join(" ");
@@ -316,6 +318,7 @@ export default function DropdownBase({
       className={rootClass}
       data-open={resolvedOpen ? "true" : "false"}
       data-disabled={disabled ? "true" : "false"}
+      data-show-icons={showOptionIcons ? "true" : "false"}
       style={{
         width: "100%",
         maxWidth: resolvedMaxWidth,
@@ -369,6 +372,7 @@ export default function DropdownBase({
                   role="option"
                   aria-selected={optionSelected}
                   className="dropdown-option"
+                  data-has-description={option.description ? "true" : "false"}
                   onMouseEnter={() => {
                     if (option.disabled) return;
                     setVirtualFocusIndex(index);

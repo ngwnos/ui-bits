@@ -9,6 +9,7 @@ export interface AudioFFTWindowProps {
   maxWidth?: number | string;
   maxBins?: number;
   playbackRatio?: number;
+  showPlaybackIndicator?: boolean;
   onScrubStart?: () => void;
   onScrub?: (ratio: number) => void;
   onScrubEnd?: (ratio: number) => void;
@@ -302,13 +303,15 @@ fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
   let activeColor = uniforms.colorActive.xyz;
   let inactiveColor = uniforms.colorInactive.xyz;
   var color = mix(inactiveColor, activeColor, activeMask);
-  let playhead = clamp(uniforms.playback, 0.0, 1.0);
-  let lineWidth = 0.004;
-  let distance = abs(normalizedX - playhead);
-  let lineFeather = smoothstep(lineWidth * 0.5, lineWidth, distance);
-  let lineMask = 1.0 - lineFeather;
-  let invertedColor = mix(activeColor, inactiveColor, activeMask);
-  color = mix(color, invertedColor, lineMask);
+  if (uniforms.playback >= 0.0 && uniforms.playback <= 1.0) {
+    let playhead = uniforms.playback;
+    let lineWidth = 0.004;
+    let distance = abs(normalizedX - playhead);
+    let lineFeather = smoothstep(lineWidth * 0.5, lineWidth, distance);
+    let lineMask = 1.0 - lineFeather;
+    let invertedColor = mix(activeColor, inactiveColor, activeMask);
+    color = mix(color, invertedColor, lineMask);
+  }
   if (peak > 0.01) {
     let peakY = clamp(peak, 0.0, 1.0);
     let peakLine = 1.0 - smoothstep(0.0, 0.01, abs(y - peakY));
@@ -444,6 +447,7 @@ export default function AudioFFTWindow({
   maxWidth,
   maxBins = 1024,
   playbackRatio = 0,
+  showPlaybackIndicator = true,
   onScrubStart,
   onScrub,
   onScrubEnd,
@@ -713,7 +717,7 @@ export default function AudioFFTWindow({
         const uniformArray = uniformArrayRef.current;
         const uniformRawCount = Math.max(1, rawBinCount || 0);
         uniformArray[0] = effectiveBinCount;
-        uniformArray[1] = playbackRatioRef.current;
+        uniformArray[1] = showPlaybackIndicator ? playbackRatioRef.current : -1;
         uniformArray[2] = blurSigmaRef.current;
         uniformArray[3] = binStep;
         uniformArray[4] = activeColorRef.current[0];

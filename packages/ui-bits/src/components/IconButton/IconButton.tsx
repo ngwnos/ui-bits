@@ -34,8 +34,8 @@ export interface IconButtonProps
   onChange?: (value: string, option: IconButtonCycleOption, index: number) => void;
 }
 
-const FALLBACK_COLOR_A = "#2f2f2f";
-const FALLBACK_COLOR_B = "#f0f0f0";
+const FALLBACK_COLOR_A = "var(--ui-bits-color-a, #2f2f2f)";
+const FALLBACK_COLOR_B = "var(--ui-bits-color-b, #f0f0f0)";
 const SLIDER_LINE_HEIGHT = 1;
 const SLIDER_PAD_Y_EM = 0.35;
 const SLIDER_BORDER_WIDTH = 1;

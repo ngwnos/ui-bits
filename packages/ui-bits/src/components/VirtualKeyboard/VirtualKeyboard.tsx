@@ -1,5 +1,5 @@
 import React from "react";
-import { Keyboard } from "lucide-react";
+import { MousePointer2, CaseUpper } from "lucide-react";
 import * as Soundfont from "soundfont-player";
 import type { Player as SoundfontPlayer } from "soundfont-player";
 import IconButton from "../IconButton";
@@ -35,6 +35,7 @@ export interface VirtualKeyboardProps {
   showLabels?: boolean;
   heightUnits?: number;
   header?: React.ReactNode;
+  footer?: React.ReactNode;
   colorA?: string;
   colorB?: string;
   whiteKeyColor?: string;
@@ -171,6 +172,7 @@ export default function VirtualKeyboard({
   showLabels = false,
   heightUnits = DEFAULT_HEIGHT_UNITS,
   header,
+  footer,
   colorA,
   colorB,
   whiteKeyColor,
@@ -513,11 +515,13 @@ export default function VirtualKeyboard({
   }, [triggerOff]);
 
   const combinedStyle: React.CSSProperties = { ...style };
+  (combinedStyle as Record<string, string>)["--ui-bits-color-a"] = safeColorA;
+  (combinedStyle as Record<string, string>)["--ui-bits-color-b"] = safeColorB;
   (combinedStyle as Record<string, string>)["--vk-font-size"] = `${resolvedFontSize}px`;
   (combinedStyle as Record<string, string>)["--vk-header-height"] = `${unitSizePx}px`;
   (combinedStyle as Record<string, string>)["--vk-body-height"] = `${unitSizePx * resolvedHeightUnits}px`;
-  (combinedStyle as Record<string, string>)["--vk-header-bg"] = safeColorA;
-  (combinedStyle as Record<string, string>)["--vk-header-text"] = safeColorB;
+  (combinedStyle as Record<string, string>)["--vk-header-bg"] = safeColorB;
+  (combinedStyle as Record<string, string>)["--vk-header-text"] = safeColorA;
   (combinedStyle as Record<string, string>)["--vk-border"] = safeColorA;
   (combinedStyle as Record<string, string>)["--vk-bg"] = resolvedBlackKeyColor;
   (combinedStyle as Record<string, string>)["--vk-white"] = resolvedWhiteKeyColor;
@@ -533,6 +537,20 @@ export default function VirtualKeyboard({
     }
     onKeyboardShortcutsChange?.(next);
   }, [isShortcutsControlled, onKeyboardShortcutsChange]);
+  const keyboardModeOptions = React.useMemo(() => ([
+    {
+      value: "pointer",
+      icon: <MousePointer2 />,
+      ariaLabel: "Pointer mode",
+      title: "Pointer mode",
+    },
+    {
+      value: "keyboard",
+      icon: <CaseUpper />,
+      ariaLabel: "Keyboard mode",
+      title: "Keyboard mode",
+    },
+  ]), []);
   const getShortcutLabel = React.useCallback((note: string) => {
     if (!shortcutsEnabled) return null;
     const midi = parseNoteName(note);
@@ -628,26 +646,24 @@ export default function VirtualKeyboard({
     >
       <div className="ui-bits-virtual-keyboard__header">
         <div className="ui-bits-virtual-keyboard__header-inner">
-          <IconButton
-            behavior="toggle"
-            toggled={shortcutsEnabled}
-            onToggle={setShortcutsEnabled}
-            onPointerDown={(event) => {
-              event.preventDefault();
-            }}
-            borderStyle="none"
-            fontSize={resolvedFontSize}
-            colorA={safeColorB}
-            colorB={safeColorA}
-            aria-label={shortcutsEnabled ? "Disable keyboard shortcuts" : "Enable keyboard shortcuts"}
-            title={shortcutsEnabled ? "Disable keyboard shortcuts" : "Enable keyboard shortcuts"}
-          >
-            <Keyboard />
-          </IconButton>
-          <div className="ui-bits-virtual-keyboard__header-label">
+          <div className="ui-bits-virtual-keyboard__header-controls">
+            <IconButton
+              behavior="cycle"
+              value={shortcutsEnabled ? "keyboard" : "pointer"}
+              options={keyboardModeOptions}
+              onChange={(nextValue) => setShortcutsEnabled(nextValue === "keyboard")}
+              onPointerDown={(event) => {
+                event.preventDefault();
+              }}
+              borderStyle="none"
+              fontSize={resolvedFontSize}
+              colorA={safeColorA}
+              colorB={safeColorB}
+            />
+          </div>
+          <div className="ui-bits-virtual-keyboard__header-content">
             {header ?? null}
           </div>
-          <div />
         </div>
       </div>
       <div className="ui-bits-virtual-keyboard__body">
@@ -719,6 +735,14 @@ export default function VirtualKeyboard({
               </button>
             );
           })}
+        </div>
+      </div>
+      <div className="ui-bits-virtual-keyboard__footer">
+        <div className="ui-bits-virtual-keyboard__footer-inner">
+          <div className="ui-bits-virtual-keyboard__footer-controls" />
+          <div className="ui-bits-virtual-keyboard__footer-content">
+            {footer ?? null}
+          </div>
         </div>
       </div>
     </div>

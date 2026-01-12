@@ -66,6 +66,7 @@ export {
 } from "./components/AudioControls";
 export { default as SelectionGrid, type SelectionGridProps } from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";
+export { default as IconDropdown, type IconDropdownProps, type IconDropdownOption } from "./components/IconDropdown";
 export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./components/LoadingBar";
 export {
   default as VirtualKeyboard,
@@ -87,6 +88,13 @@ export {
   type IconButtonBorderMask,
   type IconButtonCycleOption,
 } from "./components/IconButton";
+export {
+  default as Dial,
+  type DialProps,
+  type DialBorderStyle,
+  type DialBorderMask,
+  type DialControlMode,
+} from "./components/Dial";
 export { default as BasicButton, type BasicButtonProps, type BasicButtonBorderStyle } from "./components/BasicButton";
 export { default as Folder, type FolderProps, type FolderBorderStyle } from "./components/Folder";
 export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./components/FloatingPanel";

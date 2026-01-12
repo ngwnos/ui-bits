@@ -1,1 +1,2 @@
-export { default, type DropdownProps, type DropdownOption } from "./Dropdown";
+export { default, type DropdownProps } from "./Dropdown";
+export { type DropdownOption } from "./types";

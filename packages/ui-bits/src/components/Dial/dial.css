@@ -1,0 +1,49 @@
+.ui-bits-dial {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  line-height: 1;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  box-sizing: border-box;
+}
+
+.ui-bits-dial__arc {
+  position: absolute;
+  inset: 0;
+}
+
+.ui-bits-dial__track {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--dial-stroke, 2px);
+  stroke-linecap: round;
+  opacity: 0.25;
+}
+
+.ui-bits-dial__indicator {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--dial-stroke, 2px);
+  stroke-linecap: round;
+}
+
+.ui-bits-dial__value {
+  position: relative;
+  z-index: 1;
+}
+
+.ui-bits-dial__value[data-digits="3"],
+.ui-bits-dial__value[data-digits="4"] {
+  font-size: 0.8em;
+}
+
+.ui-bits-dial__value[data-digits="5"],
+.ui-bits-dial__value[data-digits="6"] {
+  font-size: 0.7em;
+}

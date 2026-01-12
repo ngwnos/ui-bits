@@ -4,7 +4,9 @@ import {
   AudioAnalysisProvider,
   createAudioAnalysisStore,
   AudioControls,
+  Dial,
   Dropdown,
+  IconDropdown,
   FloatingPanel,
   Folder,
   FrameLoopProvider,
@@ -102,9 +104,9 @@ const ROUTES = [
     code: `<Dropdown
   label="Waveform"
   options={[
-    { value: "sine", label: "Sine", description: "Smooth, periodic waveform" },
-    { value: "triangle", label: "Triangle", description: "Linear rise and fall" },
-    { value: "square", label: "Square", description: "Hard-edged gate", disabled: true },
+    { value: "sine", label: "Sine" },
+    { value: "triangle", label: "Triangle" },
+    { value: "square", label: "Square", disabled: true },
   ]}
   value="sine"
   onChange={(value) => setWaveformValue(value)}
@@ -129,7 +131,7 @@ const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 const WHITE_PITCHES = new Set([0, 2, 4, 5, 7, 9, 11])
 const WHITE_MIDI_VALUES = (() => {
   const values: number[] = []
-  for (let midi = 36; midi <= 84; midi += 1) {
+  for (let midi = 21; midi <= 108; midi += 1) {
     if (WHITE_PITCHES.has(((midi % 12) + 12) % 12)) {
       values.push(midi)
     }
@@ -326,11 +328,18 @@ function App() {
     { value: 'high', label: 'High' },
   ]), [])
   const dropdownOptions = useMemo(() => ([
-    { value: 'sine', label: 'Sine', description: 'Smooth, periodic waveform' },
-    { value: 'triangle', label: 'Triangle', description: 'Linear rise and fall' },
-    { value: 'square', label: 'Square', description: 'Hard-edged gate', disabled: true },
+    { value: 'sine', label: 'Sine' },
+    { value: 'triangle', label: 'Triangle' },
+    { value: 'square', label: 'Square', disabled: true },
+  ]), [])
+  const iconDropdownOptions = useMemo(() => ([
+    { value: 'drizzle', label: 'Drizzle', icon: <CloudDrizzle /> },
+    { value: 'lightning', label: 'Lightning', icon: <CloudLightning /> },
+    { value: 'snow', label: 'Snow', icon: <CloudSnow /> },
+    { value: 'sun', label: 'Sun', icon: <Sun /> },
   ]), [])
   const [waveformValue, setWaveformValue] = useState('sine')
+  const [iconDropdownValue, setIconDropdownValue] = useState('drizzle')
   const themeOptions = useMemo(() => ([
     {
       value: 'dark',
@@ -351,8 +360,8 @@ function App() {
     () => ROUTES.find((route) => route.id === activeRouteId) ?? ROUTES[0],
     [activeRouteId],
   )
-  const [keyboardNoteCount, setKeyboardNoteCount] = useState(24)
-  const defaultStartIndex = Math.max(0, WHITE_MIDI_VALUES.indexOf(60))
+  const [keyboardNoteCount, setKeyboardNoteCount] = useState(88)
+  const defaultStartIndex = Math.max(0, WHITE_MIDI_VALUES.indexOf(21))
   const [keyboardStartIndex, setKeyboardStartIndex] = useState(defaultStartIndex)
   const [keyboardHeightUnits, setKeyboardHeightUnits] = useState(3)
   const keyboardStartNote = WHITE_MIDI_VALUES[keyboardStartIndex] ?? WHITE_MIDI_VALUES[0] ?? 60
@@ -414,15 +423,26 @@ function App() {
     maxMagnitude: 1,
   }), [])
   const [liveSource, setLiveSource] = useState<null | { type: "audioNode"; node: AudioNode & { context: AudioContext } }>(null)
+  const keyboardSoundfontOptions = useMemo(() => ([
+    { value: 'acoustic_grand_piano', label: 'Grand Piano' },
+    { value: 'electric_piano_1', label: 'Electric Piano' },
+    { value: 'marimba', label: 'Marimba' },
+    { value: 'vibraphone', label: 'Vibraphone' },
+    { value: 'drawbar_organ', label: 'Drawbar Organ' },
+    { value: 'synth_strings_1', label: 'Synth Strings' },
+  ]), [])
+  const [keyboardInstrument, setKeyboardInstrument] = useState(
+    keyboardSoundfontOptions[0]?.value ?? 'acoustic_grand_piano'
+  )
   const keyboardSoundfont = useMemo<VirtualKeyboardSoundfont | null>(() => {
     if (!liveSource) return null
     return {
-      instrument: 'acoustic_grand_piano',
+      instrument: keyboardInstrument,
       soundfont: 'MusyngKite',
       format: 'mp3',
       destination: liveSource.node,
     }
-  }, [liveSource])
+  }, [keyboardInstrument, liveSource])
 
   useEffect(() => {
     if (typeof AudioContext === 'undefined') return undefined
@@ -452,6 +472,65 @@ function App() {
     window.location.hash = routeId
     setActiveRouteId(routeId)
   }
+  const keyboardHeader = (
+    <div className="docs-keyboard-header">
+      <Dropdown
+        label="Soundfont"
+        options={keyboardSoundfontOptions}
+        value={keyboardInstrument}
+        onChange={(value) => setKeyboardInstrument(value)}
+        borderStyle="b"
+        fontSize={12}
+        className="docs-keyboard-dropdown"
+      />
+      <div className="docs-keyboard-dial-wrap">
+        <span className="docs-keyboard-dial-label">Start:</span>
+        <Dial
+          min={0}
+          max={WHITE_MIDI_VALUES.length - 1}
+          step={1}
+          value={keyboardStartIndex}
+          onChange={(value) => setKeyboardStartIndex(Math.round(value))}
+          fontSize={12}
+          ariaLabel="Keyboard start note"
+          formatDisplayValue={(value) => {
+            const index = Math.round(value)
+            const midi = WHITE_MIDI_VALUES[index] ?? WHITE_MIDI_VALUES[0] ?? 60
+            return formatMidiNote(midi)
+          }}
+        />
+      </div>
+      <div className="docs-keyboard-dial-wrap">
+        <span className="docs-keyboard-dial-label">Notes:</span>
+        <Dial
+          min={4}
+          max={88}
+          step={1}
+          value={keyboardNoteCount}
+          onChange={(value) => setKeyboardNoteCount(Math.round(value))}
+          fontSize={12}
+          ariaLabel="Keyboard note count"
+          formatDisplayValue={(value) => `${Math.round(value)}`}
+        />
+      </div>
+      <div className="docs-keyboard-height-wrap">
+        <span className="docs-keyboard-dial-label">Height:</span>
+        <Dial
+          min={3}
+          max={12}
+          step={1}
+          value={keyboardHeightUnits}
+          onChange={(value) => setKeyboardHeightUnits(Math.round(value))}
+          fontSize={12}
+          ariaLabel="Keyboard height"
+          className="docs-keyboard-height"
+        />
+      </div>
+    </div>
+  )
+  const keyboardFooter = (
+    <div className="docs-keyboard-footer" />
+  )
 
   return (
     <FrameLoopProvider>
@@ -1019,7 +1098,7 @@ function App() {
 </AudioAnalysisProvider>`}
                 />
               </div>
-              <h3 className="docs-section-title">Live Input (MIDI Keyboard Placeholder)</h3>
+              <h3 className="docs-section-title">Live Input</h3>
               <div className="docs-code-section">
                 <div className="docs-audio-stack">
                   {liveSource ? (
@@ -1039,64 +1118,13 @@ function App() {
                     noteCount={keyboardNoteCount}
                     heightUnits={keyboardHeightUnits}
                     fontSize={12}
-                    header="Keyboard"
+                    header={keyboardHeader}
+                    footer={keyboardFooter}
                     colorA={flexoki.red['600']}
                     colorB={flexoki.red['100']}
                     whiteKeyColor={flexoki.paper}
                     blackKeyColor={flexoki.black}
                     soundfont={keyboardSoundfont ?? undefined}
-                  />
-                  <LFOSlider
-                    label="Start"
-                    min={0}
-                    max={WHITE_MIDI_VALUES.length - 1}
-                    step={1}
-                    width="100%"
-                    colorA={flexoki.red['600']}
-                    colorB={flexoki.red['100']}
-                    border="left"
-                    fontSize={12}
-                    mode="external"
-                    readExternal={() => keyboardStartIndex}
-                    onUserChange={(value) => setKeyboardStartIndex(Math.round(value))}
-                    onAnimatedUpdate={(value) => setKeyboardStartIndex(Math.round(value))}
-                    formatDisplayValue={(value) => {
-                      const index = Math.round(value)
-                      const midi = WHITE_MIDI_VALUES[index] ?? WHITE_MIDI_VALUES[0] ?? 60
-                      return formatMidiNote(midi)
-                    }}
-                  />
-                  <LFOSlider
-                    label="Notes"
-                    min={4}
-                    max={24}
-                    step={1}
-                    width="100%"
-                    colorA={flexoki.red['600']}
-                    colorB={flexoki.red['100']}
-                    border="left"
-                    fontSize={12}
-                    mode="external"
-                    readExternal={() => keyboardNoteCount}
-                    onUserChange={(value) => setKeyboardNoteCount(Math.round(value))}
-                    onAnimatedUpdate={(value) => setKeyboardNoteCount(Math.round(value))}
-                    formatDisplayValue={(value) => `${Math.round(value)}`}
-                  />
-                  <LFOSlider
-                    label="Height"
-                    min={3}
-                    max={12}
-                    step={1}
-                    width="100%"
-                    colorA={flexoki.red['600']}
-                    colorB={flexoki.red['100']}
-                    border="left"
-                    fontSize={12}
-                    mode="external"
-                    readExternal={() => keyboardHeightUnits}
-                    onUserChange={(value) => setKeyboardHeightUnits(Math.round(value))}
-                    onAnimatedUpdate={(value) => setKeyboardHeightUnits(Math.round(value))}
-                    formatDisplayValue={(value) => `${Math.round(value)}`}
                   />
                 </div>
                 <CodeBlock
@@ -1111,8 +1139,8 @@ function App() {
   fontSize={12}
 />
 <VirtualKeyboard
-  startNote={60}
-  noteCount={24}
+  startNote={21}
+  noteCount={88}
   heightUnits={3}
   soundfont={{
     instrument: "acoustic_grand_piano",
@@ -1200,17 +1228,51 @@ function App() {
           ) : activeRouteId === 'dropdown' ? (
             <>
               <div className="docs-code-section">
-                <Dropdown
-                  label="Waveform"
-                  options={dropdownOptions}
-                  value={waveformValue}
-                  onChange={(value) => setWaveformValue(value)}
-                  colorA={flexoki.blue['600']}
-                  colorB={flexoki.blue['100']}
-                  borderStyle="a"
-                  fontSize={12}
-                />
-                <CodeBlock code={activeRoute.code} />
+                <div className="docs-dropdown-stack">
+                  <Dropdown
+                    label="Waveform"
+                    options={dropdownOptions}
+                    value={waveformValue}
+                    onChange={(value) => setWaveformValue(value)}
+                    colorA={flexoki.blue['600']}
+                    colorB={flexoki.blue['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <IconDropdown
+                    label="Weather"
+                    options={iconDropdownOptions}
+                    value={iconDropdownValue}
+                    onChange={(value) => setIconDropdownValue(value)}
+                    colorA={flexoki.cyan['600']}
+                    colorB={flexoki.cyan['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                    width={200}
+                    showMenuIcons
+                  />
+                </div>
+                <div className="docs-code-stack">
+                  <CodeBlock code={activeRoute.code} />
+                  <CodeBlock
+                    code={`<IconDropdown
+  label="Weather"
+  options={[
+    { value: "drizzle", label: "Drizzle", icon: <CloudDrizzle /> },
+    { value: "lightning", label: "Lightning", icon: <CloudLightning /> },
+    { value: "snow", label: "Snow", icon: <CloudSnow /> },
+    { value: "sun", label: "Sun", icon: <Sun /> },
+  ]}
+  value="drizzle"
+  onChange={(value) => setIconDropdownValue(value)}
+  colorA={flexoki.cyan["600"]}
+  colorB={flexoki.cyan["100"]}
+  borderStyle="a"
+  fontSize={12}
+  showMenuIcons
+/>`}
+                  />
+                </div>
               </div>
               <div className="docs-text-block">
                 <p>
@@ -1219,9 +1281,9 @@ function App() {
                   <code>value</code> + <code>onChange</code> to bind it to application state.
                 </p>
                 <p>
-                  Keep <code>colorA</code> and <code>colorB</code> aligned with neighboring controls
-                  so the popover reads like part of the same UI system. Disabled options stay in the
-                  list to communicate unavailable modes without hiding them.
+                  IconDropdown reuses the same menu and keyboard behavior, but uses an icon trigger.
+                  Give it a short label for accessibility and set a wider width so the menu text has
+                  breathing room.
                 </p>
               </div>
             </>

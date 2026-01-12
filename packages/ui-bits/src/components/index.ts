@@ -25,11 +25,19 @@ export {
   type IconButtonBorderMask,
   type IconButtonCycleOption,
 } from "./IconButton";
+export {
+  default as Dial,
+  type DialProps,
+  type DialBorderStyle,
+  type DialBorderMask,
+  type DialControlMode,
+} from "./Dial";
 export { default as BasicButton, type BasicButtonProps, type BasicButtonBorderStyle } from "./BasicButton";
 export { default as Folder, type FolderProps, type FolderBorderStyle } from "./Folder";
 export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./FloatingPanel";
 export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./Dropdown";
+export { default as IconDropdown, type IconDropdownProps, type IconDropdownOption } from "./IconDropdown";
 export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./LoadingBar";
 export {
   default as SegmentBar,

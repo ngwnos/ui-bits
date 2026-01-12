@@ -546,16 +546,17 @@ export default function AudioControls({
           background: 'linear-gradient(180deg, #0a0a0a, #1a1a1a)',
         }}
       >
-        <AudioFFTWindow
-          heightUnits={heightUnits}
-          unitSizePx={sliderUnitPx}
-          maxWidth="100%"
-          maxBins={resolvedBinCount}
-          peakDecay={peakDecayRate}
-          playbackRatio={isBufferSource ? playheadRatio : 0}
-          onScrubStart={isBufferSource ? handleScrubStart : undefined}
-          onScrub={isBufferSource ? handleScrubMove : undefined}
-          onScrubEnd={isBufferSource ? handleScrubEnd : undefined}
+          <AudioFFTWindow
+            heightUnits={heightUnits}
+            unitSizePx={sliderUnitPx}
+            maxWidth="100%"
+            maxBins={resolvedBinCount}
+            peakDecay={peakDecayRate}
+            playbackRatio={isBufferSource ? playheadRatio : 0}
+            showPlaybackIndicator={isBufferSource}
+            onScrubStart={isBufferSource ? handleScrubStart : undefined}
+            onScrub={isBufferSource ? handleScrubMove : undefined}
+            onScrubEnd={isBufferSource ? handleScrubEnd : undefined}
           activeColor={safeA}
           inactiveColor={safeB}
           rawFftDataRef={rawFftRef}

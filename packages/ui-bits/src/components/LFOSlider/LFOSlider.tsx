@@ -512,8 +512,8 @@ function SliderCore({
   }, [drawerHandleActive, drawerLineRatios, min, max, step]);
 
   // Theme colors
-  const fallbackLeft = '#2f2f2f';
-  const fallbackRight = '#f0f0f0';
+  const fallbackLeft = 'var(--ui-bits-color-a, #2f2f2f)';
+  const fallbackRight = 'var(--ui-bits-color-b, #f0f0f0)';
   const bgLeft = colorA ?? fallbackLeft;
   const bgRight = colorB ?? fallbackRight;
   const panelEdgeBorders = usePanelEdgeBorders();

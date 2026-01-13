@@ -28,9 +28,11 @@
 .ui-bits-preset-manager__list {
   max-height: var(--pm-max-height, 160px);
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(var(--pm-row-height, 24px), auto);
   gap: 2px;
+  align-content: start;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -72,6 +74,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  grid-column: 1 / -1;
   opacity: 0.6;
   font-size: 0.9em;
 }

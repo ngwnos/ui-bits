@@ -112,6 +112,10 @@
   border-radius: var(--dropdown-radius, 3px);
 }
 
+.dropdown-root--icon .dropdown-field {
+  border: none;
+}
+
 .dropdown-menu {
   position: absolute;
   top: 100%;

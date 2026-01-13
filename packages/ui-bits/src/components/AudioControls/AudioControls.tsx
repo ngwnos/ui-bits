@@ -1,7 +1,5 @@
 import React from "react";
 import {
-  ChartColumnIncreasing,
-  ChartSpline,
   Pause,
   Play,
   Volume2,
@@ -14,8 +12,10 @@ import {
   type AudioAnalysisActions,
   type AudioAnalysisStore,
 } from "../../audioAnalysis";
+import { useControlValue, useResolvedControlIdPrefix } from "../../controlStore";
 import { useFrame } from "../../frameLoop";
 import { flexoki } from "../../flexoki";
+import { usePanelTheme } from "../../panelGap";
 import IconButton from "../IconButton";
 import LFOSlider from "../LFOSlider";
 import AudioFFTWindow from "./AudioFFTWindow";
@@ -27,7 +27,21 @@ export type AudioControlsSource =
   | { type: "mediaStream"; stream: MediaStream; context?: AudioContext }
   | { type: "audioNode"; node: AudioNode & { context: AudioContext } };
 
+export interface AudioControlsControlIds {
+  playing?: string;
+  muted?: string;
+  binCount?: string;
+  binInterpolation?: string;
+  frequencyMin?: string;
+  frequencyMax?: string;
+  fftAttack?: string;
+  fftRelease?: string;
+  fftBlurSigma?: string;
+  analyserSmoothing?: string;
+}
+
 export interface AudioControlsProps {
+  ariaLabel?: string;
   fontSize?: number;
   colorA?: string;
   colorB?: string;
@@ -36,6 +50,8 @@ export interface AudioControlsProps {
   heightUnits?: number;
   suspended?: boolean;
   audioAnalysisStore?: AudioAnalysisStore | null;
+  controlIdPrefix?: string;
+  controlIds?: AudioControlsControlIds;
   defaultPlaying?: boolean;
   playing?: boolean;
   onPlayingChange?: (playing: boolean) => void;
@@ -111,16 +127,27 @@ function useControllableState<T>(
   value: T | undefined,
   defaultValue: T,
   onChange?: (next: T) => void,
+  storeId?: string,
 ) {
+  const [storeValue, setStoreValue] = useControlValue<T>(storeId);
+  const shouldUseStore = storeId !== undefined && value === undefined;
+  const resolvedValueProp = shouldUseStore ? storeValue : value;
   const [internal, setInternal] = React.useState(defaultValue);
-  const isControlled = value !== undefined;
-  const resolved = isControlled ? value : internal;
+  const isControlled = resolvedValueProp !== undefined;
+  const resolved = isControlled ? resolvedValueProp : internal;
   const setValue = React.useCallback((next: T) => {
     if (!isControlled) {
       setInternal(next);
     }
+    if (shouldUseStore) {
+      setStoreValue(next);
+    }
     onChange?.(next);
-  }, [isControlled, onChange]);
+  }, [isControlled, onChange, setStoreValue, shouldUseStore]);
+  React.useEffect(() => {
+    if (!shouldUseStore || storeValue !== undefined) return;
+    setStoreValue(defaultValue);
+  }, [defaultValue, setStoreValue, shouldUseStore, storeValue]);
   return [resolved, setValue, isControlled] as const;
 }
 
@@ -143,14 +170,17 @@ function safeCloseAudioContext(context: AudioContext | null) {
 }
 
 export default function AudioControls({
-  fontSize = 12,
+  ariaLabel = "Audio controls",
+  fontSize,
   colorA,
   colorB,
-  borderStyle = 'a',
+  borderStyle,
   source,
   heightUnits = 6,
   suspended,
   audioAnalysisStore,
+  controlIdPrefix,
+  controlIds,
   defaultPlaying = false,
   playing,
   onPlayingChange,
@@ -183,6 +213,13 @@ export default function AudioControls({
   onAnalyserSmoothingChange,
 }: AudioControlsProps) {
   const isSuspended = useAnimationSuspended(suspended);
+  const panelTheme = usePanelTheme();
+  const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
+  const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? 'a';
+  const { safeA, safeB } = resolveColors(
+    colorA ?? panelTheme?.colorA,
+    colorB ?? panelTheme?.colorB,
+  );
   const contextStore = useAudioAnalysisStore();
   const localStoreRef = React.useRef<AudioAnalysisStore | null>(null);
   const localStore = localStoreRef.current ?? createAudioAnalysisStore({
@@ -200,8 +237,25 @@ export default function AudioControls({
     setAudioMaxMagnitude: resolvedStore.setAudioMaxMagnitude,
   }), [resolvedStore]);
   const isBufferSource = source.type === "buffer";
-  const [isPlaying, setIsPlaying] = useControllableState(playing, defaultPlaying, onPlayingChange);
-  const [isMuted, setIsMuted] = useControllableState(muted, defaultMuted, onMutedChange);
+  const resolvedControlPrefix = useResolvedControlIdPrefix(controlIdPrefix, ariaLabel);
+  const resolveControlId = React.useCallback((key: keyof AudioControlsControlIds) => {
+    const explicitId = controlIds?.[key];
+    if (explicitId) return explicitId;
+    if (key === "playing" || key === "muted") return undefined;
+    return resolvedControlPrefix ? `${resolvedControlPrefix}.${key}` : undefined;
+  }, [controlIds, resolvedControlPrefix]);
+  const [isPlaying, setIsPlaying] = useControllableState(
+    playing,
+    defaultPlaying,
+    onPlayingChange,
+    resolveControlId("playing"),
+  );
+  const [isMuted, setIsMuted] = useControllableState(
+    muted,
+    defaultMuted,
+    onMutedChange,
+    resolveControlId("muted"),
+  );
   const [playheadRatio, setPlayheadRatio] = React.useState<number>(0);
   const [isScrubbing, setIsScrubbing] = React.useState<boolean>(false);
   const [seekCommand, setSeekCommand] = React.useState<{ ratio: number; token: number } | null>(null);
@@ -211,42 +265,50 @@ export default function AudioControls({
     binCount,
     clampBins(defaultBinCount),
     onBinCountChange,
+    resolveControlId("binCount"),
   );
   const [smoothingValueRaw, setSmoothingValueRaw] = useControllableState(
     analyserSmoothing,
     roundUnit(clamp01(defaultAnalyserSmoothing)),
     onAnalyserSmoothingChange,
+    resolveControlId("analyserSmoothing"),
   );
   const [attackMsRaw, setAttackMsRaw] = useControllableState(
     fftAttack,
     roundMs(defaultFftAttack),
     onFftAttackChange,
+    resolveControlId("fftAttack"),
   );
   const [releaseMsRaw, setReleaseMsRaw] = useControllableState(
     fftRelease,
     roundMs(defaultFftRelease),
     onFftReleaseChange,
+    resolveControlId("fftRelease"),
   );
   const [blurValueRaw, setBlurValueRaw] = useControllableState(
     fftBlurSigma,
     roundSigma(defaultFftBlurSigma),
     onFftBlurSigmaChange,
+    resolveControlId("fftBlurSigma"),
   );
-  const [binInterpolationValue, setBinInterpolationValue] = useControllableState(
+  const [binInterpolationValue] = useControllableState(
     binInterpolation,
     normalizeBinInterpolation(defaultBinInterpolation, "discrete"),
     onBinInterpolationChange,
+    resolveControlId("binInterpolation"),
   );
   const [nyquistHz, setNyquistHz] = React.useState<number>(DEFAULT_NYQUIST);
   const [frequencyMinValue, setFrequencyMinValue] = useControllableState(
     frequencyMin,
     defaultFrequencyMin,
     onFrequencyMinChange,
+    resolveControlId("frequencyMin"),
   );
   const [frequencyMaxValue, setFrequencyMaxValue] = useControllableState(
     frequencyMax,
     defaultFrequencyMax,
     onFrequencyMaxChange,
+    resolveControlId("frequencyMax"),
   );
   const rawFftRef = React.useRef<Uint8Array | null>(null);
   const [rawFftMeta, setRawFftMeta] = React.useState<{ version: number; binCount: number }>({ version: 0, binCount: 0 });
@@ -284,12 +346,12 @@ export default function AudioControls({
   const handleSampleRateChange = React.useCallback((sampleRate: number) => {
     setNyquistHz(Math.max(1, sampleRate / 2));
   }, []);
-  const [sliderUnitPx, setSliderUnitPx] = React.useState<number>(() => computeSliderUnitPx(fontSize));
+  const [sliderUnitPx, setSliderUnitPx] = React.useState<number>(() => computeSliderUnitPx(resolvedFontSize));
   const sliderMeasureRef = React.useRef<HTMLDivElement | null>(null);
   React.useEffect(() => {
-    const fallback = computeSliderUnitPx(fontSize);
+    const fallback = computeSliderUnitPx(resolvedFontSize);
     setSliderUnitPx((prev) => (Math.abs(prev - fallback) < 0.5 ? prev : fallback));
-  }, [fontSize]);
+  }, [resolvedFontSize]);
   React.useLayoutEffect(() => {
     const node = sliderMeasureRef.current;
     if (!node || typeof ResizeObserver === 'undefined') return undefined;
@@ -304,25 +366,19 @@ export default function AudioControls({
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
-  const { safeA, safeB } = resolveColors(colorA, colorB);
   const seamColor = safeA;
-  const sideBorderWidth = borderStyle === 'none' ? 0 : 1;
-  const sideBorderColor = borderStyle === 'none'
+  const sideBorderWidth = resolvedBorderStyle === 'none' ? 0 : 1;
+  const sideBorderColor = resolvedBorderStyle === 'none'
     ? "transparent"
-    : borderStyle === 'b'
+    : resolvedBorderStyle === 'b'
       ? safeB
       : safeA;
   const textColor = safeA;
   const playCycleValue = isPlaying ? "playing" : "paused";
-  const interpolationCycleValue = useDiscreteBins ? "discrete" : "interpolated";
   const muteCycleValue = isMuted ? "muted" : "unmuted";
   const playCycleOptions = [
     { value: "paused", icon: <Play strokeWidth={1.6} />, ariaLabel: "Play audio analysis", title: "Play audio analysis" },
     { value: "playing", icon: <Pause strokeWidth={1.6} />, ariaLabel: "Pause audio analysis", title: "Pause audio analysis" },
-  ];
-  const interpolationCycleOptions = [
-    { value: "discrete", icon: <ChartColumnIncreasing strokeWidth={1.6} />, ariaLabel: "Show interpolated FFT bins", title: "Show interpolated FFT bins" },
-    { value: "interpolated", icon: <ChartSpline strokeWidth={1.6} />, ariaLabel: "Show discrete FFT bins", title: "Show discrete FFT bins" },
   ];
   const muteCycleOptions = [
     { value: "muted", icon: <VolumeX strokeWidth={1.6} />, ariaLabel: "Unmute audio output", title: "Unmute audio output" },
@@ -414,17 +470,7 @@ export default function AudioControls({
               options={playCycleOptions}
               onChange={(nextValue) => setIsPlaying(nextValue === "playing")}
               borderStyle="none"
-              fontSize={fontSize}
-              colorA={safeA}
-              colorB={safeB}
-            />
-            <IconButton
-              behavior="cycle"
-              value={interpolationCycleValue}
-              options={interpolationCycleOptions}
-              onChange={(nextValue) => setBinInterpolationValue(nextValue === "discrete" ? "discrete" : "interpolated")}
-              borderStyle="none"
-              fontSize={fontSize}
+              fontSize={resolvedFontSize}
               colorA={safeA}
               colorB={safeB}
             />
@@ -439,11 +485,11 @@ export default function AudioControls({
                 step={1}
                 barStyle="continuous"
                 width="100%"
-                border="left"
+                border="a"
                 borderMask={{ top: false, bottom: false, right: true, left: true }}
                 colorA={safeA}
                 colorB={safeB}
-                fontSize={fontSize}
+                fontSize={resolvedFontSize}
                 mode="external"
                 readExternal={() => resolvedBinCount}
                 onUserChange={(value: number) => {
@@ -456,18 +502,18 @@ export default function AudioControls({
               />
             </div>
             <LFOSlider
-              label="Fmin"
+              label="Min"
               variant="basic"
               min={0}
               max={Math.max(0, nyquistHz - MIN_FREQ_HZ_GAP)}
               step={1}
               barStyle="continuous"
               width="100%"
-              border="left"
+              border="a"
               borderMask={{ top: false, bottom: false, right: true, left: true }}
               colorA={safeA}
               colorB={safeB}
-              fontSize={fontSize}
+              fontSize={resolvedFontSize}
               mode="external"
               readExternal={() => freqMinHz}
               onUserChange={handleFreqMinChange}
@@ -475,19 +521,19 @@ export default function AudioControls({
               formatDisplayValue={(value) => `${Math.round(value)}`}
               style={{ gap: 0 }}
             />
-            <LFOSlider
-              label="Fmax"
+          <LFOSlider
+            label="Max"
               variant="basic"
               min={MIN_FREQ_HZ_GAP}
               max={Math.max(MIN_FREQ_HZ_GAP, nyquistHz)}
               step={1}
               barStyle="continuous"
               width="100%"
-              border="left"
+              border="a"
               borderMask={{ top: false, bottom: false, right: true, left: true }}
               colorA={safeA}
               colorB={safeB}
-              fontSize={fontSize}
+              fontSize={resolvedFontSize}
               mode="external"
               readExternal={() => freqMaxHz}
               onUserChange={handleFreqMaxChange}
@@ -598,7 +644,7 @@ export default function AudioControls({
             options={muteCycleOptions}
             onChange={(nextValue) => setIsMuted(nextValue === "muted")}
             borderStyle="none"
-            fontSize={fontSize}
+            fontSize={resolvedFontSize}
             colorA={safeA}
             colorB={safeB}
           />
@@ -620,11 +666,11 @@ export default function AudioControls({
             step={ENVELOPE_STEP_MS}
             barStyle="continuous"
             width="100%"
-            border="left"
+            border="a"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
             colorA={safeA}
             colorB={safeB}
-            fontSize={fontSize}
+            fontSize={resolvedFontSize}
             mode="external"
             readExternal={() => attackMsClamped}
             onUserChange={(value: number) => setAttackMsRaw(roundMs(value))}
@@ -640,11 +686,11 @@ export default function AudioControls({
             step={ENVELOPE_STEP_MS}
             barStyle="continuous"
             width="100%"
-            border="left"
+            border="a"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
             colorA={safeA}
             colorB={safeB}
-            fontSize={fontSize}
+            fontSize={resolvedFontSize}
             mode="external"
             readExternal={() => releaseMsClamped}
             onUserChange={(value: number) => setReleaseMsRaw(roundMs(value))}
@@ -660,11 +706,11 @@ export default function AudioControls({
             step={0.1}
             barStyle="continuous"
             width="100%"
-            border="left"
+            border="a"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
             colorA={safeA}
             colorB={safeB}
-            fontSize={fontSize}
+            fontSize={resolvedFontSize}
             mode="external"
             readExternal={() => smoothingValue}
             onUserChange={(value: number) => setSmoothingValueRaw(roundUnit(value))}
@@ -680,11 +726,11 @@ export default function AudioControls({
             step={0.1}
             barStyle="continuous"
             width="100%"
-            border="left"
+            border="a"
             borderMask={{ top: false, bottom: false, right: true, left: true }}
             colorA={safeA}
             colorB={safeB}
-            fontSize={fontSize}
+            fontSize={resolvedFontSize}
             mode="external"
             readExternal={() => blurValue}
             onUserChange={(value: number) => setBlurValueRaw(roundSigma(value))}

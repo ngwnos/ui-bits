@@ -1,4 +1,6 @@
 import React from "react";
+import { useResolvedControlId } from "../../controlStore";
+import { usePanelTheme } from "../../panelGap";
 import IconButton from "../IconButton";
 import DropdownBase from "../Dropdown/DropdownBase";
 import { type DropdownOption } from "../Dropdown/types";
@@ -16,6 +18,8 @@ export interface IconDropdownProps {
   defaultValue?: string;
   icon?: React.ReactElement;
   showMenuIcons?: boolean;
+  iconUsesOptionColors?: boolean;
+  preventFocusOnPointerDown?: boolean;
   onChange?: (value: string, option: IconDropdownOption) => void;
   open?: boolean;
   defaultOpen?: boolean;
@@ -28,6 +32,7 @@ export interface IconDropdownProps {
   width?: number | string;
   fontSize?: number;
   disabled?: boolean;
+  controlId?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -41,24 +46,33 @@ export default function IconDropdown({
   defaultValue,
   icon,
   showMenuIcons = false,
+  iconUsesOptionColors = true,
+  preventFocusOnPointerDown = false,
   onChange,
   open,
   defaultOpen,
   onOpenChange,
   colorA,
   colorB,
-  borderStyle = "a",
+  borderStyle,
   borderMask,
   borderRadius,
   width,
   fontSize,
   disabled = false,
+  controlId,
   className,
   style,
 }: IconDropdownProps) {
-  const resolvedFontSize = fontSize ?? 12;
+  const panelTheme = usePanelTheme();
+  const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
+  const resolvedColorA = colorA ?? panelTheme?.colorA;
+  const resolvedColorB = colorB ?? panelTheme?.colorB;
+  const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? "a";
   const resolvedAriaLabel = ariaLabel ?? label;
+  const resolvedControlId = useResolvedControlId(controlId, label, resolvedAriaLabel);
   const rootClassName = ["dropdown-root--icon", className].filter(Boolean).join(" ");
+  const pointerDownRef = React.useRef(false);
   const menuWidth = React.useMemo(() => {
     if (!options.length) return undefined;
     const maxLabel = options.reduce((current, option) => (
@@ -103,18 +117,20 @@ export default function IconDropdown({
       open={open}
       defaultOpen={defaultOpen}
       onOpenChange={onOpenChange}
-      colorA={colorA}
-      colorB={colorB}
-      borderStyle={borderStyle}
+      colorA={resolvedColorA}
+      colorB={resolvedColorB}
+      borderStyle={resolvedBorderStyle}
       borderMask={borderMask}
       borderRadius={borderRadius}
       width={width}
       fontSize={fontSize}
       showOptionIcons={showMenuIcons}
+      returnFocusOnSelect={!preventFocusOnPointerDown}
       disabled={disabled}
+      controlId={resolvedControlId}
       className={rootClassName}
       style={rootStyle}
-      renderTrigger={({
+      renderTrigger={({ 
         open: resolvedOpen,
         disabled: triggerDisabled,
         buttonRef,
@@ -127,21 +143,41 @@ export default function IconDropdown({
       }) => {
         const resolvedOption = activeOption as IconDropdownOption | undefined;
         const triggerIcon = resolvedOption?.icon ?? icon;
+        const triggerColorA = iconUsesOptionColors
+          ? (resolvedOption?.colorA ?? resolvedColorA)
+          : resolvedColorA;
+        const triggerColorB = iconUsesOptionColors
+          ? (resolvedOption?.colorB ?? resolvedColorB)
+          : resolvedColorB;
+        const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+          if (preventFocusOnPointerDown) {
+            pointerDownRef.current = true;
+            event.preventDefault();
+          }
+        };
+        const handleClick = () => {
+          onTriggerClick();
+          if (preventFocusOnPointerDown && pointerDownRef.current) {
+            pointerDownRef.current = false;
+            requestAnimationFrame(() => buttonRef.current?.blur());
+          }
+        };
         return (
           <IconButton
             ref={buttonRef}
             behavior="toggle"
             toggled={resolvedOpen}
-            onClick={onTriggerClick}
+            onClick={handleClick}
             onKeyDown={onTriggerKeyDown}
+            onPointerDown={handlePointerDown}
             aria-haspopup="listbox"
             aria-expanded={resolvedOpen}
             aria-controls={ariaControls}
             aria-labelledby={ariaLabelledBy}
             aria-label={triggerAriaLabel}
             fontSize={resolvedFontSize}
-            colorA={colorA}
-            colorB={colorB}
+            colorA={triggerColorA}
+            colorB={triggerColorB}
             borderStyle="none"
             disabled={triggerDisabled}
           >

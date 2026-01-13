@@ -1,5 +1,6 @@
 import React from "react";
 import DropdownBase from "./DropdownBase";
+import { useResolvedControlId } from "../../controlStore";
 import { type DropdownOption } from "./types";
 
 export interface DropdownProps {
@@ -20,6 +21,7 @@ export interface DropdownProps {
   width?: number | string;
   fontSize?: number;
   disabled?: boolean;
+  controlId?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -36,15 +38,18 @@ export default function Dropdown({
   onOpenChange,
   colorA,
   colorB,
-  borderStyle = "a",
+  borderStyle,
   borderMask,
   borderRadius,
   width,
   fontSize,
   disabled = false,
+  controlId,
   className,
   style,
 }: DropdownProps) {
+  const resolvedControlId = useResolvedControlId(controlId, label);
+
   return (
     <DropdownBase
       label={label}
@@ -64,9 +69,10 @@ export default function Dropdown({
       width={width}
       fontSize={fontSize}
       disabled={disabled}
+      controlId={resolvedControlId}
       className={className}
       style={style}
-      renderTrigger={({
+      renderTrigger={({ 
         id,
         open: resolvedOpen,
         disabled: triggerDisabled,

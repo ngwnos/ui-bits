@@ -4,7 +4,6 @@ import {
   AudioAnalysisProvider,
   createAudioAnalysisStore,
   AudioControls,
-  Dial,
   Dropdown,
   IconDropdown,
   FloatingPanel,
@@ -13,11 +12,16 @@ import {
   IconButton,
   LFOSlider,
   LoadingBar,
+  PresetManager,
+  PresetStoreProvider,
   SliderStoreProvider,
   SelectionGrid,
   SegmentBar,
   VirtualKeyboard,
-  type VirtualKeyboardSoundfont,
+  type VirtualKeyboardInstrumentOption,
+  type VirtualKeyboardSoundfontConfig,
+  type VirtualKeyboardSoundfontOption,
+  type VirtualKeyboardTone,
   useFrame,
   flexoki,
   sliderColorCombos,
@@ -116,6 +120,72 @@ const ROUTES = [
   fontSize={12}
 />`,
   },
+  {
+    id: 'floating-panel',
+    label: 'Floating Panel',
+    title: 'Floating Panel',
+    code: `const InspectorContent = () => {
+  const panelTheme = usePanelTheme()
+  // panelTheme exposes inherited colorA, colorB, fontSize, and borderStyle.
+
+  return (
+    <>
+      <PresetManager maxListHeight={120} />
+      <AudioControls source={{ type: "buffer", src: "/audio/credits.mp3" }} />
+      <VirtualKeyboard
+        defaultStartNote="C4"
+        defaultNoteCount={26}
+        defaultHeightUnits={2}
+        showHeightControl={false}
+        instrumentOptions={[
+          { value: "tonejs", label: "Tone.js", source: "tone" },
+        ]}
+        soundfontOptions={[
+          { value: "acoustic_grand_piano", label: "Grand Piano" },
+          { value: "electric_piano_1", label: "Electric Piano" },
+        ]}
+        defaultInstrument="acoustic_grand_piano"
+        whiteKeyColor={flexoki.paper}
+        blackKeyColor={flexoki.black}
+      />
+      <LFOSlider
+        label="Gain"
+        min={0}
+        max={1}
+        step={0.01}
+        defaultValue={0.65}
+        width="100%"
+      />
+      <LFOSlider
+        label="Mix"
+        min={0}
+        max={100}
+        step={1}
+        defaultValue={40}
+        width="100%"
+      />
+    </>
+  )
+}
+
+<PresetStoreProvider>
+  <FloatingPanel
+    title="Inspector"
+    collapsible
+    colorA={flexoki.blue["500"]}
+    colorB={flexoki.blue["100"]}
+    borderStyle="a"
+    fontSize={12}
+    width={300}
+    verticalGap={6}
+    paddingLeft={3}
+    paddingRight={3}
+    paddingBottom={3}
+  >
+    <InspectorContent />
+  </FloatingPanel>
+</PresetStoreProvider>`,
+  },
 ]
 
 const SIDEBAR_COLORS = [
@@ -126,25 +196,6 @@ const SIDEBAR_COLORS = [
   { colorA: flexoki.blue['100'], colorB: flexoki.blue['600'] },
   { colorA: flexoki.purple['100'], colorB: flexoki.purple['600'] },
 ]
-
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-const WHITE_PITCHES = new Set([0, 2, 4, 5, 7, 9, 11])
-const WHITE_MIDI_VALUES = (() => {
-  const values: number[] = []
-  for (let midi = 21; midi <= 108; midi += 1) {
-    if (WHITE_PITCHES.has(((midi % 12) + 12) % 12)) {
-      values.push(midi)
-    }
-  }
-  return values
-})()
-
-const formatMidiNote = (value: number) => {
-  const rounded = Math.round(value)
-  const name = NOTE_NAMES[((rounded % 12) + 12) % 12]
-  const octave = Math.floor(rounded / 12) - 1
-  return `${name}${octave}`
-}
 
 
 const AUDIO_BIN_COUNT = 128
@@ -360,11 +411,6 @@ function App() {
     () => ROUTES.find((route) => route.id === activeRouteId) ?? ROUTES[0],
     [activeRouteId],
   )
-  const [keyboardNoteCount, setKeyboardNoteCount] = useState(88)
-  const defaultStartIndex = Math.max(0, WHITE_MIDI_VALUES.indexOf(21))
-  const [keyboardStartIndex, setKeyboardStartIndex] = useState(defaultStartIndex)
-  const [keyboardHeightUnits, setKeyboardHeightUnits] = useState(3)
-  const keyboardStartNote = WHITE_MIDI_VALUES[keyboardStartIndex] ?? WHITE_MIDI_VALUES[0] ?? 60
   const brandCanvasProps = useMemo<DocsBrandCanvasProps>(() => ({
     divisions: brandDivisions,
     palette: brandPalette,
@@ -423,7 +469,10 @@ function App() {
     maxMagnitude: 1,
   }), [])
   const [liveSource, setLiveSource] = useState<null | { type: "audioNode"; node: AudioNode & { context: AudioContext } }>(null)
-  const keyboardSoundfontOptions = useMemo(() => ([
+  const keyboardInstrumentOptions = useMemo<VirtualKeyboardInstrumentOption[]>(() => ([
+    { value: 'tonejs', label: 'Tone.js', source: 'tone' },
+  ]), [])
+  const keyboardSoundfontOptions = useMemo<VirtualKeyboardSoundfontOption[]>(() => ([
     { value: 'acoustic_grand_piano', label: 'Grand Piano' },
     { value: 'electric_piano_1', label: 'Electric Piano' },
     { value: 'marimba', label: 'Marimba' },
@@ -431,18 +480,22 @@ function App() {
     { value: 'drawbar_organ', label: 'Drawbar Organ' },
     { value: 'synth_strings_1', label: 'Synth Strings' },
   ]), [])
-  const [keyboardInstrument, setKeyboardInstrument] = useState(
-    keyboardSoundfontOptions[0]?.value ?? 'acoustic_grand_piano'
-  )
-  const keyboardSoundfont = useMemo<VirtualKeyboardSoundfont | null>(() => {
+  const keyboardSoundfontConfig = useMemo<VirtualKeyboardSoundfontConfig | null>(() => {
     if (!liveSource) return null
     return {
-      instrument: keyboardInstrument,
       soundfont: 'MusyngKite',
       format: 'mp3',
       destination: liveSource.node,
     }
-  }, [keyboardInstrument, liveSource])
+  }, [liveSource])
+  const keyboardToneConfig = useMemo<VirtualKeyboardTone | null>(() => {
+    if (!liveSource) return null
+    return {
+      destination: liveSource.node,
+      context: liveSource.node.context,
+      polyphony: 32,
+    }
+  }, [liveSource])
 
   useEffect(() => {
     if (typeof AudioContext === 'undefined') return undefined
@@ -472,66 +525,6 @@ function App() {
     window.location.hash = routeId
     setActiveRouteId(routeId)
   }
-  const keyboardHeader = (
-    <div className="docs-keyboard-header">
-      <Dropdown
-        label="Soundfont"
-        options={keyboardSoundfontOptions}
-        value={keyboardInstrument}
-        onChange={(value) => setKeyboardInstrument(value)}
-        borderStyle="b"
-        fontSize={12}
-        className="docs-keyboard-dropdown"
-      />
-      <div className="docs-keyboard-dial-wrap">
-        <span className="docs-keyboard-dial-label">Start:</span>
-        <Dial
-          min={0}
-          max={WHITE_MIDI_VALUES.length - 1}
-          step={1}
-          value={keyboardStartIndex}
-          onChange={(value) => setKeyboardStartIndex(Math.round(value))}
-          fontSize={12}
-          ariaLabel="Keyboard start note"
-          formatDisplayValue={(value) => {
-            const index = Math.round(value)
-            const midi = WHITE_MIDI_VALUES[index] ?? WHITE_MIDI_VALUES[0] ?? 60
-            return formatMidiNote(midi)
-          }}
-        />
-      </div>
-      <div className="docs-keyboard-dial-wrap">
-        <span className="docs-keyboard-dial-label">Notes:</span>
-        <Dial
-          min={4}
-          max={88}
-          step={1}
-          value={keyboardNoteCount}
-          onChange={(value) => setKeyboardNoteCount(Math.round(value))}
-          fontSize={12}
-          ariaLabel="Keyboard note count"
-          formatDisplayValue={(value) => `${Math.round(value)}`}
-        />
-      </div>
-      <div className="docs-keyboard-height-wrap">
-        <span className="docs-keyboard-dial-label">Height:</span>
-        <Dial
-          min={3}
-          max={12}
-          step={1}
-          value={keyboardHeightUnits}
-          onChange={(value) => setKeyboardHeightUnits(Math.round(value))}
-          fontSize={12}
-          ariaLabel="Keyboard height"
-          className="docs-keyboard-height"
-        />
-      </div>
-    </div>
-  )
-  const keyboardFooter = (
-    <div className="docs-keyboard-footer" />
-  )
-
   return (
     <FrameLoopProvider>
       <AudioAnalysisProvider>
@@ -584,7 +577,7 @@ function App() {
                   width="100%"
                   colorA={flexoki.orange["500"]}
                   colorB={flexoki.orange["100"]}
-                  border="left"
+                  border="a"
                   fontSize={12}
                   showLfoControls
                   drawerOpen={exampleDrawerOpen}
@@ -604,7 +597,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.discrete.colorA}
                     colorB={randomizedSliderColors.discrete.colorB}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     drawerOpen={discreteDrawerOpen}
@@ -627,7 +620,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.stepAligned.colorA}
                     colorB={randomizedSliderColors.stepAligned.colorB}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     drawerOpen={stepAlignedDrawerOpen}
@@ -649,7 +642,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.continuous.colorA}
                     colorB={randomizedSliderColors.continuous.colorB}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     drawerOpen={continuousDrawerOpen}
@@ -674,7 +667,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.sine.colorA}
                     colorB={randomizedSliderColors.sine.colorB}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     defaultLfoRange={[20, 80]}
@@ -697,7 +690,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.triangle.colorA}
                     colorB={randomizedSliderColors.triangle.colorB}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     defaultLfoRange={[20, 80]}
@@ -720,7 +713,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.saw.colorA}
                     colorB={randomizedSliderColors.saw.colorB}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     defaultLfoRange={[20, 80]}
@@ -744,7 +737,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.square.colorA}
                     colorB={randomizedSliderColors.square.colorB}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     defaultLfoRange={[20, 80]}
@@ -767,7 +760,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.audio.colorA}
                     colorB={randomizedSliderColors.audio.colorB}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     defaultLfoRange={[20, 80]}
@@ -796,7 +789,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.font10.colorA}
                     colorB={randomizedSliderColors.font10.colorB}
-                    border="left"
+                    border="a"
                     fontSize={10}
                     showLfoControls
                     defaultLfoRunning
@@ -816,7 +809,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.font12.colorA}
                     colorB={randomizedSliderColors.font12.colorB}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     defaultLfoRunning
@@ -836,7 +829,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.font14.colorA}
                     colorB={randomizedSliderColors.font14.colorB}
-                    border="left"
+                    border="a"
                     fontSize={14}
                     showLfoControls
                     defaultLfoRunning
@@ -856,7 +849,7 @@ function App() {
                     width="100%"
                     colorA={randomizedSliderColors.font16.colorA}
                     colorB={randomizedSliderColors.font16.colorB}
-                    border="left"
+                    border="a"
                     fontSize={16}
                     showLfoControls
                     defaultLfoRunning
@@ -1013,7 +1006,7 @@ function App() {
                   width="100%"
                   colorA={flexoki.green['600']}
                   colorB={flexoki.green['100']}
-                  border="left"
+                  border="a"
                   fontSize={12}
                   barStyle="discrete"
                   barSegmentCount={24}
@@ -1028,7 +1021,7 @@ function App() {
                   width="100%"
                   colorA={flexoki.green['600']}
                   colorB={flexoki.green['100']}
-                  border="left"
+                  border="a"
                   fontSize={12}
                   onUserChange={setLoadingBarValue}
                   onAnimatedUpdate={setLoadingBarValue}
@@ -1069,7 +1062,7 @@ function App() {
                     width="100%"
                     colorA={flexoki.red['600']}
                     colorB={flexoki.red['100']}
-                    border="left"
+                    border="a"
                     fontSize={12}
                     showLfoControls
                     defaultLfoRunning
@@ -1114,17 +1107,19 @@ function App() {
                     />
                   ) : null}
                   <VirtualKeyboard
-                    startNote={keyboardStartNote}
-                    noteCount={keyboardNoteCount}
-                    heightUnits={keyboardHeightUnits}
+                    defaultStartNote={21}
+                    defaultNoteCount={88}
+                    defaultHeightUnits={3}
                     fontSize={12}
-                    header={keyboardHeader}
-                    footer={keyboardFooter}
-                    colorA={flexoki.red['600']}
-                    colorB={flexoki.red['100']}
+                    colorA={flexoki.red['100']}
+                    colorB={flexoki.red['600']}
+                    instrumentOptions={keyboardInstrumentOptions}
+                    soundfontOptions={keyboardSoundfontOptions}
+                    defaultInstrument="acoustic_grand_piano"
+                    soundfontConfig={keyboardSoundfontConfig ?? undefined}
+                    toneConfig={keyboardToneConfig ?? undefined}
                     whiteKeyColor={flexoki.paper}
                     blackKeyColor={flexoki.black}
-                    soundfont={keyboardSoundfont ?? undefined}
                   />
                 </div>
                 <CodeBlock
@@ -1139,16 +1134,29 @@ function App() {
   fontSize={12}
 />
 <VirtualKeyboard
-  startNote={21}
-  noteCount={88}
-  heightUnits={3}
-  soundfont={{
-    instrument: "acoustic_grand_piano",
+  defaultStartNote={21}
+  defaultNoteCount={88}
+  defaultHeightUnits={3}
+  instrumentOptions={[
+    { value: "tonejs", label: "Tone.js", source: "tone" },
+  ]}
+  soundfontOptions={[
+    { value: "acoustic_grand_piano", label: "Grand Piano" },
+    { value: "electric_piano_1", label: "Electric Piano" },
+  ]}
+  defaultInstrument="acoustic_grand_piano"
+  soundfontConfig={{
     soundfont: "MusyngKite",
     format: "mp3",
-    url: "https://gleitz.github.io/midi-js-soundfonts",
     destination: keyboardOutput,
   }}
+  toneConfig={{
+    destination: keyboardOutput,
+    context: keyboardOutput.context,
+    polyphony: 32,
+  }}
+  colorA={flexoki.red["100"]}
+  colorB={flexoki.red["600"]}
   whiteKeyColor={flexoki.paper}
   blackKeyColor={flexoki.black}
 />`}
@@ -1169,9 +1177,10 @@ function App() {
                   limits are in Hz, and the FFT controls are tuned for quick performance shaping.
                 </p>
                 <p>
-                  VirtualKeyboard can play soundfonts with the <code>soundfont</code> prop. Pass a
-                  custom <code>url</code> to host samples locally, or provide a destination node so
-                  the keyboard and AudioControls share the same analysis stream.
+                  VirtualKeyboard can play soundfonts by passing <code>soundfontOptions</code>{" "}
+                  (for a dropdown) or a fixed <code>soundfont</code> prop. Provide a custom{" "}
+                  <code>url</code> to host samples locally, or a destination node so the keyboard
+                  and AudioControls share the same analysis stream.
                 </p>
               </div>
             </>
@@ -1287,6 +1296,69 @@ function App() {
                 </p>
               </div>
             </>
+          ) : activeRouteId === 'floating-panel' ? (
+            <>
+              <div className="docs-code-section">
+                <PresetStoreProvider>
+                  <FloatingPanel
+                    title="Inspector"
+                    collapsible
+                    colorA={flexoki.blue['500']}
+                    colorB={flexoki.blue['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                    width={300}
+                    verticalGap={6}
+                    paddingLeft={3}
+                    paddingRight={3}
+                    paddingBottom={3}
+                  >
+                    <PresetManager maxListHeight={120} />
+                    <AudioControls source={{ type: "buffer", src: "/audio/credits.mp3" }} />
+                    <VirtualKeyboard
+                      defaultStartNote="C4"
+                      defaultNoteCount={26}
+                      defaultHeightUnits={2}
+                      showHeightControl={false}
+                      instrumentOptions={keyboardInstrumentOptions}
+                      soundfontOptions={keyboardSoundfontOptions}
+                      defaultInstrument="acoustic_grand_piano"
+                      whiteKeyColor={flexoki.paper}
+                      blackKeyColor={flexoki.black}
+                    />
+                    <LFOSlider
+                      label="Gain"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0.65}
+                      width="100%"
+                    />
+                    <LFOSlider
+                      label="Mix"
+                      min={0}
+                      max={100}
+                      step={1}
+                      defaultValue={40}
+                      width="100%"
+                    />
+                  </FloatingPanel>
+                </PresetStoreProvider>
+                <CodeBlock code={activeRoute.code} />
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  FloatingPanel provides a compact header + body container for stacked controls. Use{" "}
+                  <code>collapsible</code> to add the toggle icon, and set <code>title</code> or{" "}
+                  <code>header</code> when you need a custom top row.
+                </p>
+                <p>
+                  Use <code>draggable</code> + <code>showDockButton</code> when you want a true floating
+                  inspector. For dense stacks, <code>verticalGap</code> and the padding props control
+                  the spacing between controls without affecting their borders.
+                </p>
+              </div>
+            </>
           ) : (
             <CodeBlock code={activeRoute.code} />
           )}
@@ -1318,7 +1390,7 @@ function App() {
             width="100%"
             colorA="#F2F0E5"
             colorB="#282726"
-            border="left"
+            border="a"
             fontSize={12}
             mode="auto"
             showLfoControls
@@ -1335,7 +1407,7 @@ function App() {
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
-          border="left"
+          border="a"
           fontSize={12}
           mode="auto"
           showLfoControls
@@ -1352,7 +1424,7 @@ function App() {
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
-          border="left"
+          border="a"
           fontSize={12}
           mode="auto"
           showLfoControls
@@ -1369,7 +1441,7 @@ function App() {
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
-          border="left"
+          border="a"
           fontSize={12}
           mode="auto"
           showLfoControls
@@ -1386,7 +1458,7 @@ function App() {
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
-          border="left"
+          border="a"
           fontSize={12}
           mode="auto"
           showLfoControls
@@ -1403,7 +1475,7 @@ function App() {
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
-          border="left"
+          border="a"
           fontSize={12}
           mode="auto"
           showLfoControls
@@ -1420,7 +1492,7 @@ function App() {
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
-          border="left"
+          border="a"
           fontSize={12}
           mode="auto"
           showLfoControls
@@ -1437,7 +1509,7 @@ function App() {
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
-          border="left"
+          border="a"
           fontSize={12}
           mode="auto"
           showLfoControls
@@ -1454,7 +1526,7 @@ function App() {
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
-          border="left"
+          border="a"
           fontSize={12}
           mode="auto"
           showLfoControls
@@ -1471,7 +1543,7 @@ function App() {
           width="100%"
           colorA="#F2F0E5"
           colorB="#282726"
-          border="left"
+          border="a"
           fontSize={12}
           mode="auto"
           showLfoControls

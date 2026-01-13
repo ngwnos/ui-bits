@@ -1,8 +1,13 @@
 import React from "react";
-import { MousePointer2, CaseUpper } from "lucide-react";
+import { MousePointer2, CaseUpper, Piano } from "lucide-react";
 import * as Soundfont from "soundfont-player";
 import type { Player as SoundfontPlayer } from "soundfont-player";
+import * as Tone from "tone";
+import { usePanelTheme } from "../../panelGap";
+import { useControlValue, useResolvedControlIdPrefix } from "../../controlStore";
 import IconButton from "../IconButton";
+import IconDropdown from "../IconDropdown";
+import Dial from "../Dial";
 import "./virtual-keyboard.css";
 
 export interface VirtualKeyboardKey {
@@ -27,13 +32,67 @@ export interface VirtualKeyboardSoundfont {
   context?: AudioContext;
 }
 
+export type VirtualKeyboardSoundfontConfig = Omit<VirtualKeyboardSoundfont, "instrument">;
+
+export interface VirtualKeyboardTone {
+  destination?: AudioNode;
+  context?: AudioContext;
+  polyphony?: number;
+  volume?: number;
+  attack?: number;
+  decay?: number;
+  sustain?: number;
+  release?: number;
+}
+
+export interface VirtualKeyboardInstrumentOption {
+  value: string;
+  label: string;
+  source?: "tone" | "soundfont";
+  soundfontConfig?: VirtualKeyboardSoundfontConfig;
+  toneConfig?: VirtualKeyboardTone;
+}
+
+export interface VirtualKeyboardSoundfontOption extends VirtualKeyboardSoundfontConfig {
+  value: string;
+  label: string;
+}
+
+export interface VirtualKeyboardControlIds {
+  startNote?: string;
+  noteCount?: string;
+  heightUnits?: string;
+  showLabels?: string;
+  keyboardShortcutsEnabled?: string;
+  instrument?: string;
+}
+
 export interface VirtualKeyboardProps {
   whiteKeys?: VirtualKeyboardKey[];
   blackKeys?: VirtualKeyboardKey[];
   startNote?: number | string;
+  defaultStartNote?: number | string;
+  onStartNoteChange?: (startNote: number | string) => void;
   noteCount?: number;
+  defaultNoteCount?: number;
+  onNoteCountChange?: (count: number) => void;
   showLabels?: boolean;
+  defaultShowLabels?: boolean;
+  onShowLabelsChange?: (show: boolean) => void;
   heightUnits?: number;
+  defaultHeightUnits?: number;
+  onHeightUnitsChange?: (heightUnits: number) => void;
+  showControls?: boolean;
+  showHeightControl?: boolean;
+  instrumentOptions?: VirtualKeyboardInstrumentOption[];
+  soundfontOptions?: VirtualKeyboardSoundfontOption[];
+  instrument?: string;
+  defaultInstrument?: string;
+  onInstrumentChange?: (instrument: string) => void;
+  toneInstrumentValue?: string;
+  instrumentIcon?: React.ReactElement;
+  soundfontConfig?: VirtualKeyboardSoundfontConfig | null;
+  toneConfig?: VirtualKeyboardTone | null;
   header?: React.ReactNode;
   footer?: React.ReactNode;
   colorA?: string;
@@ -43,9 +102,12 @@ export interface VirtualKeyboardProps {
   whiteKeyActiveColor?: string;
   blackKeyActiveColor?: string;
   soundfont?: VirtualKeyboardSoundfont | string;
+  tone?: VirtualKeyboardTone;
   keyboardShortcutsEnabled?: boolean;
   defaultKeyboardShortcutsEnabled?: boolean;
   onKeyboardShortcutsChange?: (enabled: boolean) => void;
+  controlIdPrefix?: string;
+  controlIds?: VirtualKeyboardControlIds;
   activeNotes?: Record<string, boolean>;
   onNoteOn?: (note: string, frequency: number) => void;
   onNoteOff?: (note: string) => void;
@@ -59,12 +121,24 @@ export const DEFAULT_START_NOTE = "C4";
 export const DEFAULT_NOTE_COUNT = 13;
 export const DEFAULT_HEIGHT_UNITS = 6;
 export const DEFAULT_KEYBOARD_SHORTCUTS_ENABLED = false;
+const DEFAULT_TONE_OPTION = "tonejs";
 const MIN_SLIDER_UNIT_PX = 18;
 const FALLBACK_COLOR_A = "#f2f0e5";
 const FALLBACK_COLOR_B = "#1c1b1a";
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const BLACK_OFFSETS = new Set([1, 3, 6, 8, 10]);
 const WHITE_OFFSETS = new Set([0, 2, 4, 5, 7, 9, 11]);
+const MIN_START_MIDI = 21;
+const WHITE_MIDI_VALUES = (() => {
+  const values: number[] = [];
+  for (let midi = 0; midi <= 127; midi += 1) {
+    if (WHITE_OFFSETS.has(midi % 12)) {
+      values.push(midi);
+    }
+  }
+  return values;
+})();
+const MIN_START_INDEX = Math.max(0, WHITE_MIDI_VALUES.indexOf(MIN_START_MIDI));
 
 function midiToNoteName(midi: number) {
   const rounded = Math.round(midi);
@@ -164,13 +238,61 @@ function shouldIgnoreKeyboardEvent(target: EventTarget | null) {
   return target.isContentEditable;
 }
 
+function useControllableValue<T>(
+  value: T | undefined,
+  defaultValue: T,
+  onChange: ((next: T) => void) | undefined,
+  controlId?: string,
+) {
+  const [storeValue, setStoreValue] = useControlValue<T>(controlId);
+  const shouldUseStore = controlId !== undefined && value === undefined;
+  const [internal, setInternal] = React.useState(defaultValue);
+  const isControlled = value !== undefined;
+  const resolved = isControlled
+    ? value
+    : (shouldUseStore ? (storeValue ?? internal) : internal);
+  const setValue = React.useCallback((next: T) => {
+    if (!isControlled && !shouldUseStore) {
+      setInternal(next);
+    }
+    if (shouldUseStore) {
+      setStoreValue(next);
+    }
+    onChange?.(next);
+  }, [isControlled, onChange, setStoreValue, shouldUseStore]);
+  React.useEffect(() => {
+    if (!shouldUseStore || storeValue !== undefined) return;
+    setStoreValue(defaultValue);
+  }, [defaultValue, setStoreValue, shouldUseStore, storeValue]);
+  return [resolved, setValue] as const;
+}
+
 export default function VirtualKeyboard({
   whiteKeys,
   blackKeys,
-  startNote = DEFAULT_START_NOTE,
-  noteCount = DEFAULT_NOTE_COUNT,
-  showLabels = false,
-  heightUnits = DEFAULT_HEIGHT_UNITS,
+  startNote,
+  defaultStartNote,
+  onStartNoteChange,
+  noteCount,
+  defaultNoteCount,
+  onNoteCountChange,
+  showLabels,
+  defaultShowLabels,
+  onShowLabelsChange,
+  heightUnits,
+  defaultHeightUnits,
+  onHeightUnitsChange,
+  showControls = true,
+  showHeightControl = true,
+  instrumentOptions = [],
+  soundfontOptions = [],
+  instrument,
+  defaultInstrument,
+  onInstrumentChange,
+  toneInstrumentValue = DEFAULT_TONE_OPTION,
+  instrumentIcon,
+  soundfontConfig,
+  toneConfig,
   header,
   footer,
   colorA,
@@ -180,9 +302,12 @@ export default function VirtualKeyboard({
   whiteKeyActiveColor,
   blackKeyActiveColor,
   soundfont,
+  tone,
   keyboardShortcutsEnabled,
   defaultKeyboardShortcutsEnabled = DEFAULT_KEYBOARD_SHORTCUTS_ENABLED,
   onKeyboardShortcutsChange,
+  controlIdPrefix,
+  controlIds,
   activeNotes,
   onNoteOn,
   onNoteOff,
@@ -191,9 +316,69 @@ export default function VirtualKeyboard({
   fontSize,
   ariaLabel = "Virtual keyboard",
 }: VirtualKeyboardProps) {
-  const [internalShortcuts, setInternalShortcuts] = React.useState(defaultKeyboardShortcutsEnabled);
-  const isShortcutsControlled = keyboardShortcutsEnabled !== undefined;
-  const shortcutsEnabled = isShortcutsControlled ? keyboardShortcutsEnabled : internalShortcuts;
+  const resolvedControlPrefix = useResolvedControlIdPrefix(controlIdPrefix, ariaLabel);
+  const resolveControlId = React.useCallback((key: keyof VirtualKeyboardControlIds) => (
+    controlIds?.[key] ?? (resolvedControlPrefix ? `${resolvedControlPrefix}.${key}` : undefined)
+  ), [controlIds, resolvedControlPrefix]);
+  const startNoteControlId = resolveControlId("startNote");
+  const noteCountControlId = resolveControlId("noteCount");
+  const heightUnitsControlId = resolveControlId("heightUnits");
+  const showLabelsControlId = resolveControlId("showLabels");
+  const shortcutsControlId = resolveControlId("keyboardShortcutsEnabled");
+  const instrumentControlId = resolveControlId("instrument");
+  const [resolvedStartNote, setResolvedStartNote] = useControllableValue(
+    startNote,
+    defaultStartNote ?? DEFAULT_START_NOTE,
+    onStartNoteChange,
+    startNoteControlId,
+  );
+  const [resolvedNoteCount, setResolvedNoteCount] = useControllableValue(
+    noteCount,
+    defaultNoteCount ?? DEFAULT_NOTE_COUNT,
+    onNoteCountChange,
+    noteCountControlId,
+  );
+  const [resolvedHeightUnits, setResolvedHeightUnits] = useControllableValue(
+    heightUnits,
+    defaultHeightUnits ?? DEFAULT_HEIGHT_UNITS,
+    onHeightUnitsChange,
+    heightUnitsControlId,
+  );
+  const [resolvedShowLabels] = useControllableValue(
+    showLabels,
+    defaultShowLabels ?? false,
+    onShowLabelsChange,
+    showLabelsControlId,
+  );
+  const [shortcutsEnabled, setShortcutsEnabled] = useControllableValue(
+    keyboardShortcutsEnabled,
+    defaultKeyboardShortcutsEnabled,
+    onKeyboardShortcutsChange,
+    shortcutsControlId,
+  );
+  const normalizedSoundfontOptions = React.useMemo<VirtualKeyboardInstrumentOption[]>(() => (
+    soundfontOptions.map(({ value, label, ...config }) => ({
+      value,
+      label,
+      source: "soundfont" as const,
+      soundfontConfig: config,
+      toneConfig: undefined,
+    }))
+  ), [soundfontOptions]);
+  const resolvedInstrumentOptions = React.useMemo(() => {
+    const seen = new Set<string>();
+    return [...instrumentOptions, ...normalizedSoundfontOptions].filter((option) => {
+      if (seen.has(option.value)) return false;
+      seen.add(option.value);
+      return true;
+    });
+  }, [instrumentOptions, normalizedSoundfontOptions]);
+  const [instrumentValue, setInstrumentValue] = useControllableValue(
+    instrument,
+    defaultInstrument ?? resolvedInstrumentOptions[0]?.value ?? "",
+    onInstrumentChange,
+    instrumentControlId,
+  );
   const pointerStateRef = React.useRef<{ pointerId: number | null; note: string | null }>({
     pointerId: null,
     note: null,
@@ -206,9 +391,17 @@ export default function VirtualKeyboard({
     destination: AudioNode;
     ownsContext: boolean;
   } | null>(null);
+  const toneStateRef = React.useRef<{
+    synth: Tone.PolySynth<Tone.Synth>;
+    context: AudioContext;
+    destination: AudioNode;
+    ownsContext: boolean;
+    toneContext: Tone.Context;
+  } | null>(null);
   const soundfontNotesRef = React.useRef<Map<string, SoundfontNote>>(new Map());
   const [internalActive, setInternalActive] = React.useState<Record<string, boolean>>({});
   const resolvedActive = activeNotes ?? internalActive;
+  const resolvedNoteCountClamped = Math.max(1, Math.min(88, Math.round(resolvedNoteCount)));
   const derivedKeys = React.useMemo<{
     white: VirtualKeyboardKey[];
     black: VirtualKeyboardKey[];
@@ -216,34 +409,62 @@ export default function VirtualKeyboard({
     if (whiteKeys && blackKeys) {
       return { white: whiteKeys, black: blackKeys };
     }
-    const startMidi = resolveStartMidi(startNote);
-    const { whiteKeys: derivedWhite, blackKeys: derivedBlack } = buildKeys(startMidi, noteCount);
+    const startMidiValue = resolveStartMidi(resolvedStartNote);
+    const { whiteKeys: derivedWhite, blackKeys: derivedBlack } = buildKeys(startMidiValue, resolvedNoteCountClamped);
     return {
       white: derivedWhite,
       black: derivedBlack,
     };
-  }, [blackKeys, noteCount, startNote, whiteKeys]);
+  }, [blackKeys, resolvedNoteCountClamped, resolvedStartNote, whiteKeys]);
   const resolvedWhiteKeys = derivedKeys.white;
   const resolvedBlackKeys = derivedKeys.black;
+  const panelTheme = usePanelTheme();
   const whiteKeyWidthPct = resolvedWhiteKeys.length > 0 ? 100 / resolvedWhiteKeys.length : 100;
   const blackKeyWidthPct = whiteKeyWidthPct * 0.6;
-  const resolvedFontSize = fontSize ?? 12;
+  const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
   const unitSizePx = computeSliderUnitPx(resolvedFontSize);
-  const resolvedHeightUnits = Math.max(1, Math.round(heightUnits));
-  const startMidi = React.useMemo(() => resolveStartMidi(startNote), [startNote]);
-  const safeColorA = colorA ?? FALLBACK_COLOR_A;
-  const safeColorB = colorB ?? FALLBACK_COLOR_B;
+  const resolvedHeightUnitsClamped = Math.max(1, Math.round(resolvedHeightUnits));
+  const startMidi = React.useMemo(() => resolveStartMidi(resolvedStartNote), [resolvedStartNote]);
+  const rawStartIndex = WHITE_MIDI_VALUES.indexOf(startMidi);
+  const maxStartIndex = Math.max(0, WHITE_MIDI_VALUES.length - 1);
+  const startIndex = Math.max(
+    MIN_START_INDEX,
+    Math.min(maxStartIndex, rawStartIndex >= 0 ? rawStartIndex : MIN_START_INDEX),
+  );
+  const safeColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
+  const safeColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
   const resolvedWhiteKeyColor = whiteKeyColor ?? safeColorB;
   const resolvedBlackKeyColor = blackKeyColor ?? safeColorA;
   const resolvedWhiteKeyActive = whiteKeyActiveColor ?? safeColorA;
   const resolvedBlackKeyActive = blackKeyActiveColor ?? safeColorA;
+  const showInstrumentControl = showControls && resolvedInstrumentOptions.length > 0 && !soundfont && !tone;
+  const effectiveInstrument = instrumentValue || resolvedInstrumentOptions[0]?.value || "";
+  const selectedInstrument = React.useMemo(() => (
+    resolvedInstrumentOptions.find((option) => option.value === effectiveInstrument) ?? null
+  ), [effectiveInstrument, resolvedInstrumentOptions]);
+  const usesTone = showInstrumentControl && (
+    selectedInstrument?.source === "tone"
+    || selectedInstrument?.toneConfig != null
+    || effectiveInstrument === toneInstrumentValue
+  );
+  const resolvedSoundfontConfig = selectedInstrument?.soundfontConfig ?? soundfontConfig ?? null;
+  const baseSoundfont = showInstrumentControl && !usesTone && resolvedSoundfontConfig
+    ? { ...resolvedSoundfontConfig, instrument: effectiveInstrument }
+    : null;
   const resolvedSoundfont = React.useMemo(() => {
-    if (!soundfont) return null;
-    if (typeof soundfont === "string") {
-      return { instrument: soundfont };
+    const source = soundfont ?? baseSoundfont;
+    if (!source) return null;
+    if (typeof source === "string") {
+      return { instrument: source };
     }
-    return soundfont;
-  }, [soundfont]);
+    return source;
+  }, [baseSoundfont, soundfont]);
+  const resolvedTone = React.useMemo(() => {
+    if (tone) return tone;
+    if (!showInstrumentControl || !usesTone) return null;
+    return selectedInstrument?.toneConfig ?? toneConfig ?? {};
+  }, [selectedInstrument, showInstrumentControl, tone, toneConfig, usesTone]);
+  const instrumentIconNode = instrumentIcon ?? <Piano />;
   const soundfontInstrument = resolvedSoundfont?.instrument;
   const soundfontName = resolvedSoundfont?.soundfont;
   const soundfontFormat = resolvedSoundfont?.format;
@@ -257,6 +478,15 @@ export default function VirtualKeyboard({
   const soundfontNotes = resolvedSoundfont?.notes;
   const soundfontContext = resolvedSoundfont?.context;
   const soundfontDestination = resolvedSoundfont?.destination;
+  const toneDestination = resolvedTone?.destination;
+  const toneContext = resolvedTone?.context
+    ?? (toneDestination?.context instanceof AudioContext ? toneDestination.context : null);
+  const tonePolyphony = Math.max(1, Math.round(resolvedTone?.polyphony ?? 8));
+  const toneVolume = resolvedTone?.volume;
+  const toneAttack = resolvedTone?.attack;
+  const toneDecay = resolvedTone?.decay;
+  const toneSustain = resolvedTone?.sustain;
+  const toneRelease = resolvedTone?.release;
   const setActive = React.useCallback((note: string, nextActive: boolean) => {
     if (activeNotes) return;
     setInternalActive((prev) => {
@@ -273,20 +503,29 @@ export default function VirtualKeyboard({
 
   const triggerOn = React.useCallback((note: string, frequency: number) => {
     try {
-      const soundfontState = soundfontStateRef.current;
-      if (soundfontState) {
-        const { instrument, context } = soundfontState;
-        const existing = soundfontNotesRef.current.get(note);
-        if (existing?.stop) {
-          existing.stop(context.currentTime);
+      const toneState = toneStateRef.current;
+      if (toneState) {
+        if (toneState.context.state === "suspended") {
+          void toneState.context.resume().catch(() => {});
         }
-        soundfontNotesRef.current.delete(note);
-        if (context.state === "suspended") {
-          void context.resume().catch(() => {});
-        }
-        const node = instrument.start(note, context.currentTime);
-        if (node && typeof node.stop === "function") {
-          soundfontNotesRef.current.set(note, node);
+        void Tone.start().catch(() => {});
+        toneState.synth.triggerAttack(note);
+      } else {
+        const soundfontState = soundfontStateRef.current;
+        if (soundfontState) {
+          const { instrument, context } = soundfontState;
+          const existing = soundfontNotesRef.current.get(note);
+          if (existing?.stop) {
+            existing.stop(context.currentTime);
+          }
+          soundfontNotesRef.current.delete(note);
+          if (context.state === "suspended") {
+            void context.resume().catch(() => {});
+          }
+          const node = instrument.start(note, context.currentTime);
+          if (node && typeof node.stop === "function") {
+            soundfontNotesRef.current.set(note, node);
+          }
         }
       }
     } catch {
@@ -299,14 +538,19 @@ export default function VirtualKeyboard({
 
   const triggerOff = React.useCallback((note: string) => {
     try {
-      const soundfontState = soundfontStateRef.current;
-      if (soundfontState) {
-        const { context } = soundfontState;
-        const existing = soundfontNotesRef.current.get(note);
-        if (existing?.stop) {
-          existing.stop(context.currentTime);
+      const toneState = toneStateRef.current;
+      if (toneState) {
+        toneState.synth.triggerRelease(note);
+      } else {
+        const soundfontState = soundfontStateRef.current;
+        if (soundfontState) {
+          const { context } = soundfontState;
+          const existing = soundfontNotesRef.current.get(note);
+          if (existing?.stop) {
+            existing.stop(context.currentTime);
+          }
+          soundfontNotesRef.current.delete(note);
         }
-        soundfontNotesRef.current.delete(note);
       }
     } catch {
       // ignore soundfont playback errors
@@ -320,7 +564,7 @@ export default function VirtualKeyboard({
   const releasePointerNoteRef = React.useRef(() => {});
   const clearAllNotesRef = React.useRef(() => {});
   const startMidiRef = React.useRef(startMidi);
-  const noteCountRef = React.useRef(noteCount);
+  const noteCountRef = React.useRef(resolvedNoteCountClamped);
   React.useEffect(() => {
     triggerOnRef.current = triggerOn;
   }, [triggerOn]);
@@ -347,11 +591,80 @@ export default function VirtualKeyboard({
     startMidiRef.current = startMidi;
   }, [startMidi]);
   React.useEffect(() => {
-    noteCountRef.current = noteCount;
-  }, [noteCount]);
+    noteCountRef.current = resolvedNoteCountClamped;
+  }, [resolvedNoteCountClamped]);
 
   React.useEffect(() => {
-    if (!soundfontInstrument) {
+    if (!resolvedTone) {
+      toneStateRef.current = null;
+      return undefined;
+    }
+    if (typeof AudioContext === "undefined" && !toneContext && !toneDestination) {
+      toneStateRef.current = null;
+      return undefined;
+    }
+    const destination = toneDestination;
+    const destinationContext = destination?.context;
+    const resolvedContext = toneContext
+      ?? (destinationContext instanceof AudioContext ? destinationContext : null)
+      ?? new AudioContext();
+    const context = resolvedContext;
+    const ownsContext = !toneContext && !destination;
+    const toneContextInstance = new Tone.Context({ context });
+    const previousContext = Tone.getContext();
+    Tone.setContext(toneContextInstance);
+    const envelope = {
+      attack: toneAttack ?? 0.01,
+      decay: toneDecay ?? 0.1,
+      sustain: toneSustain ?? 0.3,
+      release: toneRelease ?? 0.8,
+    };
+    const synth = new Tone.PolySynth(Tone.Synth, { envelope });
+    synth.maxPolyphony = tonePolyphony;
+    if (toneVolume !== undefined) {
+      synth.volume.value = toneVolume;
+    }
+    if (destination && destination !== context.destination) {
+      synth.connect(destination);
+    } else {
+      synth.toDestination();
+    }
+    clearAllNotesRef.current();
+    toneStateRef.current = {
+      synth,
+      context,
+      destination: destination ?? context.destination,
+      ownsContext,
+      toneContext: toneContextInstance,
+    };
+    return () => {
+      clearAllNotesRef.current();
+      synth.releaseAll();
+      synth.disconnect();
+      synth.dispose();
+      toneStateRef.current = null;
+      if (Tone.getContext() === toneContextInstance) {
+        Tone.setContext(previousContext);
+      }
+      if (ownsContext) {
+        toneContextInstance.dispose();
+        void context.close().catch(() => {});
+      }
+    };
+  }, [
+    resolvedTone,
+    toneContext,
+    toneDestination,
+    tonePolyphony,
+    toneVolume,
+    toneAttack,
+    toneDecay,
+    toneSustain,
+    toneRelease,
+  ]);
+
+  React.useEffect(() => {
+    if (!soundfontInstrument || resolvedTone) {
       soundfontStateRef.current = null;
       return undefined;
     }
@@ -447,6 +760,7 @@ export default function VirtualKeyboard({
     };
   }, [
     soundfontInstrument,
+    resolvedTone,
     soundfontName,
     soundfontFormat,
     soundfontUrl,
@@ -462,7 +776,7 @@ export default function VirtualKeyboard({
   ]);
 
   React.useEffect(() => {
-    if (!soundfontInstrument) return;
+    if (!soundfontInstrument || resolvedTone) return;
     clearAllNotesRef.current();
     soundfontNotesRef.current.forEach((entry) => {
       if (entry?.stop) {
@@ -473,7 +787,7 @@ export default function VirtualKeyboard({
     if (!activeNotes) {
       setInternalActive({});
     }
-  }, [activeNotes, noteCount, soundfontInstrument, startMidi]);
+  }, [activeNotes, resolvedNoteCountClamped, soundfontInstrument, startMidi, resolvedTone]);
 
   const handleKeyPointerDown = React.useCallback((
     event: React.PointerEvent<HTMLButtonElement>,
@@ -519,7 +833,7 @@ export default function VirtualKeyboard({
   (combinedStyle as Record<string, string>)["--ui-bits-color-b"] = safeColorB;
   (combinedStyle as Record<string, string>)["--vk-font-size"] = `${resolvedFontSize}px`;
   (combinedStyle as Record<string, string>)["--vk-header-height"] = `${unitSizePx}px`;
-  (combinedStyle as Record<string, string>)["--vk-body-height"] = `${unitSizePx * resolvedHeightUnits}px`;
+  (combinedStyle as Record<string, string>)["--vk-body-height"] = `${unitSizePx * resolvedHeightUnitsClamped}px`;
   (combinedStyle as Record<string, string>)["--vk-header-bg"] = safeColorB;
   (combinedStyle as Record<string, string>)["--vk-header-text"] = safeColorA;
   (combinedStyle as Record<string, string>)["--vk-border"] = safeColorA;
@@ -531,12 +845,90 @@ export default function VirtualKeyboard({
   (combinedStyle as Record<string, string>)["--vk-white-active"] = resolvedWhiteKeyActive;
   (combinedStyle as Record<string, string>)["--vk-black-active"] = resolvedBlackKeyActive;
 
-  const setShortcutsEnabled = React.useCallback((next: boolean) => {
-    if (!isShortcutsControlled) {
-      setInternalShortcuts(next);
-    }
-    onKeyboardShortcutsChange?.(next);
-  }, [isShortcutsControlled, onKeyboardShortcutsChange]);
+  const handleStartIndexChange = React.useCallback((value: number) => {
+    const index = Math.max(MIN_START_INDEX, Math.min(maxStartIndex, Math.round(value)));
+    const nextMidi = WHITE_MIDI_VALUES[index] ?? WHITE_MIDI_VALUES[MIN_START_INDEX] ?? 60;
+    setResolvedStartNote(nextMidi);
+  }, [maxStartIndex, setResolvedStartNote]);
+  const handleNoteCountChange = React.useCallback((value: number) => {
+    const next = Math.max(4, Math.min(88, Math.round(value)));
+    setResolvedNoteCount(next);
+  }, [setResolvedNoteCount]);
+  const handleHeightChange = React.useCallback((value: number) => {
+    const next = Math.max(3, Math.min(12, Math.round(value)));
+    setResolvedHeightUnits(next);
+  }, [setResolvedHeightUnits]);
+
+  const headerControls = showControls ? (
+    <div className="ui-bits-virtual-keyboard__controls">
+      {showInstrumentControl ? (
+        <IconDropdown
+          label="Soundfont"
+          options={resolvedInstrumentOptions}
+          value={effectiveInstrument}
+          onChange={(value) => setInstrumentValue(value)}
+          borderStyle="b"
+          fontSize={resolvedFontSize}
+          className="ui-bits-virtual-keyboard__dropdown"
+          icon={instrumentIconNode}
+          preventFocusOnPointerDown
+        />
+      ) : null}
+      <div className="ui-bits-virtual-keyboard__control-group">
+        <span className="ui-bits-virtual-keyboard__control-label">Start:</span>
+        <Dial
+          min={MIN_START_INDEX}
+          max={maxStartIndex}
+          step={1}
+          value={startIndex}
+          onChange={handleStartIndexChange}
+          fontSize={resolvedFontSize}
+          ariaLabel="Keyboard start note"
+          formatDisplayValue={(value) => {
+            const index = Math.max(MIN_START_INDEX, Math.min(maxStartIndex, Math.round(value)));
+            const midi = WHITE_MIDI_VALUES[index] ?? WHITE_MIDI_VALUES[MIN_START_INDEX] ?? 60;
+            return midiToNoteName(midi);
+          }}
+        />
+      </div>
+      <div className="ui-bits-virtual-keyboard__control-group">
+        <span className="ui-bits-virtual-keyboard__control-label">Notes:</span>
+        <Dial
+          min={4}
+          max={88}
+          step={1}
+          value={resolvedNoteCountClamped}
+          onChange={handleNoteCountChange}
+          fontSize={resolvedFontSize}
+          ariaLabel="Keyboard note count"
+          formatDisplayValue={(value) => `${Math.round(value)}`}
+        />
+      </div>
+      {showHeightControl ? (
+        <div className="ui-bits-virtual-keyboard__control-group">
+          <span className="ui-bits-virtual-keyboard__control-label">Height:</span>
+          <Dial
+            min={3}
+            max={12}
+            step={1}
+            value={resolvedHeightUnitsClamped}
+            onChange={handleHeightChange}
+            fontSize={resolvedFontSize}
+            ariaLabel="Keyboard height"
+          />
+        </div>
+      ) : null}
+    </div>
+  ) : null;
+  const headerContent = showControls
+    ? (
+      <>
+        {headerControls}
+        {header ? <div className="ui-bits-virtual-keyboard__header-extra">{header}</div> : null}
+      </>
+    )
+    : header;
+
   const keyboardModeOptions = React.useMemo(() => ([
     {
       value: "pointer",
@@ -556,9 +948,9 @@ export default function VirtualKeyboard({
     const midi = parseNoteName(note);
     if (midi == null) return null;
     const index = midi - startMidi;
-    if (index < 0 || index >= noteCount || index >= KEYBOARD_SHORTCUTS.length) return null;
+    if (index < 0 || index >= resolvedNoteCountClamped || index >= KEYBOARD_SHORTCUTS.length) return null;
     return KEYBOARD_SHORTCUTS[index];
-  }, [noteCount, shortcutsEnabled, startMidi]);
+  }, [resolvedNoteCountClamped, shortcutsEnabled, startMidi]);
 
   React.useEffect(() => {
     if (!shortcutsEnabled) {
@@ -662,7 +1054,7 @@ export default function VirtualKeyboard({
             />
           </div>
           <div className="ui-bits-virtual-keyboard__header-content">
-            {header ?? null}
+            {headerContent ?? null}
           </div>
         </div>
       </div>
@@ -692,7 +1084,7 @@ export default function VirtualKeyboard({
                 if (shortcutLabel) {
                   return <span className="ui-bits-virtual-keyboard__label">{shortcutLabel}</span>;
                 }
-                if (!showLabels) return null;
+                if (!resolvedShowLabels) return null;
                 return <span className="ui-bits-virtual-keyboard__label">{key.note}</span>;
               })()}
             </button>
@@ -729,7 +1121,7 @@ export default function VirtualKeyboard({
                   if (shortcutLabel) {
                     return <span className="ui-bits-virtual-keyboard__label">{shortcutLabel}</span>;
                   }
-                  if (!showLabels) return null;
+                  if (!resolvedShowLabels) return null;
                   return <span className="ui-bits-virtual-keyboard__label">{key.note}</span>;
                 })()}
               </button>

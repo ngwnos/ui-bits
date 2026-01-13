@@ -3,4 +3,7 @@ export interface DropdownOption {
   label: string;
   description?: string;
   disabled?: boolean;
+  colorA?: string;
+  colorB?: string;
+  borderStyle?: "a" | "b" | "none";
 }

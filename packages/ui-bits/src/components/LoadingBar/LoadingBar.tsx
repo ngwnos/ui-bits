@@ -40,7 +40,7 @@ export default function LoadingBar({
   colorB = FALLBACK_COLOR_B,
   barStyle = "continuous",
   barSegmentCount = 32,
-  border = "left",
+  border = "a",
   borderMask,
   width,
   fontSize = 12,
@@ -58,7 +58,7 @@ export default function LoadingBar({
     : clampedValue;
   const splitPct = `${(clamp(quantizedValue, 0, 1) * 100).toFixed(3)}%`;
   const resolvedWidth = resolveSize(width);
-  const resolvedBorderColor = border === "right" ? colorB : colorA;
+  const resolvedBorderColor = border === "b" ? colorB : colorA;
   const resolvedBorderMask = {
     top: borderMask?.top ?? true,
     right: borderMask?.right ?? true,

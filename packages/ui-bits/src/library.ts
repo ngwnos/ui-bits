@@ -19,6 +19,7 @@ export {
 
 export { FrameLoopProvider, useFrame } from "./frameLoop";
 export { useStoreMirror, type MirrorFn } from "./useStoreMirror";
+export { usePanelTheme } from "./panelGap";
 export {
   AnimationSuspensionProvider,
   useAnimationSuspended,
@@ -59,6 +60,7 @@ export {
   AudioControls,
   AudioFFTWindow,
   type AudioControlsProps,
+  type AudioControlsControlIds,
   type AudioControlsBorder,
   type AudioControlsBinInterpolation,
   type AudioControlsSource,
@@ -73,13 +75,34 @@ export {
   type VirtualKeyboardProps,
   type VirtualKeyboardKey,
   type VirtualKeyboardSoundfont,
+  type VirtualKeyboardSoundfontConfig,
+  type VirtualKeyboardSoundfontOption,
+  type VirtualKeyboardTone,
+  type VirtualKeyboardInstrumentOption,
+  type VirtualKeyboardControlIds,
 } from "./components/VirtualKeyboard";
+export {
+  default as Sequencer,
+  type SequencerProps,
+  type SequencerHandle,
+  type SequencerEvent,
+} from "./components/Sequencer";
 export {
   default as SegmentBar,
   type SegmentBarProps,
   type SegmentBarOption,
   type SegmentBarBorderStyle,
 } from "./components/SegmentBar";
+export {
+  default as PresetManager,
+  type PresetManagerProps,
+  type PresetManagerPreset,
+} from "./components/PresetManager";
+export {
+  default as TextInput,
+  type TextInputProps,
+  type TextInputBorderStyle,
+} from "./components/TextInput";
 export {
   default as IconButton,
   type IconButtonProps,
@@ -99,3 +122,5 @@ export { default as BasicButton, type BasicButtonProps, type BasicButtonBorderSt
 export { default as Folder, type FolderProps, type FolderBorderStyle } from "./components/Folder";
 export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./components/FloatingPanel";
 export * from "./sliderStore";
+export * from "./controlStore";
+export * from "./presetStore";

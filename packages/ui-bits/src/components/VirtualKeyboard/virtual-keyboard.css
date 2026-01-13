@@ -41,6 +41,8 @@
   height: 100%;
   display: flex;
   align-items: center;
+  gap: 8px;
+  overflow: visible;
 }
 
 .ui-bits-virtual-keyboard__body {
@@ -114,6 +116,37 @@
 
 .ui-bits-virtual-keyboard__label {
   padding-bottom: 8px;
+}
+
+.ui-bits-virtual-keyboard__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ui-bits-virtual-keyboard__header-extra {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-bits-virtual-keyboard__control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.ui-bits-virtual-keyboard__control-label {
+  font-size: 0.9em;
+}
+
+.ui-bits-virtual-keyboard__dropdown {
+  flex-shrink: 0;
 }
 
 .ui-bits-virtual-keyboard__key--white {

@@ -13,6 +13,14 @@ export type PanelSurfaceContextValue = {
 export const PanelSurfaceContext = React.createContext<PanelSurfaceContextValue | null>(null);
 
 export const PanelEdgeBorderContext = React.createContext<{ left: boolean; right: boolean } | null>(null);
+export const PanelThemeContext = React.createContext<{
+  colorA?: string;
+  colorB?: string;
+  fontSize?: number;
+  borderStyle?: "a" | "b" | "none";
+  transparent?: boolean;
+  bodyBlur?: number;
+} | null>(null);
 
 const isFiniteNumber = (value: unknown): value is number => (
   typeof value === "number" && Number.isFinite(value)
@@ -31,4 +39,8 @@ export function usePanelEdgeBorders() {
 
 export function usePanelSurface() {
   return React.useContext(PanelSurfaceContext);
+}
+
+export function usePanelTheme() {
+  return React.useContext(PanelThemeContext);
 }

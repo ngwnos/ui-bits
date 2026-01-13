@@ -1,6 +1,7 @@
 import React from "react";
 import { clamp, snapToStep, splitFromValue } from "../../lfo";
 import { useAnimationSuspended } from "../../animationSuspension";
+import { useControlValue, useResolvedControlId } from "../../controlStore";
 import "./dial.css";
 
 export type DialBorderStyle = "a" | "b" | "none";
@@ -28,6 +29,7 @@ export interface DialProps
   disabled?: boolean;
   suspended?: boolean;
   ariaLabel?: string;
+  controlId?: string;
 }
 
 const FALLBACK_COLOR_A = "var(--ui-bits-color-a, #2f2f2f)";
@@ -76,10 +78,15 @@ export default function Dial({
   onDoubleClick,
   onKeyDown,
   onWheel,
+  controlId,
   ...rest
 }: DialProps) {
   const isSuspended = useAnimationSuspended(suspended);
-  const isControlled = value !== undefined;
+  const resolvedControlId = useResolvedControlId(controlId, ariaLabel);
+  const [storeValue, setStoreValue] = useControlValue<number>(resolvedControlId);
+  const shouldUseStore = resolvedControlId !== undefined && value === undefined;
+  const resolvedValueProp = shouldUseStore ? storeValue : value;
+  const isControlled = resolvedValueProp !== undefined;
   const resolvedStep = Number.isFinite(step) && step > 0 ? step : 1;
   const clampValue = React.useCallback((input: number) => {
     const clamped = clamp(input, min, max);
@@ -89,7 +96,7 @@ export default function Dial({
   const [internalValue, setInternalValue] = React.useState(() => (
     clampValue(defaultValue ?? min)
   ));
-  const resolvedValue = isControlled ? clampValue(value ?? min) : internalValue;
+  const resolvedValue = isControlled ? clampValue(resolvedValueProp ?? min) : internalValue;
   const pointerRef = React.useRef<number | null>(null);
   const pointerStartRef = React.useRef<{ x: number; y: number; value: number } | null>(null);
   const dialRef = React.useRef<HTMLDivElement | null>(null);
@@ -108,14 +115,21 @@ export default function Dial({
       setInternalValue((prev) => clampValue(prev));
     }
   }, [clampValue, isControlled]);
+  React.useEffect(() => {
+    if (!shouldUseStore || storeValue !== undefined) return;
+    setStoreValue(clampValue(defaultValue ?? min));
+  }, [clampValue, defaultValue, min, setStoreValue, shouldUseStore, storeValue]);
 
   const emitChange = React.useCallback((next: number) => {
     if (!isControlled) {
       setInternalValue(next);
     }
+    if (shouldUseStore) {
+      setStoreValue(next);
+    }
     onChange?.(next);
     onUserChange?.(next);
-  }, [isControlled, onChange, onUserChange]);
+  }, [isControlled, onChange, onUserChange, setStoreValue, shouldUseStore]);
 
   const ratioFromPoint = React.useCallback((clientX: number, clientY: number) => {
     const node = dialRef.current;

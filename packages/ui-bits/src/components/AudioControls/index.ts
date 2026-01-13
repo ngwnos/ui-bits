@@ -1,6 +1,7 @@
 export { default as AudioControls } from "./AudioControls";
 export type {
   AudioControlsProps,
+  AudioControlsControlIds,
   AudioControlsBorder,
   AudioControlsBinInterpolation,
   AudioControlsSource,

@@ -105,8 +105,8 @@
 .dropdown-root--icon .dropdown-menu {
   left: 0;
   right: auto;
-  width: var(--dropdown-menu-width, max-content);
-  min-width: 100%;
+  width: max-content;
+  min-width: var(--dropdown-menu-width, 100%);
   border-top-width: 1px;
   border-top-color: var(--dropdown-border);
   border-radius: var(--dropdown-radius, 3px);
@@ -227,6 +227,7 @@
 
 .dropdown-option-text {
   line-height: 1.1;
+  white-space: nowrap;
 }
 
 .dropdown-option-description {

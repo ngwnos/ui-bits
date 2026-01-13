@@ -7,6 +7,8 @@ import React, {
   useState,
 } from "react";
 import { type DropdownOption } from "./types";
+import { usePanelTheme } from "../../panelGap";
+import { useControlValue } from "../../controlStore";
 import "./dropdown.css";
 
 export interface DropdownTriggerRenderProps {
@@ -46,7 +48,9 @@ export interface DropdownBaseProps {
   width?: number | string;
   fontSize?: number;
   showOptionIcons?: boolean;
+  returnFocusOnSelect?: boolean;
   disabled?: boolean;
+  controlId?: string;
   className?: string;
   style?: React.CSSProperties;
   renderTrigger: (props: DropdownTriggerRenderProps) => React.ReactNode;
@@ -78,6 +82,22 @@ function colorWithAlpha(color: string, alpha: number, fallback = "0,0,0"): strin
 const FALLBACK_COLOR_A = "var(--ui-bits-color-a, #2f2f2f)";
 const FALLBACK_COLOR_B = "var(--ui-bits-color-b, #f0f0f0)";
 
+function resolveThemeColors({
+  colorA,
+  colorB,
+  borderStyle,
+}: {
+  colorA: string;
+  colorB: string;
+  borderStyle: "a" | "b" | "none";
+}) {
+  const surface = borderStyle === "b" ? colorA : colorB;
+  const text = borderStyle === "b" ? colorB : colorA;
+  const inverseSurface = borderStyle === "b" ? colorB : colorA;
+  const inverseText = borderStyle === "b" ? colorA : colorB;
+  return { surface, text, inverseSurface, inverseText };
+}
+
 export default function DropdownBase({
   label,
   showLabel = true,
@@ -92,22 +112,28 @@ export default function DropdownBase({
   onOpenChange,
   colorA,
   colorB,
-  borderStyle = "a",
+  borderStyle,
   borderMask,
   borderRadius,
   width,
   fontSize,
   showOptionIcons = false,
+  returnFocusOnSelect = true,
   disabled = false,
+  controlId,
   className,
   style,
   renderTrigger,
 }: DropdownBaseProps) {
   const id = useId();
+  const panelTheme = usePanelTheme();
+  const [storeValue, setStoreValue] = useControlValue<string>(controlId);
+  const shouldUseStore = controlId !== undefined && value === undefined;
+  const resolvedValueProp = shouldUseStore ? storeValue : value;
   const labelId = label ? `${id}-label` : undefined;
   const listboxId = `${id}-listbox`;
   const buttonId = `${id}-button`;
-  const isControlled = value !== undefined;
+  const isControlled = resolvedValueProp !== undefined;
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -119,22 +145,26 @@ export default function DropdownBase({
   );
 
   const resolveInitialValue = useCallback(() => {
-    if (value !== undefined) return value;
+    if (resolvedValueProp !== undefined) return resolvedValueProp;
     if (defaultValue !== undefined) return defaultValue;
     if (firstEnabledIndex >= 0) return options[firstEnabledIndex].value;
     return "";
-  }, [value, defaultValue, firstEnabledIndex, options]);
+  }, [defaultValue, firstEnabledIndex, options, resolvedValueProp]);
 
   const [internalValue, setInternalValue] = useState<string>(() => resolveInitialValue());
-  const currentValue = isControlled ? value! : internalValue;
+  const currentValue = isControlled ? resolvedValueProp! : internalValue;
 
   useEffect(() => {
-    if (value !== undefined) return;
+    if (resolvedValueProp !== undefined) return;
     const existing = options.find((option) => option.value === internalValue);
     if (!existing) {
       setInternalValue(resolveInitialValue());
     }
-  }, [internalValue, options, resolveInitialValue, value]);
+  }, [internalValue, options, resolveInitialValue, resolvedValueProp]);
+  useEffect(() => {
+    if (!shouldUseStore || storeValue !== undefined) return;
+    setStoreValue(resolveInitialValue());
+  }, [resolveInitialValue, setStoreValue, shouldUseStore, storeValue]);
 
   const activeIndex = options.findIndex((option) => option.value === currentValue);
   const activeOption = activeIndex >= 0 ? options[activeIndex] : undefined;
@@ -185,10 +215,15 @@ export default function DropdownBase({
     if (!isControlled) {
       setInternalValue(option.value);
     }
+    if (shouldUseStore) {
+      setStoreValue(option.value);
+    }
     onChange?.(option.value, option);
     setOpen(false);
-    requestAnimationFrame(() => buttonRef.current?.focus());
-  }, [disabled, isControlled, onChange, setOpen]);
+    if (returnFocusOnSelect) {
+      requestAnimationFrame(() => buttonRef.current?.focus());
+    }
+  }, [disabled, isControlled, onChange, returnFocusOnSelect, setOpen, setStoreValue, shouldUseStore]);
 
   useEffect(() => {
     if (!resolvedOpen) return;
@@ -252,24 +287,26 @@ export default function DropdownBase({
     }
   };
 
-  const appliedFontSize = fontSize ?? 12;
+  const appliedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
   const rowHeight = Math.round(appliedFontSize * (1 + 0.35 * 2) + 2);
   const iconInset = Math.max(1, Math.round(appliedFontSize * 0.1));
-  const resolvedColorA = colorA ?? FALLBACK_COLOR_A;
-  const resolvedColorB = colorB ?? FALLBACK_COLOR_B;
-  const borderColor = borderStyle === "none"
+  const resolvedColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
+  const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
+  const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? "a";
+  const borderColor = resolvedBorderStyle === "none"
     ? "transparent"
-    : borderStyle === "a"
+    : resolvedBorderStyle === "a"
       ? resolvedColorA
       : resolvedColorB;
-  const surfaceColor = borderStyle === "b" ? resolvedColorA : resolvedColorB;
-  const maskedBorderColor = borderStyle === "none" ? "transparent" : surfaceColor;
-  const textColor = borderStyle === "b" ? resolvedColorB : resolvedColorA;
+  const { surface: surfaceColor, text: textColor, inverseSurface, inverseText } = resolveThemeColors({
+    colorA: resolvedColorA,
+    colorB: resolvedColorB,
+    borderStyle: resolvedBorderStyle,
+  });
+  const maskedBorderColor = resolvedBorderStyle === "none" ? "transparent" : surfaceColor;
   const mutedColor = colorWithAlpha(textColor, 0.7);
   const highlightShadow = colorWithAlpha(textColor, 0.25);
   const placeholderColor = colorWithAlpha(textColor, 0.5);
-  const inverseSurface = borderStyle === "b" ? resolvedColorB : resolvedColorA;
-  const inverseText = borderStyle === "b" ? resolvedColorA : resolvedColorB;
   const focusOverlay = colorWithAlpha(textColor, 0.2, "16,15,15");
 
   const resolvedBorderMask = {
@@ -364,6 +401,22 @@ export default function DropdownBase({
               const optionIcon = showOptionIcons
                 ? (option as DropdownOption & { icon?: React.ReactNode }).icon
                 : undefined;
+              const hasOptionTheme = Boolean(option.colorA || option.colorB || option.borderStyle);
+              const optionTheme = hasOptionTheme
+                ? resolveThemeColors({
+                  colorA: option.colorA ?? resolvedColorA,
+                  colorB: option.colorB ?? resolvedColorB,
+                  borderStyle: option.borderStyle ?? resolvedBorderStyle,
+                })
+                : null;
+              const optionStyle = hasOptionTheme ? {
+                "--dropdown-surface": optionTheme!.surface,
+                "--dropdown-text": optionTheme!.text,
+                "--dropdown-muted": colorWithAlpha(optionTheme!.text, 0.7),
+                "--dropdown-inverse-surface": optionTheme!.inverseSurface,
+                "--dropdown-inverse-text": optionTheme!.inverseText,
+                "--dropdown-focus-overlay": colorWithAlpha(optionTheme!.text, 0.2, "16,15,15"),
+              } as React.CSSProperties : undefined;
               return (
                 <button
                   key={option.value}
@@ -373,6 +426,7 @@ export default function DropdownBase({
                   aria-selected={optionSelected}
                   className="dropdown-option"
                   data-has-description={option.description ? "true" : "false"}
+                  style={optionStyle}
                   onMouseEnter={() => {
                     if (option.disabled) return;
                     setVirtualFocusIndex(index);

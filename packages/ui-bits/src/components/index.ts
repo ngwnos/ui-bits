@@ -46,8 +46,20 @@ export {
   type SegmentBarBorderStyle,
 } from "./SegmentBar";
 export {
+  default as PresetManager,
+  type PresetManagerProps,
+  type PresetManagerPreset,
+} from "./PresetManager";
+export {
   default as VirtualKeyboard,
   type VirtualKeyboardProps,
   type VirtualKeyboardKey,
   type VirtualKeyboardSoundfont,
+  type VirtualKeyboardTone,
 } from "./VirtualKeyboard";
+export {
+  default as Sequencer,
+  type SequencerProps,
+  type SequencerHandle,
+  type SequencerEvent,
+} from "./Sequencer";

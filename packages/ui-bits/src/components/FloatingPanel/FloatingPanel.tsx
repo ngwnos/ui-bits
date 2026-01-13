@@ -1,6 +1,11 @@
 import React from "react";
 import { AnimationSuspensionProvider } from "../../animationSuspension";
-import { PanelSurfaceContext, useVerticalGap, VerticalGapContext } from "../../panelGap";
+import {
+  PanelSurfaceContext,
+  PanelThemeContext,
+  useVerticalGap,
+  VerticalGapContext,
+} from "../../panelGap";
 import IconButton from "../IconButton";
 
 export type FloatingPanelBorderStyle = "a" | "b" | "none";
@@ -85,7 +90,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     header,
     title,
     collapsible = true,
-    showDockButton = false,
+    showDockButton = true,
     dockOnMount = false,
     colorA = FALLBACK_COLOR_A,
     colorB = FALLBACK_COLOR_B,
@@ -165,14 +170,23 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     : borderStyle === "b"
       ? colorB
       : "transparent";
+  const resolvedBorderWidth = borderStyle === "none" ? 0 : 1;
   const resolvedVerticalGap = useVerticalGap(verticalGap);
   const verticalGapValue = `${resolvedVerticalGap}px`;
   const headerMinHeight = computeHeaderHeight(resolvedFontSize);
-  const headerBorderWidth = SLIDER_BORDER_WIDTH;
+  const headerBorderWidth = resolvedBorderWidth;
   const resolvedBodyOpacity = clampBetween(bodyOpacity ?? DEFAULT_BODY_OPACITY, 0, 1);
   const resolvedBodyBlur = Math.max(0, bodyBlur ?? DEFAULT_BODY_BLUR);
   const surfaceOpacity = transparent ? resolvedBodyOpacity : 1;
   const surfaceBlur = transparent ? resolvedBodyBlur : 0;
+  const panelTheme = React.useMemo(() => ({
+    colorA,
+    colorB,
+    fontSize: resolvedFontSize,
+    borderStyle,
+    transparent,
+    bodyBlur: resolvedBodyBlur,
+  }), [borderStyle, colorA, colorB, resolvedBodyBlur, resolvedFontSize, transparent]);
   const renderBody = !resolvedCollapsed || keepMounted;
   const suspendChildren = Boolean(suspended || (keepMounted && resolvedCollapsed));
   const updateSurfaceRects = React.useCallback(() => {
@@ -259,7 +273,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     }
     onCollapseChange?.(next);
   };
-  const showDock = Boolean(showDockButton && draggable);
+  const showDock = Boolean(draggable && showDockButton);
   const handleDock = React.useCallback(() => {
     const panelNode = panelRef.current;
     if (!panelNode || typeof window === "undefined") return;
@@ -421,37 +435,43 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   };
 
   return (
-    <div
-      ref={setRefs}
-      className={className}
-      style={{
-        width: resolveSize(width),
-        borderRadius: resolvedRadius,
-        border: "none",
-        background: "transparent",
-        color: colorA,
-        boxShadow: resolvedShadow,
-        boxSizing: "border-box",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        fontSize: resolvedFontSize,
-        lineHeight: 1.3,
-        position: isFloating ? "fixed" : undefined,
-        left: isFloating ? `${resolvedPosition!.x}px` : undefined,
-        top: isFloating ? `${resolvedPosition!.y}px` : undefined,
-        zIndex: isFloating ? 20 : undefined,
-        ...(style ?? {}),
-      }}
-      {...rest}
-    >
+    <PanelThemeContext.Provider value={panelTheme}>
+      <div
+        ref={setRefs}
+        className={className}
+        style={{
+          width: resolveSize(width),
+          borderRadius: resolvedRadius,
+          border: "none",
+          background: "transparent",
+          color: colorA,
+          boxShadow: resolvedShadow,
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          fontSize: resolvedFontSize,
+          lineHeight: 1.3,
+          position: isFloating ? "fixed" : undefined,
+          left: isFloating ? `${resolvedPosition!.x}px` : undefined,
+          top: isFloating ? `${resolvedPosition!.y}px` : undefined,
+          zIndex: isFloating ? 20 : undefined,
+          "--ui-bits-color-a": colorA,
+          "--ui-bits-color-b": colorB,
+          ...(style ?? {}),
+        } as React.CSSProperties}
+        {...rest}
+      >
       <div
         style={{
           minHeight: headerMinHeight,
           display: "flex",
           alignItems: "center",
           padding: `0 ${resolvedPaddingRightValue} 0 ${resolvedPaddingLeftValue}`,
-          border: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
+          borderTop: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
+          borderLeft: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
+          borderRight: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
+          borderBottom: headerBorderWidth ? `${headerBorderWidth}px solid ${resolvedBorderColor}` : "none",
           borderTopLeftRadius: resolvedRadius,
           borderTopRightRadius: resolvedRadius,
           borderBottomLeftRadius: resolvedCollapsed ? resolvedRadius : 0,
@@ -474,15 +494,29 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       </div>
       {renderBody && (
         <div
-          ref={bodyRef}
           style={{
-            padding: `${verticalGapValue} ${resolvedPaddingRightValue} ${resolvedPaddingBottomValue} ${resolvedPaddingLeftValue}`,
-            display: resolvedCollapsed ? "none" : "flex",
-            flexDirection: "column",
-            position: "relative",
+            borderLeft: resolvedBorderWidth ? `${resolvedBorderWidth}px solid ${resolvedBorderColor}` : "none",
+            borderRight: resolvedBorderWidth ? `${resolvedBorderWidth}px solid ${resolvedBorderColor}` : "none",
+            borderBottom: resolvedBorderWidth ? `${resolvedBorderWidth}px solid ${resolvedBorderColor}` : "none",
+            borderBottomLeftRadius: resolvedRadius,
+            borderBottomRightRadius: resolvedRadius,
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0,
+            overflow: "hidden",
+            display: resolvedCollapsed ? "none" : "block",
+            boxSizing: "border-box",
           }}
           aria-hidden={resolvedCollapsed}
         >
+          <div
+            ref={bodyRef}
+            style={{
+              padding: `${verticalGapValue} ${resolvedPaddingRightValue} ${resolvedPaddingBottomValue} ${resolvedPaddingLeftValue}`,
+              display: "flex",
+              flexDirection: "column",
+              position: "relative",
+            }}
+          >
           <div
             aria-hidden
             style={{
@@ -526,18 +560,20 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
               />
             )}
           </div>
-          <VerticalGapContext.Provider value={resolvedVerticalGap}>
-            <PanelSurfaceContext.Provider value={panelSurfaceValue}>
-              <AnimationSuspensionProvider suspended={suspendChildren}>
-                <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", gap: resolvedVerticalGap }}>
-                  {children}
-                </div>
-              </AnimationSuspensionProvider>
-            </PanelSurfaceContext.Provider>
-          </VerticalGapContext.Provider>
+            <VerticalGapContext.Provider value={resolvedVerticalGap}>
+              <PanelSurfaceContext.Provider value={panelSurfaceValue}>
+                <AnimationSuspensionProvider suspended={suspendChildren}>
+                  <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", gap: resolvedVerticalGap }}>
+                    {children}
+                  </div>
+                </AnimationSuspensionProvider>
+              </PanelSurfaceContext.Provider>
+            </VerticalGapContext.Provider>
+          </div>
         </div>
       )}
-    </div>
+      </div>
+    </PanelThemeContext.Provider>
   );
 });
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { AnimationSuspensionProvider } from "../../animationSuspension";
-import { usePanelEdgeBorders, usePanelSurface, useVerticalGap, VerticalGapContext } from "../../panelGap";
+import { usePanelEdgeBorders, usePanelSurface, usePanelTheme, useVerticalGap, VerticalGapContext } from "../../panelGap";
 import IconButton from "../IconButton";
 
 export type FolderBorderStyle = "a" | "b" | "none";
@@ -63,10 +63,10 @@ function computeHeaderHeight(fontSize: number) {
 const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const {
     label,
-    colorA = FALLBACK_COLOR_A,
-    colorB = FALLBACK_COLOR_B,
-    borderStyle = "a",
-    fontSize = 12,
+    colorA,
+    colorB,
+    borderStyle,
+    fontSize,
     padding = 0,
     verticalGap,
     inheritPanelSurface,
@@ -81,18 +81,24 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
     children,
     ...rest
   } = props;
+  const panelTheme = usePanelTheme();
+  const resolvedColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
+  const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
+  const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? "a";
+  const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
+  const resolvedTransparent = transparent ?? panelTheme?.transparent ?? false;
   const isControlled = collapsed !== undefined;
   const [internalCollapsed, setInternalCollapsed] = React.useState(defaultCollapsed);
   const isCollapsed = isControlled ? collapsed : internalCollapsed;
   const resolvedPadding = resolveSize(padding) ?? "0px";
-  const resolvedBorderColor = borderStyle === "a"
-    ? colorA
-    : borderStyle === "b"
-      ? colorB
+  const resolvedBorderColor = resolvedBorderStyle === "a"
+    ? resolvedColorA
+    : resolvedBorderStyle === "b"
+      ? resolvedColorB
       : "transparent";
-  const rawHeaderBackground = isCollapsed ? colorB : colorA;
-  const rawHeaderTextColor = isCollapsed ? colorA : colorB;
-  const headerHeight = computeHeaderHeight(fontSize);
+  const rawHeaderBackground = isCollapsed ? resolvedColorB : resolvedColorA;
+  const rawHeaderTextColor = isCollapsed ? resolvedColorA : resolvedColorB;
+  const headerHeight = computeHeaderHeight(resolvedFontSize);
   const headerBorderWidth = 1;
   const headerOuterHeight = headerHeight + headerBorderWidth;
   const resolvedVerticalGap = useVerticalGap(verticalGap);
@@ -108,7 +114,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const surfaceOpacity = panelSurface?.opacity ?? 1;
   const headerBackground = rawHeaderBackground;
   const headerTextColor = rawHeaderTextColor;
-  const bodyBackground = transparent
+  const bodyBackground = resolvedTransparent
     ? "transparent"
     : usePanelSurfaceBackground
       ? colorWithAlpha(rawHeaderTextColor, surfaceOpacity)
@@ -187,7 +193,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
           background: headerBackground,
           color: headerTextColor,
           boxSizing: "border-box",
-          fontSize,
+          fontSize: resolvedFontSize,
           fontWeight: 600,
           lineHeight: 1,
           cursor: "pointer",
@@ -202,7 +208,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
             options={toggleOptions}
             onChange={(value) => handleToggle(value)}
             borderStyle="none"
-            fontSize={fontSize}
+            fontSize={resolvedFontSize}
             colorA={headerTextColor}
             colorB={headerBackground}
             aria-label={toggleOptions[isCollapsed ? 0 : 1]?.ariaLabel}

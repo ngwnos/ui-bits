@@ -1,4 +1,6 @@
 import React from "react";
+import { useControlValue, useResolvedControlId } from "../../controlStore";
+import { usePanelTheme } from "../../panelGap";
 
 export type IconButtonBorderStyle = "a" | "b" | "none";
 export type IconButtonBorderMask = Partial<Record<"top" | "right" | "bottom" | "left", boolean>>;
@@ -32,6 +34,7 @@ export interface IconButtonProps
   value?: string;
   defaultValue?: string;
   onChange?: (value: string, option: IconButtonCycleOption, index: number) => void;
+  controlId?: string;
 }
 
 const FALLBACK_COLOR_A = "var(--ui-bits-color-a, #2f2f2f)";
@@ -48,9 +51,9 @@ function computeButtonSize(fontSize: number) {
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, ref) => {
   const {
     fontSize,
-    colorA = FALLBACK_COLOR_A,
-    colorB = FALLBACK_COLOR_B,
-    borderStyle = "none",
+    colorA,
+    colorB,
+    borderStyle: borderStyleProp,
     borderMask,
     behavior,
     toggled,
@@ -63,6 +66,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     value,
     defaultValue,
     onChange,
+    controlId,
     style,
     children,
     className,
@@ -79,51 +83,99 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     title,
     ...rest
   } = props;
+  const panelTheme = usePanelTheme();
+  const ariaLabel = rest["aria-label"] as string | undefined;
+  const resolvedControlId = useResolvedControlId(controlId, ariaLabel ?? title);
+  const [storeValue, setStoreValue] = useControlValue<string | boolean>(resolvedControlId);
   const resolvedBehavior: IconButtonBehavior = behavior ?? (options?.length ? "cycle" : "momentary");
+  const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
+  const baseColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
+  const baseColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
+  const baseBorderStyle = borderStyleProp ?? panelTheme?.borderStyle ?? "none";
   const cycleOptions = options ?? [];
   const [uncontrolledPressed, setUncontrolledPressed] = React.useState(defaultPressed);
   const isPressedControlled = pressed !== undefined;
-  const resolvedPressed = isPressedControlled ? pressed : uncontrolledPressed;
+  const shouldUseStorePressed = resolvedControlId !== undefined
+    && resolvedBehavior === "momentary"
+    && pressed === undefined;
+  const resolvedPressed = isPressedControlled
+    ? pressed
+    : (shouldUseStorePressed
+      ? (typeof storeValue === "boolean" ? storeValue : uncontrolledPressed)
+      : uncontrolledPressed);
   const setPressed = React.useCallback((next: boolean) => {
     if (!isPressedControlled) {
       setUncontrolledPressed(next);
     }
+    if (shouldUseStorePressed) {
+      setStoreValue(next);
+    }
     onPressChange?.(next);
-  }, [isPressedControlled, onPressChange]);
+  }, [isPressedControlled, onPressChange, setStoreValue, shouldUseStorePressed]);
   const [uncontrolledToggled, setUncontrolledToggled] = React.useState(defaultToggled);
   const isToggleControlled = toggled !== undefined;
-  const resolvedToggled = isToggleControlled ? toggled : uncontrolledToggled;
+  const shouldUseStoreToggle = resolvedControlId !== undefined
+    && resolvedBehavior === "toggle"
+    && toggled === undefined;
+  const resolvedToggled = isToggleControlled
+    ? toggled
+    : (shouldUseStoreToggle
+      ? (typeof storeValue === "boolean" ? storeValue : uncontrolledToggled)
+      : uncontrolledToggled);
   const [uncontrolledValue, setUncontrolledValue] = React.useState(() => (
     defaultValue ?? cycleOptions[0]?.value ?? ""
   ));
   const isCycleControlled = value !== undefined;
-  const resolvedCycleValue = isCycleControlled ? value : uncontrolledValue;
+  const shouldUseStoreCycle = resolvedControlId !== undefined
+    && resolvedBehavior === "cycle"
+    && value === undefined;
+  const resolvedCycleValue = isCycleControlled
+    ? value
+    : (shouldUseStoreCycle
+      ? (typeof storeValue === "string" ? storeValue : uncontrolledValue)
+      : uncontrolledValue);
   React.useEffect(() => {
     if (resolvedBehavior !== "cycle" || isCycleControlled) return;
     if (!cycleOptions.length) return;
     const exists = cycleOptions.some((option) => option.value === resolvedCycleValue);
     if (!exists) {
-      setUncontrolledValue(cycleOptions[0].value);
+      const nextValue = cycleOptions[0].value;
+      if (shouldUseStoreCycle) {
+        setStoreValue(nextValue);
+      } else {
+        setUncontrolledValue(nextValue);
+      }
     }
-  }, [cycleOptions, isCycleControlled, resolvedBehavior, resolvedCycleValue]);
+  }, [cycleOptions, isCycleControlled, resolvedBehavior, resolvedCycleValue, setStoreValue, shouldUseStoreCycle]);
+  React.useEffect(() => {
+    if (!shouldUseStoreToggle || storeValue !== undefined) return;
+    setStoreValue(defaultToggled);
+  }, [defaultToggled, setStoreValue, shouldUseStoreToggle, storeValue]);
+  React.useEffect(() => {
+    if (!shouldUseStorePressed || storeValue !== undefined) return;
+    setStoreValue(defaultPressed);
+  }, [defaultPressed, setStoreValue, shouldUseStorePressed, storeValue]);
+  React.useEffect(() => {
+    if (!shouldUseStoreCycle || storeValue !== undefined) return;
+    setStoreValue(uncontrolledValue);
+  }, [setStoreValue, shouldUseStoreCycle, storeValue, uncontrolledValue]);
   const activeCycleIndex = cycleOptions.findIndex((option) => option.value === resolvedCycleValue);
   const resolvedCycleIndex = activeCycleIndex >= 0 ? activeCycleIndex : 0;
   const activeOption = cycleOptions[resolvedCycleIndex];
   const optionColorA = resolvedBehavior === "cycle"
-    ? (activeOption?.colorA ?? colorA)
-    : colorA;
+    ? (activeOption?.colorA ?? baseColorA)
+    : baseColorA;
   const optionColorB = resolvedBehavior === "cycle"
-    ? (activeOption?.colorB ?? colorB)
-    : colorB;
+    ? (activeOption?.colorB ?? baseColorB)
+    : baseColorB;
   const shouldInvert = (resolvedBehavior === "toggle" && resolvedToggled)
     || (resolvedBehavior === "momentary" && resolvedPressed);
   const [resolvedColorA, resolvedColorB] = shouldInvert
     ? [optionColorB, optionColorA]
     : [optionColorA, optionColorB];
   const resolvedBorderStyle = resolvedBehavior === "cycle"
-    ? (activeOption?.borderStyle ?? borderStyle)
-    : borderStyle;
-  const resolvedFontSize = fontSize ?? 12;
+    ? (activeOption?.borderStyle ?? baseBorderStyle)
+    : baseBorderStyle;
   const resolvedSize = computeButtonSize(resolvedFontSize);
   const resolvedRadius = Math.max(2, Math.round(resolvedFontSize * 0.25));
   const padding = Math.max(1, Math.round(resolvedFontSize * 0.1));
@@ -193,12 +245,18 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
         if (!isToggleControlled) {
           setUncontrolledToggled(next);
         }
+        if (shouldUseStoreToggle) {
+          setStoreValue(next);
+        }
         onToggle?.(next);
       } else if (resolvedBehavior === "cycle" && cycleOptions.length) {
         const nextIndex = (resolvedCycleIndex + 1) % cycleOptions.length;
         const nextOption = cycleOptions[nextIndex];
         if (!isCycleControlled) {
           setUncontrolledValue(nextOption.value);
+        }
+        if (shouldUseStoreCycle) {
+          setStoreValue(nextOption.value);
         }
         onChange?.(nextOption.value, nextOption, nextIndex);
       }

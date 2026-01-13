@@ -52,10 +52,10 @@ import {
 import CustomColorPopover from "./components/CustomColorPopover";
 import TypeGPUTest from "./components/TypeGPUTest";
 
-const BORDER_MODES: SliderBorder[] = ['left', 'right', 'none'];
+const BORDER_MODES: SliderBorder[] = ['a', 'b', 'none'];
 const BORDER_ICONS: Record<SliderBorder, React.ComponentType<{ size?: number; strokeWidth?: number }>> = {
-  left: Square,
-  right: SquareDashed,
+  a: Square,
+  b: SquareDashed,
   none: X,
 };
 const SELECTION_PREVIEW_MODE_SEQUENCE: SelectionGridPreviewMode[] = ["gradient", "terrainHeight"];
@@ -257,7 +257,7 @@ function ColumnView({
     color: flexoki.base['50'],
     cursor: 'not-allowed',
   };
-  const currentBorder: SliderBorder = sliderStates[0]?.state.border ?? 'left';
+  const currentBorder: SliderBorder = sliderStates[0]?.state.border ?? 'a';
   const nextBorderMode = BORDER_MODES[(BORDER_MODES.indexOf(currentBorder) + 1) % BORDER_MODES.length];
 
   const handleToggleDrawer = () => {
@@ -367,7 +367,7 @@ function ColumnView({
           type="button"
           onClick={cycleColumnBorder}
           aria-label={`Cycle border for column ${columnIndex + 1}`}
-          title={"Border color left/right/none"}
+          title={"Border color A/B/none"}
           style={{ ...columnButtonBaseStyle, ...buttonPalette }}
         >
           {React.createElement(BORDER_ICONS[currentBorder], { size: drawerIconSize, strokeWidth: 2 })}
@@ -797,7 +797,7 @@ function EditableRectPOC() {
     background: customDrawerEnabled ? buttonBackground : flexoki.base['500'],
     color: customDrawerEnabled ? buttonForeground : flexoki.base['50'],
   };
-  const customBorder = customState.border ?? 'left';
+  const customBorder = customState.border ?? 'a';
   const customNextBorder = BORDER_MODES[(BORDER_MODES.indexOf(customBorder) + 1) % BORDER_MODES.length];
   const [customSwapFlipped, setCustomSwapFlipped] = React.useState(false);
   const handleSwapCustomColors = () => {
@@ -978,7 +978,7 @@ function EditableRectPOC() {
                 type="button"
                 onClick={handleCycleCustomBorder}
                 aria-label="Cycle custom slider border"
-                title={"Border color left/right/none"}
+                title={"Border color A/B/none"}
                 style={iconButtonStyle}
               >
                 {React.createElement(BORDER_ICONS[customBorder], { size: controlIconSize, strokeWidth: 2 })}
@@ -1025,7 +1025,7 @@ function EditableRectPOC() {
                 defaultValue={dateSliderValue}
                 colorA={flexoki.green['700']}
                 colorB={previewDarkMode ? flexoki.base['100'] : flexoki.base['50']}
-                border="left"
+                border="a"
                 fontSize={sliderFontSize}
                 displayFormatterPreset="dayOfYear"
                 displayFormatterPresetOptions={{ dayOfYear: DATE_SLIDER_PRESET_OPTIONS }}
@@ -1051,7 +1051,7 @@ function EditableRectPOC() {
                 defaultValue={timeSliderValue}
                 colorA={previewDarkMode ? flexoki.base['200'] : flexoki.base['900']}
                 colorB={previewDarkMode ? flexoki.blue['400'] : flexoki.blue['100']}
-                border="right"
+                border="b"
                 fontSize={sliderFontSize}
                 displayFormatterPreset="time"
                 displayFormatterPresetOptions={{ time: TIME_SLIDER_PRESET_OPTIONS }}
@@ -1329,7 +1329,7 @@ function EditableRectPOC() {
                 defaultValue={segmentCompareValue}
                 colorA={flexoki.orange['600']}
                 colorB={flexoki.magenta['300']}
-                border="left"
+                border="a"
                 fontSize={sliderFontSize}
                 onUserChange={(value: number) => setSegmentCompareValue(value)}
                 onAnimatedUpdate={(value: number) => setSegmentCompareValue(value)}
@@ -1429,7 +1429,7 @@ function EditableRectPOC() {
                   defaultValue={dropdownSliderValue}
                   colorA={flexoki.cyan['600']}
                   colorB={flexoki.base['50']}
-                  border="left"
+                  border="a"
                   fontSize={sliderFontSize}
                   onUserChange={(value: number) => setDropdownSliderValue(value)}
                   onAnimatedUpdate={(value: number) => setDropdownSliderValue(value)}
@@ -1443,7 +1443,7 @@ function EditableRectPOC() {
                   defaultValue={dropdownSliderValueDark}
                   colorA={flexoki.base['50']}
                   colorB={flexoki.cyan['600']}
-                  border="right"
+                  border="b"
                   fontSize={sliderFontSize}
                   onUserChange={(value: number) => setDropdownSliderValueDark(value)}
                   onAnimatedUpdate={(value: number) => setDropdownSliderValueDark(value)}
@@ -1458,7 +1458,7 @@ function EditableRectPOC() {
                   defaultValue={dateSliderValue}
                   colorA={flexoki.cyan['700']}
                   colorB={flexoki.base['100']}
-                  border="left"
+                  border="a"
                   fontSize={sliderFontSize}
                   displayFormatterPreset="dayOfYear"
                   displayFormatterPresetOptions={{ dayOfYear: DATE_SLIDER_PRESET_OPTIONS }}
@@ -1480,7 +1480,7 @@ function EditableRectPOC() {
                   defaultValue={timeSliderValue}
                   colorA={flexoki.cyan['800']}
                   colorB={flexoki.base['100']}
-                  border="left"
+                  border="a"
                   fontSize={sliderFontSize}
                   displayFormatterPreset="time"
                   displayFormatterPresetOptions={{ time: TIME_SLIDER_PRESET_OPTIONS }}
@@ -1680,7 +1680,7 @@ function EditableRectPOC() {
                   defaultValue={audioPreviewValue}
                   colorA={flexoki.base['600']}
                   colorB={flexoki.base['50']}
-                  border="left"
+                  border="a"
                   fontSize={12}
                   onUserChange={setAudioPreviewValue}
                   onAnimatedUpdate={setAudioPreviewValue}
@@ -1769,7 +1769,7 @@ function EditableRectPOC() {
                 width="100%"
                 colorA={floatingPanelOpacityColorA}
                 colorB={floatingPanelOpacityColorB}
-                border="left"
+                border="a"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
                 readExternal={() => floatingPanelOpacity}
@@ -1787,7 +1787,7 @@ function EditableRectPOC() {
                 width="100%"
                 colorA={floatingPanelBlurColorA}
                 colorB={floatingPanelBlurColorB}
-                border="left"
+                border="a"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
                 readExternal={() => floatingPanelBlur}
@@ -1806,7 +1806,7 @@ function EditableRectPOC() {
                 width="100%"
                 colorA={floatingPanelGapColorA}
                 colorB={floatingPanelGapColorB}
-                border="left"
+                border="a"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
                 readExternal={() => floatingPanelGap}
@@ -1825,7 +1825,7 @@ function EditableRectPOC() {
                 width="100%"
                 colorA={floatingPanelPadLeftColorA}
                 colorB={floatingPanelPadLeftColorB}
-                border="left"
+                border="a"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
                 readExternal={() => floatingPanelPaddingLeft}
@@ -1844,7 +1844,7 @@ function EditableRectPOC() {
                 width="100%"
                 colorA={floatingPanelPadRightColorA}
                 colorB={floatingPanelPadRightColorB}
-                border="left"
+                border="a"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
                 readExternal={() => floatingPanelPaddingRight}
@@ -1863,7 +1863,7 @@ function EditableRectPOC() {
                 width="100%"
                 colorA={floatingPanelPadBottomColorA}
                 colorB={floatingPanelPadBottomColorB}
-                border="left"
+                border="a"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
                 readExternal={() => floatingPanelPaddingBottom}
@@ -1889,7 +1889,7 @@ function EditableRectPOC() {
                     width="100%"
                     colorA={floatingPanelLevelColorA}
                     colorB={floatingPanelLevelColorB}
-                    border="left"
+                    border="a"
                     fontSize={CONTROL_FONT_SIZE}
                     showLfoControls
                     readExternal={() => floatingPanelValue}
@@ -1915,7 +1915,7 @@ function EditableRectPOC() {
                     width="100%"
                     colorA={floatingPanelColorA}
                     colorB={floatingPanelColorB}
-                    border="left"
+                    border="a"
                     fontSize={CONTROL_FONT_SIZE}
                     mode="external"
                     readExternal={() => floatingPanelTint}
@@ -1934,7 +1934,7 @@ function EditableRectPOC() {
                 width="100%"
                 colorA={floatingPanelBrightnessColorA}
                 colorB={floatingPanelBrightnessColorB}
-                border="left"
+                border="a"
                 fontSize={CONTROL_FONT_SIZE}
                 mode="external"
                 readExternal={() => floatingPanelBrightness}

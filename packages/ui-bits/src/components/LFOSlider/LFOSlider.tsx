@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAnimationSuspended } from "../../animationSuspension";
 import { useFrame } from "../../frameLoop";
+import { useControlValue, useResolvedControlId } from "../../controlStore";
 import { useAudioAnalysisStore } from "../../audioAnalysis";
 import {
   clamp,
@@ -13,7 +14,7 @@ import type { LfoSettings, Waveform } from "../../lfo";
 import { useStoreMirror } from "../../useStoreMirror";
 import type { MirrorFn } from "../../useStoreMirror";
 import IconButton from "../IconButton";
-import { usePanelEdgeBorders } from "../../panelGap";
+import { usePanelEdgeBorders, usePanelTheme } from "../../panelGap";
 import {
   applyReplace,
   extendStep,
@@ -33,7 +34,7 @@ import {
 } from "./valueFormatters";
 import "./lfoslider.css";
 
-export type SliderBorder = 'left' | 'right' | 'none';
+export type SliderBorder = 'a' | 'b' | 'none';
 
 const EMPTY_AUDIO_BINS: readonly number[] = [];
 const AUDIO_RESPONSE_MIN = -1;
@@ -167,6 +168,7 @@ export interface LFOSliderProps {
   onAudioSamplePositionChange?: (value: number) => void;
   borderMask?: Partial<Record<'top' | 'right' | 'bottom' | 'left', boolean>>;
   suspended?: boolean;
+  controlId?: string;
 };
 
 function SliderCore({
@@ -193,7 +195,7 @@ function SliderCore({
   audioFrequencyStep,
   colorA,
   colorB,
-  border = 'left',
+  border = 'a',
   fontSize,
   showLfoControls = false,
   phase = 0,
@@ -236,7 +238,12 @@ function SliderCore({
   onAudioSamplePositionChange,
   borderMask,
   suspended,
+  controlId,
 }: LFOSliderProps) {
+  const resolvedControlId = useResolvedControlId(controlId, label, ariaLabel);
+  const [storeValue, setStoreValue] = useControlValue<number>(resolvedControlId);
+  const shouldUseStore = resolvedControlId !== undefined && value === undefined;
+  const resolvedValueProp = shouldUseStore ? storeValue : value;
   const isSuspended = useAnimationSuspended(suspended);
   const resolvedLfoFrequencyMin = lfoFrequencyMin ?? LFO_FREQUENCY_MIN_DEFAULT;
   const resolvedLfoFrequencyMax = lfoFrequencyMax ?? LFO_FREQUENCY_MAX_DEFAULT;
@@ -250,10 +257,14 @@ function SliderCore({
   const resolvedBarSegmentCount = resolvedBarStyle === 'discrete' && Number.isFinite(barSegmentCount)
     ? Math.floor(barSegmentCount)
     : 0;
-  const initialNumeric = typeof value === 'number' && Number.isFinite(value)
-    ? value
+  const initialNumeric = typeof resolvedValueProp === 'number' && Number.isFinite(resolvedValueProp)
+    ? resolvedValueProp
     : (defaultValue !== undefined ? defaultValue : 0);
   const [text, setText] = useState<string>(() => Number(initialNumeric).toFixed(precInit));
+  useEffect(() => {
+    if (!shouldUseStore || storeValue !== undefined) return;
+    setStoreValue(initialNumeric);
+  }, [initialNumeric, setStoreValue, shouldUseStore, storeValue]);
   const lfoDefaults = defaultLfo ?? lfoProp;
   const lfoSettings = useMemo<LfoSettings>(() => {
     const defaults: LfoSettings = {
@@ -412,6 +423,18 @@ function SliderCore({
     const numeric = Number(input);
     return Number.isFinite(numeric) ? numeric : null;
   }, [resolvedParseFn]);
+  const emitUserChange = useCallback((next: number) => {
+    if (shouldUseStore) {
+      setStoreValue(next);
+    }
+    onUserChange?.(next);
+  }, [onUserChange, setStoreValue, shouldUseStore]);
+  const emitAnimatedUpdate = useCallback((next: number) => {
+    if (shouldUseStore) {
+      setStoreValue(next);
+    }
+    onAnimatedUpdate?.(next);
+  }, [onAnimatedUpdate, setStoreValue, shouldUseStore]);
   const liveValueRef = useRef<number>(valueFromSplit(splitRef.current, min, max, step));
   const displayValueRef = useRef<string>(
     formatValueForDisplay(liveValueRef.current, liveValueRef.current.toFixed(precInit), 'value'),
@@ -444,7 +467,9 @@ function SliderCore({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const valueWrapRef = useRef<HTMLDivElement | null>(null);
   const valueTextRef = useRef<HTMLSpanElement | null>(null);
-  const appliedFontSize = fontSize ?? 16;
+  const panelTheme = usePanelTheme();
+  const resolvedFontSize = fontSize ?? panelTheme?.fontSize;
+  const appliedFontSize = resolvedFontSize ?? 16;
   charRefs.current.length = text.length + 1;
 
   // Caret metrics — 70% of bar height
@@ -514,8 +539,10 @@ function SliderCore({
   // Theme colors
   const fallbackLeft = 'var(--ui-bits-color-a, #2f2f2f)';
   const fallbackRight = 'var(--ui-bits-color-b, #f0f0f0)';
-  const bgLeft = colorA ?? fallbackLeft;
-  const bgRight = colorB ?? fallbackRight;
+  const resolvedColorA = colorA ?? panelTheme?.colorA;
+  const resolvedColorB = colorB ?? panelTheme?.colorB;
+  const bgLeft = resolvedColorA ?? fallbackLeft;
+  const bgRight = resolvedColorB ?? fallbackRight;
   const panelEdgeBorders = usePanelEdgeBorders();
   const normalizedMask = useMemo(() => {
     const defaultLeft = panelEdgeBorders ? panelEdgeBorders.left : true;
@@ -543,7 +570,7 @@ function SliderCore({
   const actionGap = `${actionGapValuePx}px`;
   const sliderBorderRadius = drawerHandleActive && drawerOpen ? '3px 3px 0 0' : '3px';
   const showBorder = border !== 'none';
-  const outerBorderColor = border === 'right' ? bgRight : bgLeft;
+  const outerBorderColor = border === 'b' ? bgRight : bgLeft;
   const resolvedOuterColor = border === 'none' ? 'transparent' : outerBorderColor;
   const sliderStyle = drawerHandleActive && drawerOpen
     ? {
@@ -581,7 +608,7 @@ function SliderCore({
       isolation: 'isolate' as const,
     };
   const iconStrokeWidth = 18;
-  const infoFontSize = (fontSize ?? 16);
+  const infoFontSize = (resolvedFontSize ?? 16);
   const formatFrequency = (value: number) => value.toFixed(2).padStart(5, ' ');
   const formatPhase = (value: number) => value.toFixed(2).padStart(5, ' ');
   const handleFrequencyChange = useCallback((next: number) => {
@@ -896,7 +923,7 @@ function SliderCore({
     writeSplitVars(ratio);
     reflectValueToDom(snapped, formatted);
     setSplit(ratio);
-    onUserChange?.(snapped);
+    emitUserChange(snapped);
     editingRef.current = true;
   };
   const applyWaveValue = useCallback((value: number, nowSec?: number, forceTextSync: boolean = false) => {
@@ -929,16 +956,29 @@ function SliderCore({
       writeSplitVars(rawSplit);
       if (shouldSyncText) setSplit(rawSplit);
     }
-    if (onAnimatedUpdate && nowSec !== undefined) {
+    if ((onAnimatedUpdate || shouldUseStore) && nowSec !== undefined) {
       const nowMs = nowSec * 1000;
       if (nowMs - lastEmitMsRef.current >= 16) {
         lastEmitMsRef.current = nowMs;
-        onAnimatedUpdate(snapped);
+        emitAnimatedUpdate(snapped);
       }
     }
-  }, [drawerValueMin, drawerValueMax, focused, max, min, onAnimatedUpdate, precision, reflectValueToDom, step, writeSplitVars]);
+  }, [
+    drawerValueMin,
+    drawerValueMax,
+    emitAnimatedUpdate,
+    focused,
+    max,
+    min,
+    onAnimatedUpdate,
+    precision,
+    reflectValueToDom,
+    shouldUseStore,
+    step,
+    writeSplitVars,
+  ]);
 
-  const hasExternalValue = typeof value === 'number' && Number.isFinite(value);
+  const hasExternalValue = typeof resolvedValueProp === 'number' && Number.isFinite(resolvedValueProp);
   const hasExternalSource = hasExternalValue || Boolean(readExternal);
   const frameFn = useCallback((nowSec: number) => {
     lastNowSecRef.current = nowSec;
@@ -965,7 +1005,7 @@ function SliderCore({
       };
       nextVal = lfoValue(withPhase, nowSec, drawerValueMin, drawerValueMax);
     } else if (activeMode === 'external') {
-      const external = hasExternalValue ? value : readExternal?.();
+      const external = hasExternalValue ? resolvedValueProp : readExternal?.();
       if (typeof external === 'number' && Number.isFinite(external)) {
         nextVal = clamp(external, drawerValueMin, drawerValueMax);
       }
@@ -988,7 +1028,7 @@ function SliderCore({
     phaseDial,
     readExternal,
     sampleAudioBinValue,
-    value,
+    resolvedValueProp,
   ]);
   useFrame(isSuspended ? null : frameFn);
   const readLiveValue = useCallback(
@@ -1150,7 +1190,7 @@ function SliderCore({
     textRef.current = formatted;
     setText(formatted);
     setSelection(formatted.length, formatted.length);
-    onUserChange?.(val);
+    emitUserChange(val);
   }, [getSplitFromX, max, min, onUserChange, precision, reflectValueToDom, setSelection, step, writeSplitVars]);
 
   // Edit operations
@@ -1436,7 +1476,7 @@ function SliderCore({
         writeSplitVars(ratio);
         reflectValueToDom(snapped, formatted);
         setSplit(ratio);
-        onUserChange?.(snapped);
+        emitUserChange(snapped);
       }
     }
     editingRef.current = false; setFocused(false); setIsDragging(false); setHoverInside(false); setOverHandle(false);
@@ -1797,7 +1837,7 @@ function SliderCore({
               width="100%"
               colorA={bgLeft}
               colorB={bgRight}
-              border="left"
+              border="a"
               borderMask={{ top: false, bottom: false, right: true, left: true }}
               fontSize={infoFontSize}
               mode="external"
@@ -1817,7 +1857,7 @@ function SliderCore({
               width="100%"
               colorA={bgLeft}
               colorB={bgRight}
-              border="left"
+              border="a"
               borderMask={{ top: false, bottom: false, right: true, left: true }}
               fontSize={infoFontSize}
               mode="external"

@@ -1,0 +1,19 @@
+.ui-bits-text-input {
+  appearance: none;
+  background-clip: padding-box;
+}
+
+.ui-bits-text-input::selection {
+  background: var(--ui-bits-text-input-selection-bg, #2f2f2f);
+  color: var(--ui-bits-text-input-selection-color, #f0f0f0);
+}
+
+.ui-bits-text-input::-moz-selection {
+  background: var(--ui-bits-text-input-selection-bg, #2f2f2f);
+  color: var(--ui-bits-text-input-selection-color, #f0f0f0);
+}
+
+.ui-bits-text-input::placeholder {
+  color: currentColor;
+  opacity: 0.5;
+}

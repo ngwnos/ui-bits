@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import { clamp } from "../../lfo";
+import { useControlValue, useResolvedControlId } from "../../controlStore";
 
 export interface SegmentBarOption {
   value: string;
@@ -15,6 +16,7 @@ export interface SegmentBarOption {
 export type SegmentBarBorderStyle = "a" | "b" | "none";
 
 export interface SegmentBarProps {
+  label?: string;
   options: SegmentBarOption[];
   value?: string;
   defaultValue?: string;
@@ -25,6 +27,7 @@ export interface SegmentBarProps {
   width?: number | string;
   fontSize?: number;
   disabled?: boolean;
+  controlId?: string;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -65,6 +68,7 @@ function resolveInitialValue(
 }
 
 export default function SegmentBar({
+  label,
   options,
   value,
   defaultValue,
@@ -75,9 +79,14 @@ export default function SegmentBar({
   width,
   fontSize,
   disabled = false,
+  controlId,
   className,
   style,
 }: SegmentBarProps) {
+  const resolvedControlId = useResolvedControlId(controlId, label);
+  const [storeValue, setStoreValue] = useControlValue<string>(resolvedControlId);
+  const shouldUseStore = resolvedControlId !== undefined && value === undefined;
+  const resolvedValueProp = shouldUseStore ? storeValue : value;
   const resolvedColorA = colorA ?? FALLBACK_COLOR_A;
   const resolvedColorB = colorB ?? FALLBACK_COLOR_B;
   const borderMode = borderStyle;
@@ -90,10 +99,10 @@ export default function SegmentBar({
   const hoverOverlay = colorWithAlpha(hoverOverlayBase, 0.16, borderMode === "none" ? "0,0,0" : "255,255,255");
   const containerBackground = resolvedColorB;
   const [internalValue, setInternalValue] = useState<string>(() => (
-    resolveInitialValue(options, defaultValue, value)
+    resolveInitialValue(options, defaultValue, resolvedValueProp)
   ));
-  const isControlled = value !== undefined;
-  const currentValue = isControlled ? value! : internalValue;
+  const isControlled = resolvedValueProp !== undefined;
+  const currentValue = isControlled ? resolvedValueProp! : internalValue;
   const selectedIndex = useMemo(() => (
     options.findIndex((option) => option.value === currentValue)
   ), [currentValue, options]);
@@ -108,6 +117,10 @@ export default function SegmentBar({
       setInternalValue(options[0].value);
     }
   }, [internalValue, isControlled, options, selectedIndex]);
+  useEffect(() => {
+    if (!shouldUseStore || storeValue !== undefined) return;
+    setStoreValue(resolveInitialValue(options, defaultValue, resolvedValueProp));
+  }, [defaultValue, options, resolvedValueProp, setStoreValue, shouldUseStore, storeValue]);
 
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   optionRefs.current.length = options.length;
@@ -147,8 +160,11 @@ export default function SegmentBar({
     if (!isControlled) {
       setInternalValue(nextValue);
     }
+    if (shouldUseStore) {
+      setStoreValue(nextValue);
+    }
     onChange?.(nextValue, option, bounded);
-  }, [currentValue, disabled, isControlled, onChange, options]);
+  }, [currentValue, disabled, isControlled, onChange, options, setStoreValue, shouldUseStore]);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (disabled || !options.length) return;

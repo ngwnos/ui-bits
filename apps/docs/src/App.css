@@ -122,63 +122,6 @@
   gap: 16px;
 }
 
-.docs-keyboard-header {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  gap: 8px;
-  align-items: stretch;
-  padding: 0 6px;
-  box-sizing: border-box;
-}
-
-.docs-keyboard-dropdown {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.docs-keyboard-footer {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-}
-
-.docs-keyboard-dial-wrap,
-.docs-keyboard-height-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: end;
-}
-
-.docs-keyboard-height {
-  flex-shrink: 0;
-}
-
-.docs-keyboard-dial-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--flexoki-base-300);
-}
-
-.docs-keyboard-dropdown .dropdown-label {
-  display: none;
-}
-
-.docs-keyboard-dropdown .dropdown-field {
-  flex: 1;
-}
-
-.docs-keyboard-dropdown .dropdown-trigger {
-  flex: 1;
-  padding: 0.35em 0.6rem;
-}
-
 
 .docs-slider-item {
   display: flex;

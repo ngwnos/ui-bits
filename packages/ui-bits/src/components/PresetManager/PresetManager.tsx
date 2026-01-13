@@ -1,8 +1,9 @@
 import React from "react";
+import { useControlStoreState } from "../../controlStore";
 import { usePanelTheme } from "../../panelGap";
-import { usePresetStore } from "../../presetStore";
+import { createPresetSnapshot, usePresetStore, type PresetSnapshot } from "../../presetStore";
 import IconButton from "../IconButton";
-import { Save } from "lucide-react";
+import { ClipboardCopy, Save } from "lucide-react";
 import TextInput from "../TextInput";
 import "./preset-manager.css";
 
@@ -10,6 +11,7 @@ export interface PresetManagerPreset {
   id?: string;
   name: string;
   readonly?: boolean;
+  snapshot?: PresetSnapshot;
 }
 
 export interface PresetManagerProps
@@ -47,6 +49,34 @@ function computeRowHeight(fontSize: number) {
   return Math.round(contentHeight + SLIDER_BORDER_WIDTH * 2);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function isPresetValueEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((item, index) => isPresetValueEqual(item, b[index]));
+  }
+  if (isPlainObject(a) && isPlainObject(b)) {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    return keysA.every((key) => isPresetValueEqual(a[key], b[key]));
+  }
+  return false;
+}
+
+function isPresetMatch(current: PresetSnapshot, preset: PresetSnapshot): boolean {
+  const currentKeys = Object.keys(current);
+  const presetKeys = Object.keys(preset);
+  if (currentKeys.length !== presetKeys.length) return false;
+  return presetKeys.every((key) => isPresetValueEqual(current[key], preset[key]));
+}
+
 const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((props, ref) => {
   const {
     presets,
@@ -73,6 +103,14 @@ const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((prop
   const resolvedOnSave = onSave ?? presetStore?.savePreset;
   const resolvedOnSelect = onSelect ?? presetStore?.selectPreset;
   const resolvedOnDelete = onDelete ?? presetStore?.deletePreset;
+  const storeState = useControlStoreState();
+  const currentSnapshot = React.useMemo(() => {
+    if (presetStore?.getSnapshot) {
+      return presetStore.getSnapshot();
+    }
+    if (!storeState) return null;
+    return createPresetSnapshot(storeState);
+  }, [presetStore, storeState]);
   const panelTheme = usePanelTheme();
   const resolvedColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
   const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
@@ -171,6 +209,32 @@ const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((prop
     onValueChange?.("");
   };
 
+  const handleCopy = async () => {
+    if (disabled || !currentSnapshot) return;
+    const payload = JSON.stringify(currentSnapshot, null, 2);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payload);
+        return;
+      }
+    } catch (error) {
+      // Fall back to legacy copy path.
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = payload;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    textarea.style.pointerEvents = "none";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      document.execCommand("copy");
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  };
+
   const handleKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -233,6 +297,19 @@ const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((prop
         >
           <Save />
         </IconButton>
+        <IconButton
+          colorA={resolvedColorA}
+          colorB={resolvedColorB}
+          borderStyle="a"
+          fontSize={resolvedFontSize}
+          behavior="momentary"
+          disabled={disabled || !currentSnapshot}
+          onClick={handleCopy}
+          aria-label="Copy preset"
+          title="Copy preset"
+        >
+          <ClipboardCopy />
+        </IconButton>
       </div>
       <div
         className={[
@@ -251,10 +328,18 @@ const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((prop
           ) : (
             resolvedPresets.map((preset) => {
               const isDisabled = disabled;
+              const isActivePreset = Boolean(
+                currentSnapshot
+                && preset.snapshot
+                && isPresetMatch(currentSnapshot, preset.snapshot),
+              );
               return (
                 <div
                   key={preset.id ?? preset.name}
-                  className="ui-bits-preset-manager__item"
+                  className={[
+                    "ui-bits-preset-manager__item",
+                    isActivePreset ? "ui-bits-preset-manager__item--active" : "",
+                  ].filter(Boolean).join(" ")}
                   onClick={() => handleSelect(preset)}
                   onKeyDown={(event) => {
                     if (isDisabled) return;
@@ -265,6 +350,7 @@ const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((prop
                   role="listitem"
                   tabIndex={isDisabled ? -1 : 0}
                   aria-disabled={isDisabled}
+                  aria-current={isActivePreset ? "true" : undefined}
                 >
                   <span className="ui-bits-preset-manager__name">{preset.name}</span>
                   {resolvedOnDelete ? (

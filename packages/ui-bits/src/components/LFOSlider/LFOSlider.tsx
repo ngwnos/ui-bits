@@ -169,6 +169,7 @@ export interface LFOSliderProps {
   borderMask?: Partial<Record<'top' | 'right' | 'bottom' | 'left', boolean>>;
   suspended?: boolean;
   controlId?: string;
+  lfoControlIdPrefix?: string;
 };
 
 function SliderCore({
@@ -239,9 +240,27 @@ function SliderCore({
   borderMask,
   suspended,
   controlId,
+  lfoControlIdPrefix,
 }: LFOSliderProps) {
   const resolvedControlId = useResolvedControlId(controlId, label, ariaLabel);
-  const [storeValue, setStoreValue] = useControlValue<number>(resolvedControlId);
+  const resolvedLfoControlPrefix = lfoControlIdPrefix ?? (
+    resolvedControlId ? `${resolvedControlId}.lfo` : undefined
+  );
+  const lfoEnabledControlId = resolvedLfoControlPrefix ? `${resolvedLfoControlPrefix}.enabled` : undefined;
+  const lfoWaveformControlId = resolvedLfoControlPrefix ? `${resolvedLfoControlPrefix}.waveform` : undefined;
+  const lfoFrequencyControlId = resolvedLfoControlPrefix ? `${resolvedLfoControlPrefix}.frequency` : undefined;
+  const lfoPhaseControlId = resolvedLfoControlPrefix ? `${resolvedLfoControlPrefix}.phase` : undefined;
+  const lfoRangeControlId = resolvedLfoControlPrefix ? `${resolvedLfoControlPrefix}.range` : undefined;
+  const lfoAudioResponseControlId = resolvedLfoControlPrefix ? `${resolvedLfoControlPrefix}.audioResponse` : undefined;
+  const lfoAudioSampleControlId = resolvedLfoControlPrefix ? `${resolvedLfoControlPrefix}.audioSample` : undefined;
+  const [storeValue, setStoreValue] = useControlValue<number | undefined>(resolvedControlId);
+  const [storedLfoEnabled, setStoredLfoEnabled] = useControlValue<boolean>(lfoEnabledControlId);
+  const [storedWaveform, setStoredWaveform] = useControlValue<Waveform>(lfoWaveformControlId);
+  const [storedFrequency, setStoredFrequency] = useControlValue<number>(lfoFrequencyControlId);
+  const [storedPhase, setStoredPhase] = useControlValue<number>(lfoPhaseControlId);
+  const [storedRange, setStoredRange] = useControlValue<[number, number]>(lfoRangeControlId);
+  const [storedAudioResponse, setStoredAudioResponse] = useControlValue<number>(lfoAudioResponseControlId);
+  const [storedAudioSample, setStoredAudioSample] = useControlValue<number>(lfoAudioSampleControlId);
   const shouldUseStore = resolvedControlId !== undefined && value === undefined;
   const resolvedValueProp = shouldUseStore ? storeValue : value;
   const isSuspended = useAnimationSuspended(suspended);
@@ -260,11 +279,8 @@ function SliderCore({
   const initialNumeric = typeof resolvedValueProp === 'number' && Number.isFinite(resolvedValueProp)
     ? resolvedValueProp
     : (defaultValue !== undefined ? defaultValue : 0);
+  const manualValueRef = useRef<number>(initialNumeric);
   const [text, setText] = useState<string>(() => Number(initialNumeric).toFixed(precInit));
-  useEffect(() => {
-    if (!shouldUseStore || storeValue !== undefined) return;
-    setStoreValue(initialNumeric);
-  }, [initialNumeric, setStoreValue, shouldUseStore, storeValue]);
   const lfoDefaults = defaultLfo ?? lfoProp;
   const lfoSettings = useMemo<LfoSettings>(() => {
     const defaults: LfoSettings = {
@@ -281,6 +297,31 @@ function SliderCore({
     return { ...merged, phase: resolvedPhase };
   }, [defaultFrequency, defaultWaveform, lfoDefaults, phase]);
   const resolvedWaveform = defaultWaveform ?? lfoSettings.waveform ?? 'sine';
+  const storedWaveformValue = (
+    storedWaveform === 'sine'
+    || storedWaveform === 'triangle'
+    || storedWaveform === 'saw'
+    || storedWaveform === 'square'
+    || storedWaveform === 'audio'
+  ) ? storedWaveform : undefined;
+  const storedLfoEnabledValue = typeof storedLfoEnabled === 'boolean' ? storedLfoEnabled : undefined;
+  const storedFrequencyValue = typeof storedFrequency === 'number' && Number.isFinite(storedFrequency)
+    ? storedFrequency
+    : undefined;
+  const storedPhaseValue = typeof storedPhase === 'number' && Number.isFinite(storedPhase)
+    ? storedPhase
+    : undefined;
+  const storedAudioResponseValue = typeof storedAudioResponse === 'number' && Number.isFinite(storedAudioResponse)
+    ? storedAudioResponse
+    : undefined;
+  const storedAudioSampleValue = typeof storedAudioSample === 'number' && Number.isFinite(storedAudioSample)
+    ? storedAudioSample
+    : undefined;
+  const shouldStoreWaveform = !isBasic && lfoWaveformControlId !== undefined;
+  const shouldStoreFrequency = !isBasic && lfoFrequencyControlId !== undefined;
+  const shouldStorePhase = !isBasic && lfoPhaseControlId !== undefined;
+  const shouldStoreAudioResponse = !isBasic && lfoAudioResponseControlId !== undefined;
+  const shouldStoreAudioSample = !isBasic && lfoAudioSampleControlId !== undefined;
   const resolvedShowLfoControls = !isBasic && showLfoControls;
   const drawerHandleActive = resolvedShowLfoControls;
 
@@ -296,19 +337,76 @@ function SliderCore({
     controlledDrawerOpen ?? defaultDrawerOpen ?? false
   ));
   const [drawerHeight, setDrawerHeight] = useState<number>(0);
-  const [activeWaveform, setActiveWaveform] = useState<Waveform>(resolvedWaveform);
+  const [activeWaveform, setActiveWaveform] = useState<Waveform>(storedWaveformValue ?? resolvedWaveform);
+  const shouldStoreLfoEnabled = !isBasic && lfoEnabledControlId !== undefined && lfoRunning === undefined;
   const initialLfoEnabled = isBasic ? false : (
-    lfoRunning ?? defaultLfoRunning ?? lfoDefaults?.enabled ?? false
+    lfoRunning ?? storedLfoEnabledValue ?? defaultLfoRunning ?? lfoDefaults?.enabled ?? false
   );
   const [lfoEnabled, setLfoEnabled] = useState<boolean>(initialLfoEnabled);
+  useEffect(() => {
+    if (!shouldUseStore || storeValue !== undefined || lfoEnabled) return;
+    setStoreValue(initialNumeric);
+  }, [initialNumeric, lfoEnabled, setStoreValue, shouldUseStore, storeValue]);
+  useEffect(() => {
+    if (storedWaveformValue === undefined) return;
+    setActiveWaveform((prev) => (prev === storedWaveformValue ? prev : storedWaveformValue));
+  }, [storedWaveformValue]);
+  useEffect(() => {
+    if (!shouldStoreWaveform || storedWaveformValue !== undefined) return;
+    setStoredWaveform(activeWaveform);
+  }, [activeWaveform, setStoredWaveform, shouldStoreWaveform, storedWaveformValue]);
+  useEffect(() => {
+    if (isBasic) return;
+    if (lfoRunning !== undefined) {
+      setLfoEnabled(lfoRunning);
+      return;
+    }
+    if (storedLfoEnabledValue === undefined) return;
+    setLfoEnabled((prev) => (prev === storedLfoEnabledValue ? prev : storedLfoEnabledValue));
+  }, [isBasic, lfoRunning, storedLfoEnabledValue]);
+  useEffect(() => {
+    if (!shouldStoreLfoEnabled || storedLfoEnabledValue !== undefined) return;
+    setStoredLfoEnabled(lfoEnabled);
+  }, [lfoEnabled, setStoredLfoEnabled, shouldStoreLfoEnabled, storedLfoEnabledValue]);
+  useEffect(() => {
+    if (!shouldUseStore || lfoEnabled) return;
+    if (typeof storeValue !== 'number' || !Number.isFinite(storeValue)) return;
+    manualValueRef.current = storeValue;
+  }, [lfoEnabled, shouldUseStore, storeValue]);
+  useEffect(() => {
+    if (!shouldUseStore) return;
+    if (lfoEnabled) {
+      setStoreValue(undefined);
+      return;
+    }
+    setStoreValue(manualValueRef.current);
+  }, [lfoEnabled, setStoreValue, shouldUseStore]);
   const [knobFrequency, setKnobFrequency] = useState<number>(() => clamp(
-    defaultFrequency ?? lfoSettings.frequency ?? 0.5,
+    storedFrequencyValue ?? defaultFrequency ?? lfoSettings.frequency ?? 0.5,
     resolvedLfoFrequencyMin,
     resolvedLfoFrequencyMax,
   ));
+  useEffect(() => {
+    if (storedFrequencyValue === undefined) return;
+    const clamped = clamp(storedFrequencyValue, resolvedLfoFrequencyMin, resolvedLfoFrequencyMax);
+    setKnobFrequency((prev) => (Math.abs(prev - clamped) < 1e-6 ? prev : clamped));
+  }, [resolvedLfoFrequencyMax, resolvedLfoFrequencyMin, storedFrequencyValue]);
+  useEffect(() => {
+    if (!shouldStoreFrequency || storedFrequencyValue !== undefined) return;
+    setStoredFrequency(knobFrequency);
+  }, [knobFrequency, setStoredFrequency, shouldStoreFrequency, storedFrequencyValue]);
   const [phaseDial, setPhaseDial] = useState<number>(() => (
-    normalizePhaseFraction(defaultPhase ?? lfoSettings.phase ?? 0)
+    normalizePhaseFraction(storedPhaseValue ?? defaultPhase ?? lfoSettings.phase ?? 0)
   ));
+  useEffect(() => {
+    if (storedPhaseValue === undefined) return;
+    const normalized = normalizePhaseFraction(storedPhaseValue);
+    setPhaseDial((prev) => (Math.abs(prev - normalized) < 1e-6 ? prev : normalized));
+  }, [storedPhaseValue]);
+  useEffect(() => {
+    if (!shouldStorePhase || storedPhaseValue !== undefined) return;
+    setStoredPhase(phaseDial);
+  }, [phaseDial, setStoredPhase, shouldStorePhase, storedPhaseValue]);
 
   useEffect(() => {
     if (!drawerHandleActive && drawerOpen) {
@@ -319,9 +417,14 @@ function SliderCore({
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const draggingDrawerLineRef = useRef<number | null>(null);
   const drawerPointerCaptureRef = useRef<{ id: number; node: Element | null }>({ id: -1, node: null });
+  const storedRangeValue = Array.isArray(storedRange) && storedRange.length === 2
+    && storedRange.every((value) => typeof value === 'number' && Number.isFinite(value))
+    ? (storedRange as [number, number])
+    : undefined;
   const rangeProp = lfoRange ?? defaultLfoRange ?? drawerLines;
   const isDrawerControlled = lfoRange !== undefined;
-  const initialDrawerRange = rangeProp ?? [min, max];
+  const shouldStoreRange = !isBasic && lfoRangeControlId !== undefined && !isDrawerControlled;
+  const initialDrawerRange = rangeProp ?? storedRangeValue ?? [min, max];
   const [drawerLineValues, setDrawerLineValues] = useState<[number, number]>(() => (
     [...initialDrawerRange] as [number, number]
   ));
@@ -358,6 +461,19 @@ function SliderCore({
       return [...rangeProp] as [number, number];
     });
   }, [isDrawerControlled, rangeProp?.[0], rangeProp?.[1]]);
+  useEffect(() => {
+    if (isDrawerControlled || !storedRangeValue) return;
+    setDrawerLineValues((prev) => {
+      if (Math.abs(prev[0] - storedRangeValue[0]) < 1e-6 && Math.abs(prev[1] - storedRangeValue[1]) < 1e-6) {
+        return prev;
+      }
+      return [...storedRangeValue] as [number, number];
+    });
+  }, [isDrawerControlled, storedRangeValue?.[0], storedRangeValue?.[1]]);
+  useEffect(() => {
+    if (!shouldStoreRange || storedRangeValue !== undefined) return;
+    setStoredRange(drawerLineValues);
+  }, [drawerLineValues, setStoredRange, shouldStoreRange, storedRangeValue]);
   useEffect(() => {
     if (draggingDrawerLineRef.current !== null) return;
     const next: [number, number] = [
@@ -424,17 +540,18 @@ function SliderCore({
     return Number.isFinite(numeric) ? numeric : null;
   }, [resolvedParseFn]);
   const emitUserChange = useCallback((next: number) => {
-    if (shouldUseStore) {
+    manualValueRef.current = next;
+    if (shouldUseStore && !lfoEnabled) {
       setStoreValue(next);
     }
     onUserChange?.(next);
-  }, [onUserChange, setStoreValue, shouldUseStore]);
+  }, [lfoEnabled, onUserChange, setStoreValue, shouldUseStore]);
   const emitAnimatedUpdate = useCallback((next: number) => {
-    if (shouldUseStore) {
+    if (shouldUseStore && !lfoEnabled) {
       setStoreValue(next);
     }
     onAnimatedUpdate?.(next);
-  }, [onAnimatedUpdate, setStoreValue, shouldUseStore]);
+  }, [lfoEnabled, onAnimatedUpdate, setStoreValue, shouldUseStore]);
   const liveValueRef = useRef<number>(valueFromSplit(splitRef.current, min, max, step));
   const displayValueRef = useRef<string>(
     formatValueForDisplay(liveValueRef.current, liveValueRef.current.toFixed(precInit), 'value'),
@@ -444,23 +561,43 @@ function SliderCore({
   const lastEmitMsRef = useRef(0);
   const lastNowSecRef = useRef(0);
   const [audioResponse, setAudioResponse] = useState<number>(() => clamp(
-    defaultAudioResponse ?? 0,
+    storedAudioResponseValue ?? defaultAudioResponse ?? 0,
     AUDIO_RESPONSE_MIN,
     AUDIO_RESPONSE_MAX,
   ));
   useEffect(() => {
+    if (storedAudioResponseValue === undefined) return;
+    const clamped = clamp(storedAudioResponseValue, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX);
+    setAudioResponse((prev) => (Math.abs(prev - clamped) < 1e-6 ? prev : clamped));
+  }, [storedAudioResponseValue]);
+  useEffect(() => {
+    if (!shouldStoreAudioResponse || storedAudioResponseValue !== undefined) return;
+    setStoredAudioResponse(audioResponse);
+  }, [audioResponse, setStoredAudioResponse, shouldStoreAudioResponse, storedAudioResponseValue]);
+  useEffect(() => {
+    if (storedAudioResponseValue !== undefined) return;
     if (defaultAudioResponse === undefined) return;
     setAudioResponse(clamp(defaultAudioResponse, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX));
-  }, [defaultAudioResponse]);
+  }, [defaultAudioResponse, storedAudioResponseValue]);
   const [audioSamplePosition, setAudioSamplePosition] = useState<number>(() => clamp(
-    defaultAudioSamplePosition ?? 0.5,
+    storedAudioSampleValue ?? defaultAudioSamplePosition ?? 0.5,
     resolvedAudioFrequencyMin,
     resolvedAudioFrequencyMax,
   ));
   useEffect(() => {
+    if (storedAudioSampleValue === undefined) return;
+    const clamped = clamp(storedAudioSampleValue, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax);
+    setAudioSamplePosition((prev) => (Math.abs(prev - clamped) < 1e-6 ? prev : clamped));
+  }, [resolvedAudioFrequencyMax, resolvedAudioFrequencyMin, storedAudioSampleValue]);
+  useEffect(() => {
+    if (!shouldStoreAudioSample || storedAudioSampleValue !== undefined) return;
+    setStoredAudioSample(audioSamplePosition);
+  }, [audioSamplePosition, setStoredAudioSample, shouldStoreAudioSample, storedAudioSampleValue]);
+  useEffect(() => {
+    if (storedAudioSampleValue !== undefined) return;
     if (defaultAudioSamplePosition === undefined) return;
     setAudioSamplePosition(clamp(defaultAudioSamplePosition, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax));
-  }, [defaultAudioSamplePosition, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
+  }, [defaultAudioSamplePosition, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin, storedAudioSampleValue]);
 
   // DOM refs
   const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
@@ -614,23 +751,41 @@ function SliderCore({
   const handleFrequencyChange = useCallback((next: number) => {
     const clamped = clamp(next, resolvedLfoFrequencyMin, resolvedLfoFrequencyMax);
     setKnobFrequency(clamped);
+    if (shouldStoreFrequency) {
+      setStoredFrequency(clamped);
+    }
     onFrequencyChange?.(clamped);
-  }, [onFrequencyChange, resolvedLfoFrequencyMax, resolvedLfoFrequencyMin]);
+  }, [onFrequencyChange, resolvedLfoFrequencyMax, resolvedLfoFrequencyMin, setStoredFrequency, shouldStoreFrequency]);
   const handlePhaseChange = useCallback((next: number) => {
     const normalized = normalizePhaseFraction(next);
     setPhaseDial(normalized);
+    if (shouldStorePhase) {
+      setStoredPhase(normalized);
+    }
     onPhaseChange?.(normalized);
-  }, [onPhaseChange]);
+  }, [onPhaseChange, setStoredPhase, shouldStorePhase]);
   const handleAudioResponseChange = useCallback((next: number) => {
     const clamped = clamp(next, AUDIO_RESPONSE_MIN, AUDIO_RESPONSE_MAX);
     setAudioResponse(clamped);
+    if (shouldStoreAudioResponse) {
+      setStoredAudioResponse(clamped);
+    }
     onAudioResponseChange?.(clamped);
-  }, [onAudioResponseChange]);
+  }, [onAudioResponseChange, setStoredAudioResponse, shouldStoreAudioResponse]);
   const handleAudioSampleChange = useCallback((next: number) => {
     const clamped = clamp(next, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax);
     setAudioSamplePosition(clamped);
+    if (shouldStoreAudioSample) {
+      setStoredAudioSample(clamped);
+    }
     onAudioSamplePositionChange?.(clamped);
-  }, [onAudioSamplePositionChange, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
+  }, [
+    onAudioSamplePositionChange,
+    resolvedAudioFrequencyMax,
+    resolvedAudioFrequencyMin,
+    setStoredAudioSample,
+    shouldStoreAudioSample,
+  ]);
   const audioAnalysisStore = useAudioAnalysisStore();
   const isAudioWaveform = activeWaveform === 'audio';
   const frequencyRange = isAudioWaveform
@@ -862,6 +1017,9 @@ function SliderCore({
       if (Math.abs(prev[index] - snappedValue) < 1e-6) return prev;
       const next = [...prev] as [number, number];
       next[index] = snappedValue;
+      if (shouldStoreRange) {
+        setStoredRange(next);
+      }
       onDrawerLinesChange?.(next);
       return next;
     });
@@ -872,7 +1030,17 @@ function SliderCore({
     setActiveDrawerValue(null);
     draggingDrawerLineRef.current = null;
     drawerPointerCaptureRef.current = { id: -1, node: null };
-  }, [getDrawerRatioFromClientX, max, min, onDrawerLinesChange, setDrawerLineRatio, setDrawerLineValues, step]);
+  }, [
+    getDrawerRatioFromClientX,
+    max,
+    min,
+    onDrawerLinesChange,
+    setDrawerLineRatio,
+    setDrawerLineValues,
+    setStoredRange,
+    shouldStoreRange,
+    step,
+  ]);
   const handleDrawerLinePointerUp = useCallback((e: React.PointerEvent<HTMLSpanElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1066,12 +1234,13 @@ function SliderCore({
   }, [activeWaveform, knobFrequency, phaseDial, lfoSettings.depth, lfoSettings.offset]);
 
   useEffect(() => {
+    if (storedFrequencyValue !== undefined) return;
     setKnobFrequency(clamp(
       lfoSettings.frequency ?? 0.5,
       resolvedLfoFrequencyMin,
       resolvedLfoFrequencyMax,
     ));
-  }, [lfoSettings.frequency, resolvedLfoFrequencyMax, resolvedLfoFrequencyMin]);
+  }, [lfoSettings.frequency, resolvedLfoFrequencyMax, resolvedLfoFrequencyMin, storedFrequencyValue]);
 
   useEffect(() => {
     if (!isAudioWaveform) return;
@@ -1082,12 +1251,9 @@ function SliderCore({
   }, [isAudioWaveform, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
 
   useEffect(() => {
+    if (storedPhaseValue !== undefined) return;
     setPhaseDial(normalizePhaseFraction(defaultPhase ?? lfoSettings.phase ?? 0));
-  }, [defaultPhase, lfoSettings.phase]);
-  useEffect(() => {
-    if (isBasic || lfoRunning === undefined) return;
-    setLfoEnabled(lfoRunning);
-  }, [isBasic, lfoRunning]);
+  }, [defaultPhase, lfoSettings.phase, storedPhaseValue]);
   useEffect(() => {
     if (controlledDrawerOpen === undefined) return;
     setDrawerOpen(controlledDrawerOpen);
@@ -1100,7 +1266,10 @@ function SliderCore({
     setDrawerOpen(false);
     setActiveDrawerValue(null);
     setLfoEnabled(false);
-  }, [resolvedShowLfoControls]);
+    if (shouldStoreLfoEnabled) {
+      setStoredLfoEnabled(false);
+    }
+  }, [resolvedShowLfoControls, setStoredLfoEnabled, shouldStoreLfoEnabled]);
   const toggleDrawer = () => {
     if (!drawerHandleActive) return;
     setDrawerOpen((prev) => {
@@ -1887,20 +2056,28 @@ function SliderCore({
                   if (isSelectedWaveform) {
                     setLfoEnabled((enabled) => {
                       const next = !enabled;
+                      if (shouldStoreLfoEnabled) {
+                        setStoredLfoEnabled(next);
+                      }
                       onLfoEnabledChange?.(next);
                       return next;
                     });
                     return;
                   }
                   setActiveWaveform(icon.waveform);
+                  if (shouldStoreWaveform) {
+                    setStoredWaveform(icon.waveform);
+                  }
                   if (activeWaveform !== icon.waveform) {
                     onWaveformChange?.(icon.waveform);
                   }
-                  setLfoEnabled((enabled) => {
-                    if (enabled) return enabled;
+                  if (!lfoEnabled) {
+                    setLfoEnabled(true);
+                    if (shouldStoreLfoEnabled) {
+                      setStoredLfoEnabled(true);
+                    }
                     onLfoEnabledChange?.(true);
-                    return true;
-                  });
+                  }
                 };
                 return (
                   <IconButton

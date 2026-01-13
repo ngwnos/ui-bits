@@ -168,7 +168,7 @@ const ROUTES = [
   )
 }
 
-<PresetStoreProvider>
+<PresetStoreProvider storageKey="ui-bits:docs:floating-panel">
   <FloatingPanel
     title="Inspector"
     collapsible
@@ -1299,7 +1299,7 @@ function App() {
           ) : activeRouteId === 'floating-panel' ? (
             <>
               <div className="docs-code-section">
-                <PresetStoreProvider>
+                <PresetStoreProvider storageKey="ui-bits:docs:floating-panel">
                   <FloatingPanel
                     title="Inspector"
                     collapsible
@@ -1333,6 +1333,7 @@ function App() {
                       step={0.01}
                       defaultValue={0.65}
                       width="100%"
+                      showLfoControls
                     />
                     <LFOSlider
                       label="Mix"
@@ -1341,6 +1342,7 @@ function App() {
                       step={1}
                       defaultValue={40}
                       width="100%"
+                      showLfoControls
                     />
                   </FloatingPanel>
                 </PresetStoreProvider>

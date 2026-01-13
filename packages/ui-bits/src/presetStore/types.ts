@@ -29,4 +29,5 @@ export interface PresetStoreContextValue {
   setPresets: (
     next: PresetStorePreset[] | ((prev: PresetStorePreset[]) => PresetStorePreset[])
   ) => void;
+  getSnapshot?: () => PresetSnapshot;
 }

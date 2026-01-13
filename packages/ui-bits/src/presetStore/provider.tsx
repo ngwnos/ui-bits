@@ -18,6 +18,8 @@ export interface PresetStoreProviderProps {
   controlStore?: ControlStore;
   autoIds?: boolean;
   controlIdPrefix?: string;
+  storageKey?: string;
+  storage?: Storage;
   snapshotOptions?: PresetSnapshotOptions;
   applyOptions?: ApplyPresetOptions;
   includeDefaultsPreset?: boolean;
@@ -30,6 +32,53 @@ function toPresetId(value: string) {
   return slug || `preset-${Date.now()}`;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function normalizePreset(value: unknown): PresetStorePreset | null {
+  if (!isPlainObject(value)) return null;
+  const name = typeof value.name === "string" ? value.name.trim() : "";
+  if (!name) return null;
+  const snapshot = isPlainObject(value.snapshot) ? value.snapshot : null;
+  if (!snapshot) return null;
+  const id = typeof value.id === "string" ? value.id : undefined;
+  const readonly = Boolean(value.readonly);
+  return {
+    id,
+    name,
+    snapshot,
+    readonly,
+  };
+}
+
+function loadStoredPresets(raw: string | null): PresetStorePreset[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizePreset).filter(Boolean) as PresetStorePreset[];
+  } catch (error) {
+    return [];
+  }
+}
+
+function mergePresets(primary: PresetStorePreset[], secondary: PresetStorePreset[]) {
+  const seen = new Set<string>();
+  const result: PresetStorePreset[] = [];
+  const addPreset = (preset: PresetStorePreset) => {
+    const key = (preset.id ?? preset.name).toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(preset);
+  };
+  primary.forEach(addPreset);
+  secondary.forEach(addPreset);
+  return result;
+}
+
 export function PresetStoreProvider({
   children,
   presets,
@@ -38,6 +87,8 @@ export function PresetStoreProvider({
   controlStore,
   autoIds = true,
   controlIdPrefix,
+  storageKey,
+  storage,
   snapshotOptions,
   applyOptions,
   includeDefaultsPreset = true,
@@ -101,6 +152,39 @@ export function PresetStoreProvider({
     applyPresetSnapshot(resolvedStore, preset.snapshot, applyOptions);
   }, [applyOptions, resolvedStore]);
 
+  const resolvedStorage = storage ?? (typeof window !== "undefined" ? window.localStorage : null);
+  const hasLoadedRef = React.useRef(false);
+  const defaultPresetKeys = React.useMemo(() => {
+    const keys = new Set<string>();
+    defaultPresets.forEach((preset) => {
+      keys.add((preset.id ?? preset.name).toLowerCase());
+    });
+    return keys;
+  }, [defaultPresets]);
+
+  React.useEffect(() => {
+    if (!storageKey || isControlled || !resolvedStorage) return;
+    const stored = loadStoredPresets(resolvedStorage.getItem(storageKey));
+    if (stored.length) {
+      setInternalPresets((prev) => mergePresets(stored, prev));
+    }
+    hasLoadedRef.current = true;
+  }, [isControlled, resolvedStorage, setInternalPresets, storageKey]);
+
+  React.useEffect(() => {
+    if (!storageKey || isControlled || !resolvedStorage || !hasLoadedRef.current) return;
+    const persistable = internalPresets.filter((preset) => {
+      if (preset.readonly) return false;
+      const key = (preset.id ?? preset.name).toLowerCase();
+      return !defaultPresetKeys.has(key);
+    });
+    try {
+      resolvedStorage.setItem(storageKey, JSON.stringify(persistable));
+    } catch (error) {
+      // Ignore storage failures (private mode, quota, etc).
+    }
+  }, [defaultPresetKeys, internalPresets, isControlled, resolvedStorage, storageKey]);
+
   const defaultsSnapshotRef = React.useRef<PresetStorePreset | null>(null);
   React.useEffect(() => {
     if (!includeDefaultsPreset || defaultsSnapshotRef.current) return;
@@ -136,6 +220,9 @@ export function PresetStoreProvider({
       (preset.id ?? preset.name) !== defaultsPreset.id
     ))];
   }, [includeDefaultsPreset, resolvedPresets]);
+  const getSnapshot = React.useCallback(() => (
+    createPresetSnapshot(resolvedStore.getState(), snapshotOptions)
+  ), [resolvedStore, snapshotOptions]);
 
   const contextValue = React.useMemo<PresetStoreContextValue>(() => ({
     presets: resolvedPresetList,
@@ -143,7 +230,8 @@ export function PresetStoreProvider({
     selectPreset,
     deletePreset,
     setPresets,
-  }), [deletePreset, resolvedPresetList, savePreset, selectPreset, setPresets]);
+    getSnapshot,
+  }), [deletePreset, getSnapshot, resolvedPresetList, savePreset, selectPreset, setPresets]);
 
   const content = (
     <PresetStoreContext.Provider value={contextValue}>

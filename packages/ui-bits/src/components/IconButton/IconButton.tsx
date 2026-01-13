@@ -86,7 +86,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
   const panelTheme = usePanelTheme();
   const ariaLabel = rest["aria-label"] as string | undefined;
   const resolvedControlId = useResolvedControlId(controlId, ariaLabel ?? title);
-  const [storeValue, setStoreValue] = useControlValue<string | boolean>(resolvedControlId);
+  const [storeValue, setStoreValue] = useControlValue<string | boolean | undefined>(resolvedControlId);
   const resolvedBehavior: IconButtonBehavior = behavior ?? (options?.length ? "cycle" : "momentary");
   const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
   const baseColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
@@ -108,7 +108,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
       setUncontrolledPressed(next);
     }
     if (shouldUseStorePressed) {
-      setStoreValue(next);
+      setStoreValue(next ? true : undefined);
     }
     onPressChange?.(next);
   }, [isPressedControlled, onPressChange, setStoreValue, shouldUseStorePressed]);
@@ -152,8 +152,15 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     setStoreValue(defaultToggled);
   }, [defaultToggled, setStoreValue, shouldUseStoreToggle, storeValue]);
   React.useEffect(() => {
-    if (!shouldUseStorePressed || storeValue !== undefined) return;
-    setStoreValue(defaultPressed);
+    if (!shouldUseStorePressed) return;
+    if (storeValue === false) {
+      setStoreValue(undefined);
+      return;
+    }
+    if (storeValue !== undefined) return;
+    if (defaultPressed) {
+      setStoreValue(true);
+    }
   }, [defaultPressed, setStoreValue, shouldUseStorePressed, storeValue]);
   React.useEffect(() => {
     if (!shouldUseStoreCycle || storeValue !== undefined) return;

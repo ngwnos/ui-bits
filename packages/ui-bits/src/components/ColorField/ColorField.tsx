@@ -98,9 +98,9 @@ function intToHex(value: number) {
   return `#${clamped.toString(16).padStart(6, "0")}`;
 }
 
-function hslToRgb(h: number, s: number, l: number) {
+function hsvToRgb(h: number, s: number, v: number) {
   const normalizedHue = ((h % 360) + 360) % 360;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const c = v * s;
   const hp = normalizedHue / 60;
   const x = c * (1 - Math.abs((hp % 2) - 1));
   let r = 0;
@@ -125,7 +125,7 @@ function hslToRgb(h: number, s: number, l: number) {
     r = c;
     b = x;
   }
-  const m = l - c / 2;
+  const m = v - c;
   return {
     r: Math.round((r + m) * 255),
     g: Math.round((g + m) * 255),
@@ -133,7 +133,7 @@ function hslToRgb(h: number, s: number, l: number) {
   };
 }
 
-function rgbToHsl(r: number, g: number, b: number) {
+function rgbToHsv(r: number, g: number, b: number) {
   const rn = r / 255;
   const gn = g / 255;
   const bn = b / 255;
@@ -141,10 +141,9 @@ function rgbToHsl(r: number, g: number, b: number) {
   const min = Math.min(rn, gn, bn);
   const delta = max - min;
   let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
+  const v = max;
+  const s = max === 0 ? 0 : delta / max;
   if (delta !== 0) {
-    s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
     switch (max) {
       case rn:
         h = ((gn - bn) / delta + (gn < bn ? 6 : 0)) * 60;
@@ -157,11 +156,11 @@ function rgbToHsl(r: number, g: number, b: number) {
         break;
     }
   }
-  return { h, s, l };
+  return { h, s, v };
 }
 
-function hslToHex(h: number, s: number, l: number) {
-  const rgb = hslToRgb(h, s, l);
+function hsvToHex(h: number, s: number, v: number) {
+  const rgb = hsvToRgb(h, s, v);
   const value = (rgb.r << 16) | (rgb.g << 8) | rgb.b;
   return intToHex(value);
 }
@@ -399,11 +398,11 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   const draggingRef = React.useRef(false);
   const activeRegionRef = React.useRef<"plane" | "hue" | null>(null);
   const [canvasMetrics, setCanvasMetrics] = React.useState({ width: 0, height: 0, barHeight: 0 });
-  const [hslState, setHslState] = React.useState(() => {
+  const [hsvState, setHsvState] = React.useState(() => {
     const rgb = hexToRgb(resolvedValue) ?? { r: 255, g: 255, b: 255 };
-    return rgbToHsl(rgb.r, rgb.g, rgb.b);
+    return rgbToHsv(rgb.r, rgb.g, rgb.b);
   });
-  const hslRef = React.useRef(hslState);
+  const hsvRef = React.useRef(hsvState);
   const [rgbState, setRgbState] = React.useState(() => (
     hexToRgb(resolvedValue) ?? { r: 255, g: 255, b: 255 }
   ));
@@ -413,12 +412,12 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
     return rgbToOklch(rgb.r, rgb.g, rgb.b);
   });
   const oklchRef = React.useRef(oklchState);
-  const [colorMode, setColorMode] = React.useState<"hsl" | "rgb" | "oklch">("oklch");
+  const [colorMode, setColorMode] = React.useState<"hsv" | "rgb" | "oklch">("oklch");
   const [isPickerOpen, setIsPickerOpen] = React.useState(false);
 
   React.useEffect(() => {
-    hslRef.current = hslState;
-  }, [hslState]);
+    hsvRef.current = hsvState;
+  }, [hsvState]);
   React.useEffect(() => {
     rgbRef.current = rgbState;
   }, [rgbState]);
@@ -431,9 +430,9 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
     if (draggingRef.current) return;
     const rgb = hexToRgb(resolvedValue);
     if (!rgb) return;
-    const next = rgbToHsl(rgb.r, rgb.g, rgb.b);
-    hslRef.current = next;
-    setHslState(next);
+    const next = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    hsvRef.current = next;
+    setHsvState(next);
     rgbRef.current = rgb;
     setRgbState(rgb);
     const nextOklch = rgbToOklchWithHue(rgb.r, rgb.g, rgb.b, oklchRef.current.h);
@@ -456,9 +455,9 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
       rgbRef.current = rgb;
       setRgbState(rgb);
     } else {
-      const nextHsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-      hslRef.current = nextHsl;
-      setHslState(nextHsl);
+      const nextHsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+      hsvRef.current = nextHsv;
+      setHsvState(nextHsv);
     }
   }, [colorMode, resolvedValue]);
 
@@ -532,8 +531,8 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
       const planeMode = colorMode;
       const hue = planeMode === "oklch"
         ? oklchRef.current.h
-        : planeMode === "hsl"
-          ? hslRef.current.h
+        : planeMode === "hsv"
+          ? hsvRef.current.h
           : 0;
       const stripeHeight = Math.max(1, Math.round(sliderUnitHeight(resolvedFontSize) * dpr));
       const stripeCount = Math.max(1, Math.ceil(height / stripeHeight));
@@ -561,8 +560,8 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
           planeR: rgbRef.current.r,
           planeG: rgbRef.current.g,
           planeB: rgbRef.current.b,
-          planeS: hslRef.current.s,
-          planeHslL: hslRef.current.l,
+          planeS: hsvRef.current.s,
+          planeHsvV: hsvRef.current.v,
           token,
         });
       });
@@ -575,9 +574,9 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   }, [
     isPickerOpen,
     resolvedFontSize,
-    hslState.h,
-    hslState.s,
-    hslState.l,
+    hsvState.h,
+    hsvState.s,
+    hsvState.v,
     oklchState.h,
     oklchState.l,
     oklchState.c,
@@ -641,13 +640,13 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
         const ratioX = clamp01(rect.width > 0 ? x / rect.width : 0);
         const ratioY = clamp01(planeHeight > 0 ? y / planeHeight : 0);
         const next = {
-          ...hslRef.current,
+          ...hsvRef.current,
           s: ratioX,
-          l: 1 - ratioY,
+          v: 1 - ratioY,
         };
-        hslRef.current = next;
-        setHslState(next);
-        commitValue(hslToHex(next.h, next.s, next.l));
+        hsvRef.current = next;
+        setHsvState(next);
+        commitValue(hsvToHex(next.h, next.s, next.v));
       }
     } else if (planeMode === "oklch") {
       // Bar: X = Lightness
@@ -668,12 +667,12 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
       commitValue(rgbToHex(next.r, next.g, next.b));
     } else {
       const next = {
-        ...hslRef.current,
+        ...hsvRef.current,
         h: clamp01(rect.width > 0 ? x / rect.width : 0) * 360,
       };
-      hslRef.current = next;
-      setHslState(next);
-      commitValue(hslToHex(next.h, next.s, next.l));
+      hsvRef.current = next;
+      setHsvState(next);
+      commitValue(hsvToHex(next.h, next.s, next.v));
     }
   }, [canvasMetrics.barHeight, colorMode, commitValue, resolvedFontSize]);
 
@@ -788,12 +787,12 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
         >
           <SegmentBar
             options={[
-              { value: "hsl", label: "HSL" },
+              { value: "hsv", label: "HSV" },
               { value: "rgb", label: "RGB" },
               { value: "oklch", label: "OKLCH" },
             ]}
             value={colorMode}
-            onChange={(next) => setColorMode(next as "hsl" | "rgb" | "oklch")}
+            onChange={(next) => setColorMode(next as "hsv" | "rgb" | "oklch")}
             colorA={resolvedColorA}
             colorB={resolvedColorB}
             borderStyle={resolvedBorderStyle}
@@ -827,23 +826,23 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
                 const planeMode = colorMode;
                 const planeHeight = Math.max(1, canvasMetrics.height - canvasMetrics.barHeight);
                 // OKLCH: X = Hue, Y = Chroma (high at top)
-                // Others: X = S or R, Y = L or G (inverted)
+                // Others: X = S or R, Y = V or G (inverted)
                 const planeX = planeMode === "oklch"
                   ? clamp01(oklchState.h / 360) * canvasMetrics.width
                   : planeMode === "rgb"
                     ? clamp01(rgbState.r / 255) * canvasMetrics.width
-                    : clamp01(hslState.s) * canvasMetrics.width;
+                    : clamp01(hsvState.s) * canvasMetrics.width;
                 const planeY = planeMode === "oklch"
                   ? clamp01(1 - oklchState.c / OKLCH_MAX_CHROMA) * planeHeight
                   : planeMode === "rgb"
                     ? clamp01(1 - rgbState.g / 255) * planeHeight
-                    : clamp01(1 - hslState.l) * planeHeight;
+                    : clamp01(1 - hsvState.v) * planeHeight;
                 // OKLCH bar: Lightness, Others: Hue or Blue
                 const barValue = planeMode === "oklch"
                   ? oklchState.l
                   : planeMode === "rgb"
                     ? rgbState.b / 255
-                    : hslState.h / 360;
+                    : hsvState.h / 360;
                 const barX = clamp01(barValue) * canvasMetrics.width;
                 return (
                   <>

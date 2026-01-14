@@ -5,14 +5,14 @@ type PaintMessage = {
   yStart: number;
   yEnd: number;
   hue: number;
-  mode: "hsl" | "oklch" | "rgb";
+  mode: "hsv" | "oklch" | "rgb";
   planeL: number;
   planeC: number;
   planeR: number;
   planeG: number;
   planeB: number;
   planeS: number;
-  planeHslL: number;
+  planeHsvV: number;
   token: number;
 };
 
@@ -22,9 +22,10 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function hslToRgb(h: number, s: number, l: number) {
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const hp = h / 60;
+function hsvToRgb(h: number, s: number, v: number) {
+  const normalizedHue = ((h % 360) + 360) % 360;
+  const c = v * s;
+  const hp = normalizedHue / 60;
   const x = c * (1 - Math.abs((hp % 2) - 1));
   let r = 0;
   let g = 0;
@@ -48,7 +49,7 @@ function hslToRgb(h: number, s: number, l: number) {
     r = c;
     b = x;
   }
-  const m = l - c / 2;
+  const m = v - c;
   return {
     r: Math.round((r + m) * 255),
     g: Math.round((g + m) * 255),
@@ -125,14 +126,14 @@ function fillPixels(
   yStart: number,
   yEnd: number,
   hue: number,
-  mode: "hsl" | "oklch" | "rgb",
+  mode: "hsv" | "oklch" | "rgb",
   planeL: number,
   planeC: number,
   planeR: number,
   planeG: number,
   planeB: number,
   planeS: number,
-  planeHslL: number,
+  planeHsvV: number,
 ) {
   const sliceHeight = Math.max(0, yEnd - yStart);
   const pixels = new Uint8ClampedArray(width * sliceHeight * 4);
@@ -153,7 +154,7 @@ function fillPixels(
               g: clamp(planeG, 0, 255),
               b: Math.round((x / maxX) * 255),
             }
-            : hslToRgb((x / maxX) * 360, planeS, planeHslL))
+            : hsvToRgb((x / maxX) * 360, planeS, planeHsvV))
         : (mode === "oklch"
           // Plane: H (X axis) × C (Y axis, high at top) at fixed L
           ? (() => {
@@ -178,7 +179,7 @@ function fillPixels(
               g: Math.round((1 - y / maxY) * 255),
               b: clamp(planeB, 0, 255),
             }
-            : hslToRgb(hue, x / maxX, 1 - y / maxY));
+            : hsvToRgb(hue, x / maxX, 1 - y / maxY));
       const idx = (localY * width + x) * 4;
       pixels[idx] = color.r;
       pixels[idx + 1] = color.g;
@@ -204,7 +205,7 @@ self.onmessage = (event: MessageEvent<PaintMessage>) => {
     planeG,
     planeB,
     planeS,
-    planeHslL,
+    planeHsvV,
     token,
   } = event.data;
   const pixels = fillPixels(
@@ -221,7 +222,7 @@ self.onmessage = (event: MessageEvent<PaintMessage>) => {
     planeG,
     planeB,
     planeS,
-    planeHslL,
+    planeHsvV,
   );
   self.postMessage({ pixels, width, height: Math.max(0, yEnd - yStart), token }, [pixels.buffer]);
 };

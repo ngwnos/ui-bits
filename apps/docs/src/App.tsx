@@ -18,6 +18,7 @@ import {
   SelectionGrid,
   SegmentBar,
   VirtualKeyboard,
+  WebGpuStatus,
   type VirtualKeyboardInstrumentOption,
   type VirtualKeyboardSoundfontConfig,
   type VirtualKeyboardSoundfontOption,
@@ -131,6 +132,13 @@ const ROUTES = [
   return (
     <>
       <PresetManager maxListHeight={120} />
+      <Folder
+        label="WebGPU Status"
+        colorA={flexoki.green["500"]}
+        colorB={flexoki.green["100"]}
+      >
+        <WebGpuStatus />
+      </Folder>
       <AudioControls source={{ type: "buffer", src: "/audio/credits.mp3" }} />
       <VirtualKeyboard
         defaultStartNote="C4"
@@ -1314,8 +1322,15 @@ function App() {
                     paddingRight={3}
                     paddingBottom={3}
                   >
-                    <PresetManager maxListHeight={120} />
-                    <AudioControls source={{ type: "buffer", src: "/audio/credits.mp3" }} />
+      <PresetManager maxListHeight={120} />
+      <Folder
+        label="WebGPU Status"
+        colorA={flexoki.green["500"]}
+        colorB={flexoki.green["100"]}
+      >
+        <WebGpuStatus />
+      </Folder>
+      <AudioControls source={{ type: "buffer", src: "/audio/credits.mp3" }} />
                     <VirtualKeyboard
                       defaultStartNote="C4"
                       defaultNoteCount={26}

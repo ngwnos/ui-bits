@@ -1,0 +1,32 @@
+.ui-bits-webgpu-status {
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-bits-webgpu-status__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: var(--ui-bits-webgpu-row-height);
+  padding: 0 var(--ui-bits-webgpu-padding-x);
+  border-top: 1px solid var(--ui-bits-webgpu-border-color);
+  box-sizing: border-box;
+}
+
+.ui-bits-webgpu-status__row:first-child {
+  border-top: none;
+}
+
+.ui-bits-webgpu-status__label,
+.ui-bits-webgpu-status__value {
+  white-space: nowrap;
+}
+
+.ui-bits-webgpu-status__label {
+  opacity: 0.7;
+}
+
+.ui-bits-webgpu-status__value {
+  text-align: right;
+}

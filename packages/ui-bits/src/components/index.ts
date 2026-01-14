@@ -63,3 +63,8 @@ export {
   type SequencerHandle,
   type SequencerEvent,
 } from "./Sequencer";
+export {
+  default as WebGpuStatus,
+  type WebGpuStatusProps,
+  type WebGpuStatusBorderStyle,
+} from "./WebGpuStatus";

@@ -88,6 +88,11 @@ export {
   type SequencerEvent,
 } from "./components/Sequencer";
 export {
+  default as WebGpuStatus,
+  type WebGpuStatusProps,
+  type WebGpuStatusBorderStyle,
+} from "./components/WebGpuStatus";
+export {
   default as SegmentBar,
   type SegmentBarProps,
   type SegmentBarOption,

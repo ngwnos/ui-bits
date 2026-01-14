@@ -218,7 +218,7 @@ function rgbToOklchWithHue(r: number, g: number, b: number, fallbackHue: number)
   return next;
 }
 
-function oklchToRgb(l: number, c: number, h: number) {
+function oklchToLinearRgb(l: number, c: number, h: number) {
   const hRad = (h * Math.PI) / 180;
   const a = c * Math.cos(hRad);
   const b = c * Math.sin(hRad);
@@ -228,18 +228,53 @@ function oklchToRgb(l: number, c: number, h: number) {
   const l3 = l_ * l_ * l_;
   const m3 = m_ * m_ * m_;
   const s3 = s_ * s_ * s_;
-  const rLin = 4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
-  const gLin = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
-  const bLin = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
   return {
-    r: Math.round(linearToSrgb(rLin) * 255),
-    g: Math.round(linearToSrgb(gLin) * 255),
-    b: Math.round(linearToSrgb(bLin) * 255),
+    r: 4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3,
+    g: -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3,
+    b: -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3,
   };
 }
 
+function isOklchInGamut(l: number, c: number, h: number) {
+  const rgb = oklchToLinearRgb(l, c, h);
+  const epsilon = 0.0001;
+  return rgb.r >= -epsilon && rgb.r <= 1 + epsilon
+    && rgb.g >= -epsilon && rgb.g <= 1 + epsilon
+    && rgb.b >= -epsilon && rgb.b <= 1 + epsilon;
+}
+
+function findMaxChroma(l: number, h: number, targetC: number) {
+  if (isOklchInGamut(l, targetC, h)) return targetC;
+  let lo = 0;
+  let hi = targetC;
+  for (let i = 0; i < 12; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (isOklchInGamut(l, mid, h)) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
+}
+
+function oklchToRgb(l: number, c: number, h: number) {
+  const rgb = oklchToLinearRgb(l, c, h);
+  return {
+    r: Math.round(linearToSrgb(rgb.r) * 255),
+    g: Math.round(linearToSrgb(rgb.g) * 255),
+    b: Math.round(linearToSrgb(rgb.b) * 255),
+  };
+}
+
+function oklchToRgbGamutMapped(l: number, c: number, h: number) {
+  if (isOklchInGamut(l, c, h)) return oklchToRgb(l, c, h);
+  const mappedC = findMaxChroma(l, h, c);
+  return oklchToRgb(l, mappedC, h);
+}
+
 function oklchToHex(l: number, c: number, h: number) {
-  const rgb = oklchToRgb(l, c, h);
+  const rgb = oklchToRgbGamutMapped(l, c, h);
   const value = (rgb.r << 16) | (rgb.g << 8) | rgb.b;
   return intToHex(value);
 }
@@ -360,6 +395,7 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   const workerPoolRef = React.useRef<Worker[]>([]);
   const paintTokenRef = React.useRef(0);
   const canvasSizeRef = React.useRef({ width: 0, height: 0 });
+  const lastCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const draggingRef = React.useRef(false);
   const activeRegionRef = React.useRef<"plane" | "hue" | null>(null);
   const [canvasMetrics, setCanvasMetrics] = React.useState({ width: 0, height: 0, barHeight: 0 });
@@ -435,6 +471,16 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
     };
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isPickerOpen]);
+
+  React.useEffect(() => {
+    if (!isPickerOpen) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (lastCanvasRef.current !== canvas) {
+      canvasSizeRef.current = { width: 0, height: 0 };
+      lastCanvasRef.current = canvas;
+    }
   }, [isPickerOpen]);
 
   React.useEffect(() => {

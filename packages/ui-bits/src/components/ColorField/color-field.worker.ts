@@ -89,7 +89,6 @@ function isOklchInGamut(l: number, c: number, h: number) {
 }
 
 function findMaxChroma(l: number, h: number, targetC: number) {
-  // Binary search for max in-gamut chroma
   if (isOklchInGamut(l, targetC, h)) return targetC;
   let lo = 0;
   let hi = targetC;
@@ -114,6 +113,7 @@ function oklchToRgb(l: number, c: number, h: number) {
 }
 
 function oklchToRgbGamutMapped(l: number, c: number, h: number) {
+  if (isOklchInGamut(l, c, h)) return oklchToRgb(l, c, h);
   const mappedC = findMaxChroma(l, h, c);
   return oklchToRgb(l, mappedC, h);
 }
@@ -167,7 +167,7 @@ function fillPixels(
               if (belowInGamut) {
                 return { r: 0, g: 0, b: 0 }; // Black boundary line
               }
-              // Show gamut-mapped color above the boundary
+              // Show the same fallback as the selection uses
               return oklchToRgbGamutMapped(planeL, c, h);
             }
             return oklchToRgb(planeL, c, h);

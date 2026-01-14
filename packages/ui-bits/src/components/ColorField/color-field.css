@@ -1,0 +1,10 @@
+.ui-bits-color-field {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ui-bits-color-field__label {
+  font-weight: 600;
+  line-height: 1;
+}

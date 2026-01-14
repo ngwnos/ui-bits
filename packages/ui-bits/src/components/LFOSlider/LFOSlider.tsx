@@ -155,6 +155,7 @@ export interface LFOSliderProps {
   style?: React.CSSProperties;
   formatDisplayValue?: FormatDisplayValueFn;
   parseDisplayValue?: ParseDisplayValueFn;
+  formatEditingValue?: boolean;
   valuePrefix?: string;
   valueSuffix?: string;
   displayFormatterPreset?: DisplayValueFormatterPreset;
@@ -226,6 +227,7 @@ function SliderCore({
   style,
   formatDisplayValue,
   parseDisplayValue,
+  formatEditingValue = false,
   valuePrefix,
   valueSuffix,
   displayFormatterPreset,
@@ -529,6 +531,13 @@ function SliderCore({
     const next = resolvedFormatFn(value, { reason, rawValueText: rawText });
     return typeof next === 'string' ? next : rawText;
   }, [resolvedFormatFn]);
+  const formatEditingText = useCallback(
+    (value: number, reason: DisplayValueFormatReason) => {
+      const raw = value.toFixed(precision);
+      return formatEditingValue ? formatValueForDisplay(value, raw, reason) : raw;
+    },
+    [formatEditingValue, formatValueForDisplay, precision],
+  );
   const parseTextToValue = useCallback((input: string): number | null => {
     if (resolvedParseFn) {
       const parsed = resolvedParseFn(input);
@@ -1064,6 +1073,17 @@ function SliderCore({
     setSelStart(s);
     setSelEnd(e);
   };
+  useEffect(() => {
+    if (!formatEditingValue) return;
+    if (editingRef.current || focused) return;
+    const numeric = valueFromSplit(splitRef.current, min, max, step);
+    const formatted = formatEditingText(numeric, 'value');
+    if (textRef.current !== formatted) {
+      textRef.current = formatted;
+      setText(formatted);
+      setSelection(formatted.length, formatted.length);
+    }
+  }, [focused, formatEditingText, formatEditingValue, max, min, setSelection, step]);
   const linkSplitToText = (val: string) => {
     const num = parseTextToValue(val);
     if (num === null) return;
@@ -1079,7 +1099,8 @@ function SliderCore({
     const target = numeric + stepValue * dir;
     const clamped = clamp(target, min, max);
     const snapped = snapToStep(clamped, min, step);
-    const formatted = snapped.toFixed(precision);
+    const raw = snapped.toFixed(precision);
+    const formatted = formatEditingText(snapped, 'value');
     const pos = formatted.length;
     const ratio = splitFromValue(snapped, min, max);
     textRef.current = formatted;
@@ -1089,7 +1110,7 @@ function SliderCore({
     setSelEnd(pos);
     splitRef.current = ratio;
     writeSplitVars(ratio);
-    reflectValueToDom(snapped, formatted);
+    reflectValueToDom(snapped, raw);
     setSplit(ratio);
     emitUserChange(snapped);
     editingRef.current = true;
@@ -1099,12 +1120,13 @@ function SliderCore({
     const upper = drawerValueMax;
     if (!Number.isFinite(lower) || !Number.isFinite(upper)) return;
     if (upper < lower) return;
-    const raw = clamp(value, lower, upper);
-    const snapped = snapToStep(raw, min, step);
-    const formatted = snapped.toFixed(precision);
+    const clamped = clamp(value, lower, upper);
+    const snapped = snapToStep(clamped, min, step);
+    const rawText = snapped.toFixed(precision);
+    const formatted = formatEditingText(snapped, 'value');
     const caretPos = formatted.length;
     const shouldSyncText = focused || editingRef.current || forceTextSync;
-    reflectValueToDom(snapped, formatted);
+    reflectValueToDom(snapped, rawText);
     if (shouldSyncText) {
       if (textRef.current !== formatted) {
         textRef.current = formatted;
@@ -1118,7 +1140,7 @@ function SliderCore({
     } else {
       textRef.current = formatted;
     }
-    const rawSplit = splitFromValue(raw, min, max);
+    const rawSplit = splitFromValue(clamped, min, max);
     if (Number.isFinite(rawSplit) && Math.abs(rawSplit - splitRef.current) > 1e-5) {
       splitRef.current = rawSplit;
       writeSplitVars(rawSplit);
@@ -1136,6 +1158,7 @@ function SliderCore({
     drawerValueMax,
     emitAnimatedUpdate,
     focused,
+    formatEditingText,
     max,
     min,
     onAnimatedUpdate,
@@ -1354,13 +1377,14 @@ function SliderCore({
     writeSplitVars(newSplit);
     setSplit(newSplit);
     const val = valueFromSplit(newSplit, min, max, step);
-    const formatted = val.toFixed(precision);
-    reflectValueToDom(val, formatted);
+    const raw = val.toFixed(precision);
+    const formatted = formatEditingText(val, 'value');
+    reflectValueToDom(val, raw);
     textRef.current = formatted;
     setText(formatted);
     setSelection(formatted.length, formatted.length);
     emitUserChange(val);
-  }, [getSplitFromX, max, min, onUserChange, precision, reflectValueToDom, setSelection, step, writeSplitVars]);
+  }, [formatEditingText, getSplitFromX, max, min, onUserChange, precision, reflectValueToDom, setSelection, step, writeSplitVars]);
 
   // Edit operations
   const replaceSelection = (insertStr: string) => {
@@ -1638,12 +1662,13 @@ function SliderCore({
       if (parsed !== null) {
         const clamped = clamp(parsed, min, max);
         const snapped = snapToStep(clamped, min, step);
-        const formatted = snapped.toFixed(precision);
-        const ratio = splitFromValue(Number(formatted), min, max);
+        const raw = snapped.toFixed(precision);
+        const formatted = formatEditingText(snapped, 'value');
+        const ratio = splitFromValue(snapped, min, max);
         setText(formatted); setSelection(formatted.length, formatted.length); textRef.current = formatted;
         splitRef.current = ratio;
         writeSplitVars(ratio);
-        reflectValueToDom(snapped, formatted);
+        reflectValueToDom(snapped, raw);
         setSplit(ratio);
         emitUserChange(snapped);
       }

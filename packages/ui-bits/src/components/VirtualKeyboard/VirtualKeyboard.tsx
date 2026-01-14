@@ -101,6 +101,7 @@ export interface VirtualKeyboardProps {
   blackKeyColor?: string;
   whiteKeyActiveColor?: string;
   blackKeyActiveColor?: string;
+  dialIndicatorColor?: string;
   soundfont?: VirtualKeyboardSoundfont | string;
   tone?: VirtualKeyboardTone;
   keyboardShortcutsEnabled?: boolean;
@@ -301,6 +302,7 @@ export default function VirtualKeyboard({
   blackKeyColor,
   whiteKeyActiveColor,
   blackKeyActiveColor,
+  dialIndicatorColor,
   soundfont,
   tone,
   keyboardShortcutsEnabled,
@@ -883,7 +885,8 @@ export default function VirtualKeyboard({
           value={startIndex}
           onChange={handleStartIndexChange}
           fontSize={resolvedFontSize}
-          indicatorStyle="dot"
+          indicatorStyle="arc"
+          indicatorColor={dialIndicatorColor}
           ariaLabel="Keyboard start note"
           formatDisplayValue={(value) => {
             const index = Math.max(MIN_START_INDEX, Math.min(maxStartIndex, Math.round(value)));
@@ -901,7 +904,8 @@ export default function VirtualKeyboard({
           value={resolvedNoteCountClamped}
           onChange={handleNoteCountChange}
           fontSize={resolvedFontSize}
-          indicatorStyle="dot"
+          indicatorStyle="arc"
+          indicatorColor={dialIndicatorColor}
           ariaLabel="Keyboard note count"
           formatDisplayValue={(value) => `${Math.round(value)}`}
         />
@@ -916,7 +920,8 @@ export default function VirtualKeyboard({
             value={resolvedHeightUnitsClamped}
             onChange={handleHeightChange}
             fontSize={resolvedFontSize}
-            indicatorStyle="dot"
+            indicatorStyle="arc"
+            indicatorColor={dialIndicatorColor}
             ariaLabel="Keyboard height"
           />
         </div>

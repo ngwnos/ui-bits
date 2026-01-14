@@ -137,6 +137,7 @@ const ROUTES = [
         defaultNoteCount={26}
         defaultHeightUnits={2}
         showHeightControl={false}
+        dialIndicatorColor={flexoki.red["600"]}
         instrumentOptions={[
           { value: "tonejs", label: "Tone.js", source: "tone" },
         ]}

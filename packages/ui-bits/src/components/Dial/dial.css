@@ -28,13 +28,13 @@
 
 .ui-bits-dial__indicator {
   fill: none;
-  stroke: currentColor;
+  stroke: var(--dial-indicator-color, currentColor);
   stroke-width: var(--dial-stroke, 2px);
   stroke-linecap: round;
 }
 
 .ui-bits-dial__dot {
-  fill: currentColor;
+  fill: var(--dial-indicator-color, currentColor);
 }
 
 .ui-bits-dial__value {

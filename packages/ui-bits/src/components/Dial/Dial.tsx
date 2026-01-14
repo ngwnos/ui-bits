@@ -25,6 +25,7 @@ export interface DialProps
   fontSize?: number;
   formatDisplayValue?: (value: number) => string;
   indicatorStyle?: DialIndicatorStyle;
+  indicatorColor?: string;
   controlMode?: DialControlMode;
   defaultControlMode?: DialControlMode;
   onControlModeChange?: (mode: DialControlMode) => void;
@@ -66,6 +67,7 @@ export default function Dial({
   fontSize = 12,
   formatDisplayValue,
   indicatorStyle = "arc",
+  indicatorColor,
   controlMode,
   defaultControlMode = "xy",
   onControlModeChange,
@@ -333,6 +335,7 @@ export default function Dial({
         borderLeftColor: resolvedBorderMask.left ? resolvedBorderColor : maskedBorderColor,
         "--dial-stroke": `${strokeWidth}px`,
         "--dial-border-width": `${SLIDER_BORDER_WIDTH}px`,
+        ...(indicatorColor ? { "--dial-indicator-color": indicatorColor } : null),
         ...(disabled ? { opacity: 0.5 } : null),
         ...(style ?? {}),
       } as React.CSSProperties}

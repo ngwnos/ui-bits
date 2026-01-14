@@ -1,0 +1,12 @@
+.ui-bits-floating-panel__body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.ui-bits-floating-panel__scrollbar {
+  opacity: 0;
+}
+
+.ui-bits-floating-panel__body-wrap:hover .ui-bits-floating-panel__scrollbar {
+  opacity: 1;
+}

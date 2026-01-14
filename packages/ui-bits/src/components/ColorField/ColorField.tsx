@@ -391,6 +391,8 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   }, [oklchState]);
 
   React.useEffect(() => {
+    // Skip sync when dragging - we already updated state directly
+    if (draggingRef.current) return;
     const rgb = hexToRgb(resolvedValue);
     if (!rgb) return;
     const next = rgbToHsl(rgb.r, rgb.g, rgb.b);
@@ -403,7 +405,11 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
     setOklchState(nextOklch);
   }, [resolvedValue]);
 
+  const prevColorModeRef = React.useRef(colorMode);
   React.useEffect(() => {
+    // Only sync when color mode actually changes, not on every resolvedValue change
+    if (prevColorModeRef.current === colorMode) return;
+    prevColorModeRef.current = colorMode;
     const rgb = hexToRgb(resolvedValue);
     if (!rgb) return;
     if (colorMode === "oklch") {
@@ -509,6 +515,8 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
           planeR: rgbRef.current.r,
           planeG: rgbRef.current.g,
           planeB: rgbRef.current.b,
+          planeS: hslRef.current.s,
+          planeHslL: hslRef.current.l,
           token,
         });
       });
@@ -522,6 +530,8 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
     isPickerOpen,
     resolvedFontSize,
     hslState.h,
+    hslState.s,
+    hslState.l,
     oklchState.h,
     oklchState.l,
     oklchState.c,
@@ -779,7 +789,7 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
                     ? clamp01(1 - rgbState.g / 255) * planeHeight
                     : clamp01(1 - hslState.l) * planeHeight;
                 const hueValue = planeMode === "oklch"
-                  ? oklchState.h
+                  ? oklchState.h / 360
                   : planeMode === "rgb"
                     ? rgbState.b / 255
                     : hslState.h / 360;

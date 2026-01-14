@@ -8,6 +8,7 @@ import {
 } from "../../panelGap";
 import IconButton from "../IconButton";
 import Dial from "../Dial";
+import "./floating-panel.css";
 
 export type FloatingPanelBorderStyle = "a" | "b" | "none";
 
@@ -131,9 +132,13 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     ...rest
   } = props;
   const panelRef = React.useRef<HTMLDivElement | null>(null);
+  const bodyRef = React.useRef<HTMLDivElement | null>(null);
   const pointerIdRef = React.useRef<number | null>(null);
   const dragOffsetRef = React.useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const scrollTimeoutRef = React.useRef<number | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
+  const [scrollMetrics, setScrollMetrics] = React.useState({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
+  const [isScrolling, setIsScrolling] = React.useState(false);
   const [dragPosition, setDragPosition] = React.useState<{ x: number; y: number } | null>(() => (
     defaultPosition ? { x: defaultPosition.x, y: defaultPosition.y } : null
   ));
@@ -150,7 +155,9 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     const panelNode = panelRef.current;
     const rect = panelNode?.getBoundingClientRect();
     const maxX = rect ? Math.max(0, window.innerWidth - rect.width) : window.innerWidth;
-    const maxY = rect ? Math.max(0, window.innerHeight - rect.height) : window.innerHeight;
+    // Allow panel to be positioned lower - body will scroll when needed
+    const minVisibleHeight = computeHeaderHeight(fontSize ?? 12) + 6;
+    const maxY = Math.max(0, window.innerHeight - minVisibleHeight);
     setDragPosition({
       x: clampBetween(defaultPosition.x, 0, maxX),
       y: clampBetween(defaultPosition.y, 0, maxY),
@@ -357,6 +364,58 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
 
   const resolvedPosition = position ?? dragPosition;
   const isFloating = Boolean(draggable && resolvedPosition);
+  const bottomMargin = 6;
+  const dynamicBodyMaxHeight = isFloating && resolvedPosition
+    ? Math.max(0, window.innerHeight - resolvedPosition.y - headerMinHeight - bottomMargin)
+    : undefined;
+
+  const updateScrollMetrics = React.useCallback(() => {
+    const node = bodyRef.current;
+    if (!node) return;
+    setScrollMetrics((prev) => {
+      const next = { scrollTop: node.scrollTop, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight };
+      if (prev.scrollTop === next.scrollTop && prev.scrollHeight === next.scrollHeight && prev.clientHeight === next.clientHeight) {
+        return prev;
+      }
+      return next;
+    });
+  }, []);
+
+  const handleBodyScroll = React.useCallback(() => {
+    updateScrollMetrics();
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = window.setTimeout(() => {
+      setIsScrolling(false);
+      scrollTimeoutRef.current = null;
+    }, 650);
+  }, [updateScrollMetrics]);
+
+  React.useEffect(() => {
+    updateScrollMetrics();
+  }, [updateScrollMetrics, dynamicBodyMaxHeight, resolvedCollapsed]);
+
+  React.useEffect(() => {
+    const node = bodyRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => updateScrollMetrics());
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [updateScrollMetrics]);
+
+  React.useEffect(() => () => {
+    if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current);
+  }, []);
+
+  const hasBodyOverflow = scrollMetrics.scrollHeight - scrollMetrics.clientHeight > 1;
+  const scrollThumbHeight = hasBodyOverflow
+    ? Math.max(12, Math.round(scrollMetrics.clientHeight * (scrollMetrics.clientHeight / scrollMetrics.scrollHeight)))
+    : 0;
+  const maxScrollThumbTop = Math.max(0, scrollMetrics.clientHeight - scrollThumbHeight);
+  const scrollThumbTop = hasBodyOverflow && scrollMetrics.scrollHeight > scrollMetrics.clientHeight
+    ? Math.round((scrollMetrics.scrollTop / (scrollMetrics.scrollHeight - scrollMetrics.clientHeight)) * maxScrollThumbTop)
+    : 0;
+
   const setRefs = (node: HTMLDivElement | null) => {
     panelRef.current = node;
     if (!ref) return;
@@ -393,9 +452,9 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     const rect = panelNode?.getBoundingClientRect();
     const offset = dragOffsetRef.current;
     const width = rect?.width ?? 0;
-    const height = rect?.height ?? 0;
     const maxX = Math.max(0, window.innerWidth - width);
-    const maxY = Math.max(0, window.innerHeight - height);
+    // Allow panel to move lower - only require header to stay visible
+    const maxY = Math.max(0, window.innerHeight - headerMinHeight - 6);
     const nextX = clampBetween(event.clientX - offset.x, 0, maxX);
     const nextY = clampBetween(event.clientY - offset.y, 0, maxY);
     const nextPosition = { x: nextX, y: nextY };
@@ -478,6 +537,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       </div>
       {renderBody && (
         <div
+          className="ui-bits-floating-panel__body-wrap"
           style={{
             borderLeft: resolvedBorderWidth ? `${resolvedBorderWidth}px solid ${resolvedBorderColor}` : "none",
             borderRight: resolvedBorderWidth ? `${resolvedBorderWidth}px solid ${resolvedBorderColor}` : "none",
@@ -494,26 +554,64 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
           aria-hidden={resolvedCollapsed}
         >
           <div
+            ref={bodyRef}
+            onScroll={handleBodyScroll}
             style={{
-              padding: `${verticalGapValue} ${resolvedPaddingRightValue} ${resolvedPaddingBottomValue} ${resolvedPaddingLeftValue}`,
-              display: "flex",
-              flexDirection: "column",
-              position: "relative",
-              background: colorWithAlpha(colorB, surfaceOpacity),
-              backdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
-              WebkitBackdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
-            }}
+              overflowY: dynamicBodyMaxHeight !== undefined ? "auto" : undefined,
+              maxHeight: dynamicBodyMaxHeight !== undefined ? `${dynamicBodyMaxHeight}px` : undefined,
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+            } as React.CSSProperties}
+            className="ui-bits-floating-panel__body"
           >
-            <VerticalGapContext.Provider value={resolvedVerticalGap}>
-              <PanelSurfaceContext.Provider value={panelSurfaceValue}>
-                <AnimationSuspensionProvider suspended={suspendChildren}>
-                  <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: resolvedVerticalGap }}>
-                    {children}
-                  </div>
-                </AnimationSuspensionProvider>
-              </PanelSurfaceContext.Provider>
-            </VerticalGapContext.Provider>
+            <div
+              style={{
+                padding: `${verticalGapValue} ${resolvedPaddingRightValue} ${resolvedPaddingBottomValue} ${resolvedPaddingLeftValue}`,
+                display: "flex",
+                flexDirection: "column",
+                position: "relative",
+                background: colorWithAlpha(colorB, surfaceOpacity),
+                backdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
+                WebkitBackdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
+              }}
+            >
+              <VerticalGapContext.Provider value={resolvedVerticalGap}>
+                <PanelSurfaceContext.Provider value={panelSurfaceValue}>
+                  <AnimationSuspensionProvider suspended={suspendChildren}>
+                    <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: resolvedVerticalGap }}>
+                      {children}
+                    </div>
+                  </AnimationSuspensionProvider>
+                </PanelSurfaceContext.Provider>
+              </VerticalGapContext.Provider>
+            </div>
           </div>
+          {hasBodyOverflow && (
+            <div
+              className="ui-bits-floating-panel__scrollbar"
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: 6,
+                pointerEvents: "none",
+                opacity: isScrolling ? 1 : undefined,
+                transition: "opacity 160ms ease",
+              }}
+            >
+              <div
+                style={{
+                  width: "100%",
+                  height: scrollThumbHeight,
+                  borderRadius: 999,
+                  background: colorA,
+                  transform: `translateY(${scrollThumbTop}px)`,
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
       </div>

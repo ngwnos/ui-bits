@@ -11,6 +11,8 @@ type PaintMessage = {
   planeR: number;
   planeG: number;
   planeB: number;
+  planeS: number;
+  planeHslL: number;
   token: number;
 };
 
@@ -61,7 +63,7 @@ function linearToSrgb(value: number) {
     : 1.055 * Math.pow(clamped, 1 / 2.4) - 0.055;
 }
 
-function oklchToRgb(l: number, c: number, h: number) {
+function oklchToLinearRgb(l: number, c: number, h: number) {
   const hRad = (h * Math.PI) / 180;
   const a = c * Math.cos(hRad);
   const b = c * Math.sin(hRad);
@@ -71,14 +73,49 @@ function oklchToRgb(l: number, c: number, h: number) {
   const l3 = l_ * l_ * l_;
   const m3 = m_ * m_ * m_;
   const s3 = s_ * s_ * s_;
-  const rLin = 4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
-  const gLin = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
-  const bLin = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
   return {
-    r: Math.round(linearToSrgb(rLin) * 255),
-    g: Math.round(linearToSrgb(gLin) * 255),
-    b: Math.round(linearToSrgb(bLin) * 255),
+    r: 4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3,
+    g: -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3,
+    b: -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3,
   };
+}
+
+function isOklchInGamut(l: number, c: number, h: number) {
+  const rgb = oklchToLinearRgb(l, c, h);
+  const epsilon = 0.0001;
+  return rgb.r >= -epsilon && rgb.r <= 1 + epsilon
+    && rgb.g >= -epsilon && rgb.g <= 1 + epsilon
+    && rgb.b >= -epsilon && rgb.b <= 1 + epsilon;
+}
+
+function findMaxChroma(l: number, h: number, targetC: number) {
+  // Binary search for max in-gamut chroma
+  if (isOklchInGamut(l, targetC, h)) return targetC;
+  let lo = 0;
+  let hi = targetC;
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2;
+    if (isOklchInGamut(l, mid, h)) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
+}
+
+function oklchToRgb(l: number, c: number, h: number) {
+  const rgb = oklchToLinearRgb(l, c, h);
+  return {
+    r: Math.round(linearToSrgb(rgb.r) * 255),
+    g: Math.round(linearToSrgb(rgb.g) * 255),
+    b: Math.round(linearToSrgb(rgb.b) * 255),
+  };
+}
+
+function oklchToRgbGamutMapped(l: number, c: number, h: number) {
+  const mappedC = findMaxChroma(l, h, c);
+  return oklchToRgb(l, mappedC, h);
 }
 
 function fillPixels(
@@ -94,6 +131,8 @@ function fillPixels(
   planeR: number,
   planeG: number,
   planeB: number,
+  planeS: number,
+  planeHslL: number,
 ) {
   const sliceHeight = Math.max(0, yEnd - yStart);
   const pixels = new Uint8ClampedArray(width * sliceHeight * 4);
@@ -106,14 +145,14 @@ function fillPixels(
       const isBar = y >= planeHeight;
       const color = isBar
         ? (mode === "oklch"
-          ? oklchToRgb(planeL, planeC, (x / maxX) * 360)
+          ? oklchToRgbGamutMapped(planeL, planeC, (x / maxX) * 360)
           : mode === "rgb"
             ? {
               r: clamp(planeR, 0, 255),
               g: clamp(planeG, 0, 255),
               b: Math.round((x / maxX) * 255),
             }
-            : hslToRgb((x / maxX) * 360, 1, 0.5))
+            : hslToRgb((x / maxX) * 360, planeS, planeHslL))
         : (mode === "oklch"
           ? oklchToRgb(1 - y / maxY, (x / maxX) * OKLCH_MAX_CHROMA, hue)
           : mode === "rgb"
@@ -147,6 +186,8 @@ self.onmessage = (event: MessageEvent<PaintMessage>) => {
     planeR,
     planeG,
     planeB,
+    planeS,
+    planeHslL,
     token,
   } = event.data;
   const pixels = fillPixels(
@@ -162,6 +203,8 @@ self.onmessage = (event: MessageEvent<PaintMessage>) => {
     planeR,
     planeG,
     planeB,
+    planeS,
+    planeHslL,
   );
   self.postMessage({ pixels, width, height: Math.max(0, yEnd - yStart), token }, [pixels.buffer]);
 };

@@ -86,6 +86,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
   const panelTheme = usePanelTheme();
   const ariaLabel = rest["aria-label"] as string | undefined;
   const resolvedControlId = useResolvedControlId(controlId, ariaLabel ?? title);
+  const hasExplicitControlId = controlId !== undefined;
   const [storeValue, setStoreValue] = useControlValue<string | boolean | undefined>(resolvedControlId);
   const resolvedBehavior: IconButtonBehavior = behavior ?? (options?.length ? "cycle" : "momentary");
   const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
@@ -97,7 +98,9 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
   const isPressedControlled = pressed !== undefined;
   const shouldUseStorePressed = resolvedControlId !== undefined
     && resolvedBehavior === "momentary"
-    && pressed === undefined;
+    && pressed === undefined
+    && hasExplicitControlId;
+  const shouldPersistPressed = shouldUseStorePressed;
   const resolvedPressed = isPressedControlled
     ? pressed
     : (shouldUseStorePressed
@@ -107,11 +110,11 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     if (!isPressedControlled) {
       setUncontrolledPressed(next);
     }
-    if (shouldUseStorePressed) {
+    if (shouldPersistPressed) {
       setStoreValue(next ? true : undefined);
     }
     onPressChange?.(next);
-  }, [isPressedControlled, onPressChange, setStoreValue, shouldUseStorePressed]);
+  }, [isPressedControlled, onPressChange, setStoreValue, shouldPersistPressed]);
   const [uncontrolledToggled, setUncontrolledToggled] = React.useState(defaultToggled);
   const isToggleControlled = toggled !== undefined;
   const shouldUseStoreToggle = resolvedControlId !== undefined
@@ -152,7 +155,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     setStoreValue(defaultToggled);
   }, [defaultToggled, setStoreValue, shouldUseStoreToggle, storeValue]);
   React.useEffect(() => {
-    if (!shouldUseStorePressed) return;
+    if (!shouldPersistPressed) return;
     if (storeValue === false) {
       setStoreValue(undefined);
       return;

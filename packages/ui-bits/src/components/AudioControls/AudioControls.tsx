@@ -490,8 +490,7 @@ export default function AudioControls({
                 colorA={safeA}
                 colorB={safeB}
                 fontSize={resolvedFontSize}
-                mode="external"
-                readExternal={() => resolvedBinCount}
+                value={resolvedBinCount}
                 onUserChange={(value: number) => {
                   setBinCountValue(clampBins(value));
                 }}
@@ -514,15 +513,14 @@ export default function AudioControls({
               colorA={safeA}
               colorB={safeB}
               fontSize={resolvedFontSize}
-              mode="external"
-              readExternal={() => freqMinHz}
+              value={freqMinHz}
               onUserChange={handleFreqMinChange}
               onAnimatedUpdate={handleFreqMinChange}
               formatDisplayValue={(value) => `${Math.round(value)}`}
               style={{ gap: 0 }}
             />
-          <LFOSlider
-            label="Max"
+            <LFOSlider
+              label="Max"
               variant="basic"
               min={MIN_FREQ_HZ_GAP}
               max={Math.max(MIN_FREQ_HZ_GAP, nyquistHz)}
@@ -534,8 +532,7 @@ export default function AudioControls({
               colorA={safeA}
               colorB={safeB}
               fontSize={resolvedFontSize}
-              mode="external"
-              readExternal={() => freqMaxHz}
+              value={freqMaxHz}
               onUserChange={handleFreqMaxChange}
               onAnimatedUpdate={handleFreqMaxChange}
               formatDisplayValue={(value) => `${Math.round(value)}`}
@@ -671,8 +668,7 @@ export default function AudioControls({
             colorA={safeA}
             colorB={safeB}
             fontSize={resolvedFontSize}
-            mode="external"
-            readExternal={() => attackMsClamped}
+            value={attackMsClamped}
             onUserChange={(value: number) => setAttackMsRaw(roundMs(value))}
             onAnimatedUpdate={(value: number) => setAttackMsRaw(roundMs(value))}
             formatDisplayValue={(value) => `${Math.round(value)}`}
@@ -691,8 +687,7 @@ export default function AudioControls({
             colorA={safeA}
             colorB={safeB}
             fontSize={resolvedFontSize}
-            mode="external"
-            readExternal={() => releaseMsClamped}
+            value={releaseMsClamped}
             onUserChange={(value: number) => setReleaseMsRaw(roundMs(value))}
             onAnimatedUpdate={(value: number) => setReleaseMsRaw(roundMs(value))}
             formatDisplayValue={(value) => `${Math.round(value)}`}
@@ -711,8 +706,7 @@ export default function AudioControls({
             colorA={safeA}
             colorB={safeB}
             fontSize={resolvedFontSize}
-            mode="external"
-            readExternal={() => smoothingValue}
+            value={smoothingValue}
             onUserChange={(value: number) => setSmoothingValueRaw(roundUnit(value))}
             onAnimatedUpdate={(value: number) => setSmoothingValueRaw(roundUnit(value))}
             formatDisplayValue={(value) => value.toFixed(1)}
@@ -731,8 +725,7 @@ export default function AudioControls({
             colorA={safeA}
             colorB={safeB}
             fontSize={resolvedFontSize}
-            mode="external"
-            readExternal={() => blurValue}
+            value={blurValue}
             onUserChange={(value: number) => setBlurValueRaw(roundSigma(value))}
             onAnimatedUpdate={(value: number) => setBlurValueRaw(roundSigma(value))}
             formatDisplayValue={(value) => value.toFixed(1)}

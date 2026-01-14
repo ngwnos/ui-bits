@@ -779,6 +779,7 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
             borderWidth: 1,
             borderColor: popoverBorderColor,
             background: resolvedColorA,
+            boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
             boxSizing: "border-box",
             zIndex: 20,
             display: "flex",

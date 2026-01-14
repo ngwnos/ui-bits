@@ -145,7 +145,8 @@ function fillPixels(
       const isBar = y >= planeHeight;
       const color = isBar
         ? (mode === "oklch"
-          ? oklchToRgbGamutMapped(planeL, planeC, (x / maxX) * 360)
+          // Bar: Lightness (X axis = L from 0 to 1)
+          ? oklchToRgbGamutMapped((x / maxX), planeC, hue)
           : mode === "rgb"
             ? {
               r: clamp(planeR, 0, 255),
@@ -154,7 +155,23 @@ function fillPixels(
             }
             : hslToRgb((x / maxX) * 360, planeS, planeHslL))
         : (mode === "oklch"
-          ? oklchToRgb(1 - y / maxY, (x / maxX) * OKLCH_MAX_CHROMA, hue)
+          // Plane: H (X axis) × C (Y axis, high at top) at fixed L
+          ? (() => {
+            const h = (x / maxX) * 360;
+            const c = (1 - y / maxY) * OKLCH_MAX_CHROMA;
+            const inGamut = isOklchInGamut(planeL, c, h);
+            if (!inGamut) {
+              // Check if we're at the gamut boundary (pixel below is in gamut)
+              const cBelow = (1 - (y + 1) / maxY) * OKLCH_MAX_CHROMA;
+              const belowInGamut = isOklchInGamut(planeL, cBelow, h);
+              if (belowInGamut) {
+                return { r: 0, g: 0, b: 0 }; // Black boundary line
+              }
+              // Show gamut-mapped color above the boundary
+              return oklchToRgbGamutMapped(planeL, c, h);
+            }
+            return oklchToRgb(planeL, c, h);
+          })()
           : mode === "rgb"
             ? {
               r: Math.round((x / maxX) * 255),

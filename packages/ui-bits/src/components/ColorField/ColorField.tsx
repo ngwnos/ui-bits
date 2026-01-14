@@ -569,12 +569,13 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
       ?? (y >= planeHeight ? "hue" : "plane");
     if (region === "plane") {
       if (planeMode === "oklch") {
+        // Plane: X = Hue, Y = Chroma (high at top)
         const ratioX = clamp01(rect.width > 0 ? x / rect.width : 0);
         const ratioY = clamp01(planeHeight > 0 ? y / planeHeight : 0);
         const next = {
           ...oklchRef.current,
-          c: ratioX * OKLCH_MAX_CHROMA,
-          l: 1 - ratioY,
+          h: ratioX * 360,
+          c: (1 - ratioY) * OKLCH_MAX_CHROMA,
         };
         oklchRef.current = next;
         setOklchState(next);
@@ -603,9 +604,10 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
         commitValue(hslToHex(next.h, next.s, next.l));
       }
     } else if (planeMode === "oklch") {
+      // Bar: X = Lightness
       const next = {
         ...oklchRef.current,
-        h: clamp01(rect.width > 0 ? x / rect.width : 0) * 360,
+        l: clamp01(rect.width > 0 ? x / rect.width : 0),
       };
       oklchRef.current = next;
       setOklchState(next);
@@ -778,22 +780,25 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
               (() => {
                 const planeMode = colorMode;
                 const planeHeight = Math.max(1, canvasMetrics.height - canvasMetrics.barHeight);
+                // OKLCH: X = Hue, Y = Chroma (high at top)
+                // Others: X = S or R, Y = L or G (inverted)
                 const planeX = planeMode === "oklch"
-                  ? clamp01(oklchState.c / OKLCH_MAX_CHROMA) * canvasMetrics.width
+                  ? clamp01(oklchState.h / 360) * canvasMetrics.width
                   : planeMode === "rgb"
                     ? clamp01(rgbState.r / 255) * canvasMetrics.width
                     : clamp01(hslState.s) * canvasMetrics.width;
                 const planeY = planeMode === "oklch"
-                  ? clamp01(1 - oklchState.l) * planeHeight
+                  ? clamp01(1 - oklchState.c / OKLCH_MAX_CHROMA) * planeHeight
                   : planeMode === "rgb"
                     ? clamp01(1 - rgbState.g / 255) * planeHeight
                     : clamp01(1 - hslState.l) * planeHeight;
-                const hueValue = planeMode === "oklch"
-                  ? oklchState.h / 360
+                // OKLCH bar: Lightness, Others: Hue or Blue
+                const barValue = planeMode === "oklch"
+                  ? oklchState.l
                   : planeMode === "rgb"
                     ? rgbState.b / 255
                     : hslState.h / 360;
-                const hueX = clamp01(hueValue) * canvasMetrics.width;
+                const barX = clamp01(barValue) * canvasMetrics.width;
                 return (
                   <>
                     <div
@@ -813,7 +818,7 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
                     <div
                       style={{
                         position: "absolute",
-                        left: `${hueX}px`,
+                        left: `${barX}px`,
                         top: `${Math.max(1, canvasMetrics.height - canvasMetrics.barHeight) + canvasMetrics.barHeight / 2}px`,
                         width: 10,
                         height: 10,

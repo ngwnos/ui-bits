@@ -129,23 +129,20 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const panelSurface = usePanelSurface();
   const usePanelSurfaceBackground = inheritPanelSurface ?? Boolean(panelSurface);
   const surfaceOpacity = panelSurface?.opacity ?? 1;
+  const surfaceBlur = panelSurface?.blur ?? 0;
   const headerBackground = rawHeaderBackground;
   const headerTextColor = rawHeaderTextColor;
   const bodyBaseColor = isCollapsed ? resolvedColorA : resolvedColorB;
-  const bodyBackground = resolvedTransparent
-    ? "transparent"
-    : usePanelSurfaceBackground
-      ? colorWithAlpha(bodyBaseColor, surfaceOpacity)
-      : bodyBaseColor;
+  const useTransparentSurface = resolvedTransparent && usePanelSurfaceBackground;
+  const bodyBackground = useTransparentSurface
+    ? colorWithAlpha(bodyBaseColor, surfaceOpacity)
+    : bodyBaseColor;
   const toggleValue = isCollapsed ? "collapsed" : "expanded";
   const toggleOptions = [
     { value: "collapsed", ariaLabel: "Expand section", title: "Expand section" },
     { value: "expanded", ariaLabel: "Collapse section", title: "Collapse section" },
   ];
   const localRef = React.useRef<HTMLDivElement | null>(null);
-  const bodyRef = React.useRef<HTMLDivElement | null>(null);
-  const registerSurface = panelSurface?.registerSurface;
-  const unregisterSurface = panelSurface?.unregisterSurface;
   const setRefs = React.useCallback((node: HTMLDivElement | null) => {
     localRef.current = node;
     if (!ref) return;
@@ -155,16 +152,6 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
       (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
     }
   }, [ref]);
-  const shouldRegisterBody = usePanelSurfaceBackground && renderBody && !isCollapsed;
-  React.useEffect(() => {
-    if (!shouldRegisterBody || !registerSurface) return;
-    const node = bodyRef.current;
-    if (!node) return;
-    registerSurface(node);
-    return () => {
-      if (unregisterSurface) unregisterSurface(node);
-    };
-  }, [isCollapsed, registerSurface, renderBody, shouldRegisterBody, unregisterSurface]);
 
   const commitCollapse = (next: boolean) => {
     if (!isControlled) {
@@ -270,7 +257,6 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
       </div>
       {renderBody && (
         <div
-          ref={bodyRef}
           style={{
             paddingLeft: resolveSize(padding),
             paddingRight: resolveSize(padding),
@@ -280,6 +266,8 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
             flexDirection: "column",
             gap: bodyGap,
             background: bodyBackground,
+            backdropFilter: useTransparentSurface && surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
+            WebkitBackdropFilter: useTransparentSurface && surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
           }}
           aria-hidden={isCollapsed}
         >

@@ -128,11 +128,6 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const [dragPosition, setDragPosition] = React.useState<{ x: number; y: number } | null>(() => (
     defaultPosition ? { x: defaultPosition.x, y: defaultPosition.y } : null
   ));
-  const bodyRef = React.useRef<HTMLDivElement | null>(null);
-  const surfaceNodesRef = React.useRef<Set<HTMLElement>>(new Set());
-  const resizeObserverRef = React.useRef<ResizeObserver | null>(null);
-  const [surfaceRects, setSurfaceRects] = React.useState<Array<{ x: number; y: number; width: number; height: number }>>([]);
-  const [surfaceSize, setSurfaceSize] = React.useState<{ width: number; height: number } | null>(null);
   React.useEffect(() => {
     if (position) {
       setDragPosition({ x: position.x, y: position.y });
@@ -189,94 +184,10 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   }), [borderStyle, colorA, colorB, resolvedBodyBlur, resolvedFontSize, transparent]);
   const renderBody = !resolvedCollapsed || keepMounted;
   const suspendChildren = Boolean(suspended || (keepMounted && resolvedCollapsed));
-  const updateSurfaceRects = React.useCallback(() => {
-    const bodyNode = bodyRef.current;
-    if (!bodyNode) return;
-    const bodyRect = bodyNode.getBoundingClientRect();
-    if (!bodyRect.width || !bodyRect.height) return;
-    const nextRects: Array<{ x: number; y: number; width: number; height: number }> = [];
-    surfaceNodesRef.current.forEach((node) => {
-      const rect = node.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      const x = Math.max(0, rect.left - bodyRect.left);
-      const y = Math.max(0, rect.top - bodyRect.top);
-      const width = Math.max(0, Math.min(rect.width, bodyRect.width - x));
-      const height = Math.max(0, Math.min(rect.height, bodyRect.height - y));
-      if (width > 0 && height > 0) {
-        nextRects.push({ x, y, width, height });
-      }
-    });
-    setSurfaceSize({ width: bodyRect.width, height: bodyRect.height });
-    setSurfaceRects(nextRects);
-  }, []);
-  const registerSurface = React.useCallback((node: HTMLElement) => {
-    surfaceNodesRef.current.add(node);
-    resizeObserverRef.current?.observe(node);
-    updateSurfaceRects();
-  }, [updateSurfaceRects]);
-  const unregisterSurface = React.useCallback((node: HTMLElement) => {
-    surfaceNodesRef.current.delete(node);
-    resizeObserverRef.current?.unobserve(node);
-    updateSurfaceRects();
-  }, [updateSurfaceRects]);
-  React.useLayoutEffect(() => {
-    updateSurfaceRects();
-  }, [updateSurfaceRects, children, resolvedPaddingLeftValue, resolvedPaddingRightValue, resolvedPaddingBottomValue, resolvedVerticalGap]);
-  React.useEffect(() => {
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => updateSurfaceRects());
-    resizeObserverRef.current = observer;
-    const bodyNode = bodyRef.current;
-    if (bodyNode) observer.observe(bodyNode);
-    surfaceNodesRef.current.forEach((node) => observer.observe(node));
-    return () => {
-      observer.disconnect();
-      resizeObserverRef.current = null;
-    };
-  }, [updateSurfaceRects]);
-  const surfaceOverlayRects = React.useMemo(() => (
-    surfaceRects.map((rect) => ({
-      x: Math.max(0, Math.floor(rect.x)),
-      y: Math.max(0, Math.floor(rect.y)),
-      width: Math.max(0, Math.ceil(rect.width)),
-      height: Math.max(0, Math.ceil(rect.height)),
-    }))
-  ), [surfaceRects]);
-  const surfacePathData = React.useMemo(() => {
-    if (!surfaceSize) return null;
-    const width = Math.max(1, Math.ceil(surfaceSize.width));
-    const height = Math.max(1, Math.ceil(surfaceSize.height));
-    const makeHolePath = (rect: { x: number; y: number; width: number; height: number }) => {
-      const rawRadius = Math.min(resolvedRadius, rect.width / 2, rect.height / 2);
-      const radius = Math.max(0, Math.floor(rawRadius));
-      if (radius <= 0) {
-        return `M${rect.x} ${rect.y}H${rect.x + rect.width}V${rect.y + rect.height}H${rect.x}Z`;
-      }
-      const right = rect.x + rect.width;
-      const bottom = rect.y + rect.height;
-      return [
-        `M${rect.x} ${rect.y}`,
-        `H${right}`,
-        `V${bottom - radius}`,
-        `A${radius} ${radius} 0 0 1 ${right - radius} ${bottom}`,
-        `H${rect.x + radius}`,
-        `A${radius} ${radius} 0 0 1 ${rect.x} ${bottom - radius}`,
-        "Z",
-      ].join("");
-    };
-    const holes = surfaceOverlayRects.map((rect) => makeHolePath(rect));
-    return {
-      width,
-      height,
-      path: `M0 0H${width}V${height}H0Z${holes.length ? ` ${holes.join(" ")}` : ""}`,
-    };
-  }, [resolvedRadius, surfaceOverlayRects, surfaceSize]);
   const panelSurfaceValue = React.useMemo(() => ({
     opacity: surfaceOpacity,
     blur: surfaceBlur,
-    registerSurface,
-    unregisterSurface,
-  }), [registerSurface, surfaceBlur, surfaceOpacity, unregisterSurface]);
+  }), [surfaceBlur, surfaceOpacity]);
   const toggleValue = resolvedCollapsed ? "collapsed" : "expanded";
   const toggleOptions = [
     { value: "collapsed", ariaLabel: "Expand panel", title: "Expand panel" },
@@ -527,61 +438,20 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
           aria-hidden={resolvedCollapsed}
         >
           <div
-            ref={bodyRef}
             style={{
               padding: `${verticalGapValue} ${resolvedPaddingRightValue} ${resolvedPaddingBottomValue} ${resolvedPaddingLeftValue}`,
               display: "flex",
               flexDirection: "column",
               position: "relative",
+              background: colorWithAlpha(colorB, surfaceOpacity),
+              backdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
+              WebkitBackdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
             }}
           >
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: surfaceBlur > 0 ? "rgba(0,0,0,0.001)" : "transparent",
-                backdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
-                WebkitBackdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
-                pointerEvents: "none",
-                zIndex: 0,
-              }}
-            />
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                inset: 0,
-                pointerEvents: "none",
-                zIndex: 1,
-              }}
-            >
-              {surfacePathData ? (
-                <svg
-                  width="100%"
-                  height="100%"
-                  viewBox={`0 0 ${surfacePathData.width} ${surfacePathData.height}`}
-                  preserveAspectRatio="none"
-                  style={{ display: "block" }}
-                >
-                  <path d={surfacePathData.path} fill={colorWithAlpha(colorB, surfaceOpacity)} fillRule="evenodd" />
-                </svg>
-              ) : (
-                <div
-                  aria-hidden
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: colorWithAlpha(colorB, surfaceOpacity),
-                    pointerEvents: "none",
-                  }}
-                />
-              )}
-            </div>
             <VerticalGapContext.Provider value={resolvedVerticalGap}>
               <PanelSurfaceContext.Provider value={panelSurfaceValue}>
                 <AnimationSuspensionProvider suspended={suspendChildren}>
-                  <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", gap: resolvedVerticalGap }}>
+                  <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: resolvedVerticalGap }}>
                     {children}
                   </div>
                 </AnimationSuspensionProvider>

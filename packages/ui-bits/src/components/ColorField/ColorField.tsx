@@ -414,6 +414,7 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   const oklchRef = React.useRef(oklchState);
   const [colorMode, setColorMode] = React.useState<"hsv" | "rgb" | "oklch">("oklch");
   const [isPickerOpen, setIsPickerOpen] = React.useState(false);
+  const [popoverPlacement, setPopoverPlacement] = React.useState<"below" | "above">("below");
 
   React.useEffect(() => {
     hsvRef.current = hsvState;
@@ -471,6 +472,28 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [isPickerOpen]);
+
+  const updatePopoverPlacement = React.useCallback(() => {
+    if (!fieldRef.current || typeof window === "undefined") return;
+    const rect = fieldRef.current.getBoundingClientRect();
+    const nextPlacement = rect.top + popoverOffset + popoverHeight > window.innerHeight
+      ? "above"
+      : "below";
+    setPopoverPlacement((prev) => (prev === nextPlacement ? prev : nextPlacement));
+  }, [popoverHeight, popoverOffset]);
+
+  React.useEffect(() => {
+    if (!isPickerOpen || typeof window === "undefined") return;
+    const handleUpdate = () => updatePopoverPlacement();
+    const frame = window.requestAnimationFrame(handleUpdate);
+    window.addEventListener("resize", handleUpdate);
+    window.addEventListener("scroll", handleUpdate, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", handleUpdate);
+      window.removeEventListener("scroll", handleUpdate, true);
+    };
+  }, [isPickerOpen, updatePopoverPlacement]);
 
   React.useEffect(() => {
     if (!isPickerOpen) return;
@@ -770,7 +793,9 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
         <div
           style={{
             position: "absolute",
-            top: popoverOffset,
+            top: popoverPlacement === "above"
+              ? -(popoverHeight + popoverOffset)
+              : popoverOffset,
             left: 0,
             width: "100%",
             height: popoverHeight,

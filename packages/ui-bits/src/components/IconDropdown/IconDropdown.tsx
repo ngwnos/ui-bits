@@ -90,7 +90,11 @@ export default function IconDropdown({
       const iconGap = showMenuIcons ? resolvedFontSize * 0.4 : 0;
       return `calc(${maxLabel.length}ch + ${Math.max(2, Math.round(resolvedFontSize * 0.6))}em + ${Math.round(iconWidth + iconGap)}px)`;
     }
-    context.font = `600 ${resolvedFontSize}px 'IBM Plex Mono', monospace`;
+    const computedFont = getComputedStyle(document.documentElement)
+      .getPropertyValue("--ui-bits-font-family")
+      .trim();
+    const fontFamily = computedFont || '"IBM Plex Mono", monospace';
+    context.font = `600 ${resolvedFontSize}px ${fontFamily}`;
     const maxTextWidth = options.reduce((max, option) => (
       Math.max(max, context.measureText(option.label).width)
     ), 0);

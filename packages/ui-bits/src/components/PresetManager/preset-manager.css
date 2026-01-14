@@ -4,7 +4,7 @@
   gap: 6px;
   width: 100%;
   color: var(--pm-color-a, #f0f0f0);
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--ui-bits-font-family, "IBM Plex Mono", monospace);
   box-sizing: border-box;
 }
 

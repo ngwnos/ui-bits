@@ -140,7 +140,7 @@ export default function SegmentBar({
     flexDirection: "column",
     gap: "0.25rem",
     fontSize: appliedFontSize,
-    fontFamily: "'IBM Plex Mono', monospace",
+    fontFamily: 'var(--ui-bits-font-family, "IBM Plex Mono", monospace)',
     fontWeight: 600,
     ...(style ?? {}),
   };

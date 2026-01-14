@@ -378,6 +378,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
           flexDirection: "column",
           overflow: "hidden",
           fontSize: resolvedFontSize,
+          fontFamily: 'var(--ui-bits-font-family, "IBM Plex Mono", monospace)',
           lineHeight: 1.3,
           position: isFloating ? "fixed" : undefined,
           left: isFloating ? `${resolvedPosition!.x}px` : undefined,

@@ -1,5 +1,5 @@
 .dropdown-root {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--ui-bits-font-family, "IBM Plex Mono", monospace);
   font-size: var(--dropdown-font-size, 16px);
   display: flex;
   flex-direction: column;

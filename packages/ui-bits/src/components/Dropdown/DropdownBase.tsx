@@ -359,7 +359,7 @@ export default function DropdownBase({
       style={{
         width: "100%",
         maxWidth: resolvedMaxWidth,
-        fontFamily: "'IBM Plex Mono', monospace",
+        fontFamily: 'var(--ui-bits-font-family, "IBM Plex Mono", monospace)',
         fontWeight: 600,
         ...themeVars,
         ...style,

@@ -1690,7 +1690,7 @@ function SliderCore({
     width: '100%',
     maxWidth: resolvedMaxWidth,
     fontSize: appliedFontSize,
-    fontFamily: "'IBM Plex Mono', monospace",
+    fontFamily: 'var(--ui-bits-font-family, "IBM Plex Mono", monospace)',
     fontWeight: 600,
     gap: stackGap,
     ...(style ?? {}),

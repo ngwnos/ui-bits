@@ -5,3 +5,7 @@
   font-style: normal;
   font-display: swap;
 }
+
+:root {
+  --ui-bits-font-family: "IBM Plex Mono", monospace;
+}

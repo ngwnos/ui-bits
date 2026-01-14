@@ -3,7 +3,7 @@
   width: 100%;
   border: 1px solid var(--seq-border, #4a4a4a);
   border-radius: 3px;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--ui-bits-font-family, "IBM Plex Mono", monospace);
   font-size: var(--seq-font-size, 12px);
   color: var(--seq-header-text, #f2f0e5);
 }

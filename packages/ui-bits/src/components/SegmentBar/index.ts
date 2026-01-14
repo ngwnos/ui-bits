@@ -3,4 +3,5 @@ export type {
   SegmentBarProps,
   SegmentBarOption,
   SegmentBarBorderStyle,
+  SegmentBarBorderMask,
 } from "./SegmentBar";

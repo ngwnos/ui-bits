@@ -75,6 +75,11 @@ export {
   type ColorPickerBorderStyle,
   type ColorPickerBorderMask,
 } from "./components/ColorPicker";
+export {
+  default as ColorField,
+  type ColorFieldProps,
+  type ColorFieldBorderStyle,
+} from "./components/ColorField";
 export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./components/LoadingBar";
 export {
   default as VirtualKeyboard,
@@ -103,6 +108,7 @@ export {
   type SegmentBarProps,
   type SegmentBarOption,
   type SegmentBarBorderStyle,
+  type SegmentBarBorderMask,
 } from "./components/SegmentBar";
 export {
   default as PresetManager,

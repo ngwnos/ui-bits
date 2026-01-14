@@ -7,6 +7,7 @@ import {
   VerticalGapContext,
 } from "../../panelGap";
 import IconButton from "../IconButton";
+import Dial from "../Dial";
 
 export type FloatingPanelBorderStyle = "a" | "b" | "none";
 
@@ -23,6 +24,9 @@ export interface FloatingPanelProps extends Omit<React.HTMLAttributes<HTMLDivEle
   transparent?: boolean;
   bodyBlur?: number;
   bodyOpacity?: number;
+  defaultBodyOpacity?: number;
+  onBodyOpacityChange?: (opacity: number) => void;
+  showOpacityControl?: boolean;
   verticalGap?: number;
   collapsed?: boolean;
   defaultCollapsed?: boolean;
@@ -100,6 +104,9 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     transparent = false,
     bodyBlur,
     bodyOpacity,
+    defaultBodyOpacity,
+    onBodyOpacityChange,
+    showOpacityControl = false,
     collapsed,
     defaultCollapsed = false,
     keepMounted = true,
@@ -172,18 +179,44 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const verticalGapValue = `${resolvedVerticalGap}px`;
   const headerMinHeight = computeHeaderHeight(resolvedFontSize);
   const headerBorderWidth = resolvedBorderWidth;
-  const resolvedBodyOpacity = clampBetween(bodyOpacity ?? DEFAULT_BODY_OPACITY, 0, 1);
+  const isBodyOpacityControlled = bodyOpacity !== undefined;
+  const [internalBodyOpacity, setInternalBodyOpacity] = React.useState(() => (
+    clampBetween(bodyOpacity ?? defaultBodyOpacity ?? DEFAULT_BODY_OPACITY, 0, 1)
+  ));
+  React.useEffect(() => {
+    if (bodyOpacity === undefined) return;
+    setInternalBodyOpacity(clampBetween(bodyOpacity, 0, 1));
+  }, [bodyOpacity]);
+  const resolvedBodyOpacity = clampBetween(
+    isBodyOpacityControlled ? bodyOpacity! : internalBodyOpacity,
+    0,
+    1,
+  );
   const resolvedBodyBlur = Math.max(0, bodyBlur ?? DEFAULT_BODY_BLUR);
-  const surfaceOpacity = transparent ? resolvedBodyOpacity : 1;
-  const surfaceBlur = transparent ? resolvedBodyBlur : 0;
+  const usesTransparency = transparent || showOpacityControl;
+  const transparencyActive = usesTransparency && (!showOpacityControl || resolvedBodyOpacity < 1);
+  const surfaceOpacity = transparencyActive ? resolvedBodyOpacity : 1;
+  const surfaceBlur = transparencyActive ? resolvedBodyBlur : 0;
+  const opacityDialValue = Math.round(resolvedBodyOpacity * 100);
+  const formatOpacity = React.useCallback(
+    (value: number) => String(Math.round(value) % 100).padStart(2, "0"),
+    [],
+  );
+  const handleOpacityDialChange = (value: number) => {
+    const nextOpacity = clampBetween(value / 100, 0, 1);
+    if (!isBodyOpacityControlled) {
+      setInternalBodyOpacity(nextOpacity);
+    }
+    onBodyOpacityChange?.(nextOpacity);
+  };
   const panelTheme = React.useMemo(() => ({
     colorA,
     colorB,
     fontSize: resolvedFontSize,
     borderStyle,
-    transparent,
+    transparent: transparencyActive,
     bodyBlur: resolvedBodyBlur,
-  }), [borderStyle, colorA, colorB, resolvedBodyBlur, resolvedFontSize, transparent]);
+  }), [borderStyle, colorA, colorB, resolvedBodyBlur, resolvedFontSize, transparencyActive]);
   const renderBody = !resolvedCollapsed || keepMounted;
   const suspendChildren = Boolean(suspended || (keepMounted && resolvedCollapsed));
   const panelSurfaceValue = React.useMemo(() => ({
@@ -223,6 +256,20 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     if (typeof window === "undefined") return;
     handleDock();
   }, [dockOnMount, handleDock]);
+  const opacityControl = showOpacityControl ? (
+    <Dial
+      min={0}
+      max={100}
+      step={1}
+      value={opacityDialValue}
+      onChange={handleOpacityDialChange}
+      borderStyle="none"
+      fontSize={resolvedFontSize}
+      ariaLabel="Panel opacity"
+      formatDisplayValue={formatOpacity}
+      data-floating-panel-ignore-drag
+    />
+  ) : null;
   const resolvedHeader = header ?? (
     <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -273,9 +320,10 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
         )}
         {title ? <span>{title}</span> : null}
       </div>
-      {(headerControls || showDock) ? (
+      {(headerControls || opacityControl || showDock) ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
           {headerControls}
+          {opacityControl}
           {showDock ? (
             <IconButton
               borderStyle="none"

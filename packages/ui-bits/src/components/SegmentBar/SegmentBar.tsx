@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { clamp } from "../../lfo";
 import { useControlValue, useResolvedControlId } from "../../controlStore";
+import { usePanelTheme } from "../../panelGap";
 
 export interface SegmentBarOption {
   value: string;
@@ -14,9 +15,12 @@ export interface SegmentBarOption {
 }
 
 export type SegmentBarBorderStyle = "a" | "b" | "none";
+export type SegmentBarBorderMask = Partial<Record<"top" | "right" | "bottom" | "left", boolean>>;
 
 export interface SegmentBarProps {
   label?: string;
+  showLabel?: boolean;
+  ariaLabel?: string;
   options: SegmentBarOption[];
   value?: string;
   defaultValue?: string;
@@ -24,6 +28,7 @@ export interface SegmentBarProps {
   colorA?: string;
   colorB?: string;
   borderStyle?: SegmentBarBorderStyle;
+  borderMask?: SegmentBarBorderMask;
   width?: number | string;
   fontSize?: number;
   disabled?: boolean;
@@ -69,13 +74,16 @@ function resolveInitialValue(
 
 export default function SegmentBar({
   label,
+  showLabel = false,
+  ariaLabel,
   options,
   value,
   defaultValue,
   onChange,
   colorA,
   colorB,
-  borderStyle = "a",
+  borderStyle,
+  borderMask,
   width,
   fontSize,
   disabled = false,
@@ -83,13 +91,17 @@ export default function SegmentBar({
   className,
   style,
 }: SegmentBarProps) {
-  const resolvedControlId = useResolvedControlId(controlId, label);
+  const panelTheme = usePanelTheme();
+  const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
+  const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? "a";
+  const resolvedColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
+  const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
+  const accessibleLabel = ariaLabel ?? label;
+  const resolvedControlId = useResolvedControlId(controlId, accessibleLabel);
   const [storeValue, setStoreValue] = useControlValue<string>(resolvedControlId);
   const shouldUseStore = resolvedControlId !== undefined && value === undefined;
   const resolvedValueProp = shouldUseStore ? storeValue : value;
-  const resolvedColorA = colorA ?? FALLBACK_COLOR_A;
-  const resolvedColorB = colorB ?? FALLBACK_COLOR_B;
-  const borderMode = borderStyle;
+  const borderMode = resolvedBorderStyle;
   const resolvedBorderColor = borderMode === "a"
     ? resolvedColorA
     : borderMode === "b"
@@ -126,20 +138,20 @@ export default function SegmentBar({
   optionRefs.current.length = options.length;
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  const appliedFontSize = fontSize ?? 12;
   const resolvedWidth = width == null
     ? undefined
     : typeof width === "number"
       ? `${width}px`
       : width;
-  const segmentPaddingY = `${0.35}em`;
+  const segmentPaddingY = "0.35em";
+  const segmentPaddingX = "0.5em";
   const wrapperStyle: React.CSSProperties = {
     width: "100%",
     maxWidth: resolvedWidth,
     display: "flex",
     flexDirection: "column",
-    gap: "0.25rem",
-    fontSize: appliedFontSize,
+    gap: showLabel && label ? "0.25rem" : 0,
+    fontSize: resolvedFontSize,
     fontFamily: 'var(--ui-bits-font-family, "IBM Plex Mono", monospace)',
     fontWeight: 600,
     ...(style ?? {}),
@@ -218,17 +230,40 @@ export default function SegmentBar({
     };
   }, []);
 
+  const normalizedBorderMask = {
+    top: borderMask?.top ?? true,
+    right: borderMask?.right ?? true,
+    bottom: borderMask?.bottom ?? true,
+    left: borderMask?.left ?? true,
+  };
+
   return (
     <div className={className} style={wrapperStyle}>
+      {showLabel && label ? (
+        <div
+          style={{
+            fontSize: "0.8em",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: resolvedColorA,
+          }}
+        >
+          {label}
+        </div>
+      ) : null}
       <div
         role="radiogroup"
+        aria-label={accessibleLabel}
         aria-disabled={disabled || undefined}
         style={{
           position: "relative",
           display: "grid",
           gridTemplateColumns: `repeat(${Math.max(options.length, 1)}, minmax(0, 1fr))`,
           borderRadius: 3,
-          border: `1px solid ${resolvedBorderColor}`,
+          borderTop: normalizedBorderMask.top ? `1px solid ${resolvedBorderColor}` : "none",
+          borderRight: normalizedBorderMask.right ? `1px solid ${resolvedBorderColor}` : "none",
+          borderBottom: normalizedBorderMask.bottom ? `1px solid ${resolvedBorderColor}` : "none",
+          borderLeft: normalizedBorderMask.left ? `1px solid ${resolvedBorderColor}` : "none",
           overflow: "hidden",
           backgroundColor: containerBackground,
           touchAction: "none",
@@ -285,13 +320,13 @@ export default function SegmentBar({
                 }}
                 style={{
                   border: "none",
-                  borderRight: index < options.length - 1 ? `1px solid ${resolvedColorA}` : "none",
+                  borderRight: index < options.length - 1 ? `1px solid ${resolvedBorderColor}` : "none",
                   background,
                   color: isActive ? activeTextColor : inactiveTextColor,
                   fontSize: "inherit",
                   fontFamily: "inherit",
                   fontWeight: 600,
-                  padding: `${segmentPaddingY} 0.75rem`,
+                  padding: `${segmentPaddingY} ${segmentPaddingX}`,
                   lineHeight: 1,
                   display: "flex",
                   alignItems: "center",

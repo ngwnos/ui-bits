@@ -68,8 +68,6 @@ const ColorPicker = React.forwardRef<HTMLButtonElement, ColorPickerProps>((props
   const [storeValue, setStoreValue] = useControlValue<string>(resolvedControlId);
   const shouldUseStore = resolvedControlId !== undefined && value === undefined;
   const resolvedValueProp = shouldUseStore ? storeValue : value;
-  const isControlled = resolvedValueProp !== undefined;
-  const [internalValue, setInternalValue] = React.useState(defaultValue);
   const baseColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
   const baseColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
   const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? "none";
@@ -88,99 +86,61 @@ const ColorPicker = React.forwardRef<HTMLButtonElement, ColorPickerProps>((props
   const resolvedSize = computeButtonSize(resolvedFontSize);
   const resolvedRadius = Math.max(2, Math.round(resolvedFontSize * 0.25));
   const padding = Math.max(1, Math.round(resolvedFontSize * 0.1));
-  const resolvedValue = isControlled ? (resolvedValueProp ?? defaultValue) : internalValue;
+  const resolvedValue = resolvedValueProp ?? defaultValue;
   const normalizedValue = normalizeHex(resolvedValue) ?? normalizeHex(defaultValue) ?? DEFAULT_COLOR;
   const maskedBorderColor = normalizedValue;
-  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  void onChange;
+  void onChange;
 
   React.useEffect(() => {
     if (!shouldUseStore || storeValue !== undefined) return;
     setStoreValue(normalizedValue);
   }, [normalizedValue, setStoreValue, shouldUseStore, storeValue]);
 
-  const commitValue = React.useCallback((nextValue: string) => {
-    if (!isControlled) {
-      setInternalValue(nextValue);
-    }
-    if (shouldUseStore) {
-      setStoreValue(nextValue);
-    }
-    onChange?.(nextValue);
-  }, [isControlled, onChange, setStoreValue, shouldUseStore]);
-
-  const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
-    commitValue(event.target.value);
-  };
-
-  const openPicker = () => {
-    if (disabled) return;
-    inputRef.current?.click();
-  };
-
   const handleButtonClick: React.MouseEventHandler<HTMLButtonElement> = (event) => {
-    openPicker();
     onClick?.(event);
   };
 
   const handleButtonKeyDown: React.KeyboardEventHandler<HTMLButtonElement> = (event) => {
     if (event.key === " " || event.key === "Enter") {
       event.preventDefault();
-      openPicker();
     }
     onKeyDown?.(event);
   };
 
   return (
-    <span style={{ display: "inline-flex", position: "relative" }}>
-      <button
-        ref={ref}
-        type={type ?? "button"}
-        className={className}
-        disabled={disabled}
-        onClick={handleButtonClick}
-        onKeyDown={handleButtonKeyDown}
-        title={title}
-        style={{
-          width: resolvedSize,
-          height: resolvedSize,
-          borderRadius: resolvedRadius,
-          borderStyle: "solid",
-          borderWidth: 1,
-          borderColor: resolvedBorderColor,
-          borderTopColor: resolvedBorderMask.top ? resolvedBorderColor : maskedBorderColor,
-          borderRightColor: resolvedBorderMask.right ? resolvedBorderColor : maskedBorderColor,
-          borderBottomColor: resolvedBorderMask.bottom ? resolvedBorderColor : maskedBorderColor,
-          borderLeftColor: resolvedBorderMask.left ? resolvedBorderColor : maskedBorderColor,
-          boxSizing: "border-box",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding,
-          backgroundClip: "padding-box",
-          background: normalizedValue,
-          cursor: disabled ? "not-allowed" : "pointer",
-          ...(disabled ? { opacity: 0.5 } : null),
-          ...(style ?? {}),
-        } as React.CSSProperties}
-        {...rest}
-      />
-      <input
-        ref={inputRef}
-        type="color"
-        tabIndex={-1}
-        value={normalizedValue}
-        onChange={handleInputChange}
-        disabled={disabled}
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          width: 0,
-          height: 0,
-          opacity: 0,
-          pointerEvents: "none",
-        }}
-      />
-    </span>
+    <button
+      ref={ref}
+      type={type ?? "button"}
+      className={className}
+      disabled={disabled}
+      onClick={handleButtonClick}
+      onKeyDown={handleButtonKeyDown}
+      title={title}
+      style={{
+        width: resolvedSize,
+        height: resolvedSize,
+        borderRadius: resolvedRadius,
+        borderStyle: "solid",
+        borderWidth: 1,
+        borderColor: resolvedBorderColor,
+        borderTopColor: resolvedBorderMask.top ? resolvedBorderColor : maskedBorderColor,
+        borderRightColor: resolvedBorderMask.right ? resolvedBorderColor : maskedBorderColor,
+        borderBottomColor: resolvedBorderMask.bottom ? resolvedBorderColor : maskedBorderColor,
+        borderLeftColor: resolvedBorderMask.left ? resolvedBorderColor : maskedBorderColor,
+        boxSizing: "border-box",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding,
+        backgroundClip: "padding-box",
+        background: normalizedValue,
+        cursor: disabled ? "not-allowed" : "pointer",
+        ...(disabled ? { opacity: 0.5 } : null),
+        ...(style ?? {}),
+      } as React.CSSProperties}
+      {...rest}
+    />
   );
 });
 

@@ -38,6 +38,12 @@ export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBo
 export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./Dropdown";
 export { default as IconDropdown, type IconDropdownProps, type IconDropdownOption } from "./IconDropdown";
+export {
+  default as ColorPicker,
+  type ColorPickerProps,
+  type ColorPickerBorderStyle,
+  type ColorPickerBorderMask,
+} from "./ColorPicker";
 export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./LoadingBar";
 export {
   default as SegmentBar,

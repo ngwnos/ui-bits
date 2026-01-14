@@ -4,6 +4,8 @@ import {
   AudioAnalysisProvider,
   createAudioAnalysisStore,
   AudioControls,
+  ColorPicker,
+  Dial,
   Dropdown,
   IconDropdown,
   FloatingPanel,
@@ -125,13 +127,18 @@ const ROUTES = [
     id: 'floating-panel',
     label: 'Floating Panel',
     title: 'Floating Panel',
-    code: `const InspectorContent = () => {
+    code: `const [panelOpacity, setPanelOpacity] = useState(0.85)
+const panelOpacityDial = Math.round(panelOpacity * 100)
+const formatOpacity = (value) => String(Math.round(value) % 100).padStart(2, "0")
+
+const InspectorContent = () => {
   const panelTheme = usePanelTheme()
   // panelTheme exposes inherited colorA, colorB, fontSize, and borderStyle.
 
   return (
     <>
       <PresetManager maxListHeight={120} />
+      <ColorPicker aria-label="Accent color" />
       <Folder
         label="WebGPU Status"
         colorA={flexoki.green["500"]}
@@ -186,10 +193,27 @@ const ROUTES = [
     borderStyle="a"
     fontSize={12}
     width={300}
+    transparent={panelOpacity < 1}
+    bodyOpacity={panelOpacity}
+    bodyBlur={0}
     verticalGap={6}
     paddingLeft={3}
     paddingRight={3}
     paddingBottom={3}
+    headerControls={(
+      <Dial
+        min={0}
+        max={100}
+        step={1}
+        value={panelOpacityDial}
+        onChange={(value) => setPanelOpacity(value / 100)}
+        borderStyle="none"
+        fontSize={12}
+        ariaLabel="Panel opacity"
+        formatDisplayValue={formatOpacity}
+        data-floating-panel-ignore-drag
+      />
+    )}
   >
     <InspectorContent />
   </FloatingPanel>
@@ -269,6 +293,12 @@ function App() {
   const [brandColorAttack, setBrandColorAttack] = useState(15)
   const [brandColorRelease, setBrandColorRelease] = useState(5)
   const [loadingBarValue, setLoadingBarValue] = useState(0.6)
+  const [panelOpacity, setPanelOpacity] = useState(0.85)
+  const panelOpacityDial = Math.round(panelOpacity * 100)
+  const formatOpacity = useCallback(
+    (value: number) => String(Math.round(value) % 100).padStart(2, '0'),
+    [],
+  )
   const [iconToggled, setIconToggled] = useState(false)
   const [powerToggled, setPowerToggled] = useState(false)
   const [weatherMode, setWeatherMode] = useState('drizzle')
@@ -1317,20 +1347,38 @@ function App() {
                     borderStyle="a"
                     fontSize={12}
                     width={300}
+                    transparent={panelOpacity < 1}
+                    bodyOpacity={panelOpacity}
+                    bodyBlur={0}
                     verticalGap={6}
                     paddingLeft={3}
                     paddingRight={3}
                     paddingBottom={3}
+                    headerControls={(
+                      <Dial
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={panelOpacityDial}
+                        onChange={(value) => setPanelOpacity(value / 100)}
+                        borderStyle="none"
+                        fontSize={12}
+                        ariaLabel="Panel opacity"
+                        formatDisplayValue={formatOpacity}
+                        data-floating-panel-ignore-drag
+                      />
+                    )}
                   >
-      <PresetManager maxListHeight={120} />
-      <Folder
-        label="WebGPU Status"
-        colorA={flexoki.green["500"]}
-        colorB={flexoki.green["100"]}
-      >
-        <WebGpuStatus />
-      </Folder>
-      <AudioControls source={{ type: "buffer", src: "/audio/credits.mp3" }} />
+                    <PresetManager maxListHeight={120} />
+                    <ColorPicker aria-label="Accent color" />
+                    <Folder
+                      label="WebGPU Status"
+                      colorA={flexoki.green["500"]}
+                      colorB={flexoki.green["100"]}
+                    >
+                      <WebGpuStatus />
+                    </Folder>
+                    <AudioControls source={{ type: "buffer", src: "/audio/credits.mp3" }} />
                     <VirtualKeyboard
                       defaultStartNote="C4"
                       defaultNoteCount={26}

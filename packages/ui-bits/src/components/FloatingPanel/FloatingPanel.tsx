@@ -12,6 +12,7 @@ export type FloatingPanelBorderStyle = "a" | "b" | "none";
 
 export interface FloatingPanelProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   header?: React.ReactNode;
+  headerControls?: React.ReactNode;
   title?: React.ReactNode;
   collapsible?: boolean;
   showDockButton?: boolean;
@@ -88,6 +89,7 @@ function computeHeaderHeight(fontSize: number) {
 const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((props, ref) => {
   const {
     header,
+    headerControls,
     title,
     collapsible = true,
     showDockButton = true,
@@ -222,7 +224,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     handleDock();
   }, [dockOnMount, handleDock]);
   const resolvedHeader = header ?? (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: showDock ? "space-between" : "flex-start", width: "100%" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {collapsible && (
           <IconButton
@@ -271,31 +273,36 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
         )}
         {title ? <span>{title}</span> : null}
       </div>
-      {showDock ? (
-        <IconButton
-          borderStyle="none"
-          fontSize={resolvedFontSize}
-          colorA={colorA}
-          colorB={colorB}
-          aria-label="Dock panel"
-          title="Dock panel"
-          onClick={handleDock}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="100%"
-            height="100%"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M7 7h10v10" />
-            <path d="M7 17 17 7" />
-          </svg>
-        </IconButton>
+      {(headerControls || showDock) ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+          {headerControls}
+          {showDock ? (
+            <IconButton
+              borderStyle="none"
+              fontSize={resolvedFontSize}
+              colorA={colorA}
+              colorB={colorB}
+              aria-label="Dock panel"
+              title="Dock panel"
+              onClick={handleDock}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="100%"
+                height="100%"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M7 7h10v10" />
+                <path d="M7 17 17 7" />
+              </svg>
+            </IconButton>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

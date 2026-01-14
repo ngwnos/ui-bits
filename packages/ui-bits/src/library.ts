@@ -69,6 +69,12 @@ export {
 export { default as SelectionGrid, type SelectionGridProps } from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";
 export { default as IconDropdown, type IconDropdownProps, type IconDropdownOption } from "./components/IconDropdown";
+export {
+  default as ColorPicker,
+  type ColorPickerProps,
+  type ColorPickerBorderStyle,
+  type ColorPickerBorderMask,
+} from "./components/ColorPicker";
 export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./components/LoadingBar";
 export {
   default as VirtualKeyboard,

@@ -1,6 +1,13 @@
 import React from "react";
 import { AnimationSuspensionProvider } from "../../animationSuspension";
-import { usePanelEdgeBorders, usePanelSurface, usePanelTheme, useVerticalGap, VerticalGapContext } from "../../panelGap";
+import {
+  PanelThemeContext,
+  usePanelEdgeBorders,
+  usePanelSurface,
+  usePanelTheme,
+  useVerticalGap,
+  VerticalGapContext,
+} from "../../panelGap";
 import IconButton from "../IconButton";
 
 export type FolderBorderStyle = "a" | "b" | "none";
@@ -85,8 +92,18 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const resolvedColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
   const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
   const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? "a";
+  const showBorder = resolvedBorderStyle !== "none";
   const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
   const resolvedTransparent = transparent ?? panelTheme?.transparent ?? false;
+  const resolvedBodyBlur = panelTheme?.bodyBlur;
+  const resolvedTheme = React.useMemo(() => ({
+    colorA: resolvedColorA,
+    colorB: resolvedColorB,
+    fontSize: resolvedFontSize,
+    borderStyle: resolvedBorderStyle,
+    transparent: resolvedTransparent,
+    bodyBlur: resolvedBodyBlur,
+  }), [resolvedBorderStyle, resolvedBodyBlur, resolvedColorA, resolvedColorB, resolvedFontSize, resolvedTransparent]);
   const isControlled = collapsed !== undefined;
   const [internalCollapsed, setInternalCollapsed] = React.useState(defaultCollapsed);
   const isCollapsed = isControlled ? collapsed : internalCollapsed;
@@ -96,10 +113,10 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
     : resolvedBorderStyle === "b"
       ? resolvedColorB
       : "transparent";
-  const rawHeaderBackground = isCollapsed ? resolvedColorB : resolvedColorA;
-  const rawHeaderTextColor = isCollapsed ? resolvedColorA : resolvedColorB;
+  const rawHeaderBackground = isCollapsed ? resolvedColorA : resolvedColorB;
+  const rawHeaderTextColor = isCollapsed ? resolvedColorB : resolvedColorA;
   const headerHeight = computeHeaderHeight(resolvedFontSize);
-  const headerBorderWidth = 1;
+  const headerBorderWidth = showBorder ? 1 : 0;
   const headerOuterHeight = headerHeight + headerBorderWidth;
   const resolvedVerticalGap = useVerticalGap(verticalGap);
   const bodyGap = resolvedVerticalGap;
@@ -114,11 +131,12 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
   const surfaceOpacity = panelSurface?.opacity ?? 1;
   const headerBackground = rawHeaderBackground;
   const headerTextColor = rawHeaderTextColor;
+  const bodyBaseColor = isCollapsed ? resolvedColorA : resolvedColorB;
   const bodyBackground = resolvedTransparent
     ? "transparent"
     : usePanelSurfaceBackground
-      ? colorWithAlpha(rawHeaderTextColor, surfaceOpacity)
-      : rawHeaderTextColor;
+      ? colorWithAlpha(bodyBaseColor, surfaceOpacity)
+      : bodyBaseColor;
   const toggleValue = isCollapsed ? "collapsed" : "expanded";
   const toggleOptions = [
     { value: "collapsed", ariaLabel: "Expand section", title: "Expand section" },
@@ -169,7 +187,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
       style={{
         display: "flex",
         flexDirection: "column",
-        borderTop: `1px solid ${resolvedBorderColor}`,
+        borderTop: showBorder ? `1px solid ${resolvedBorderColor}` : "none",
         borderBottom: "none",
         borderLeft: "none",
         borderRight: "none",
@@ -187,9 +205,9 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
           gridTemplateColumns: `${headerHeight}px 1fr ${headerHeight}px`,
           alignItems: "center",
           padding: `0 ${resolvedPadding}`,
-          borderLeft: showLeftBorder ? `1px solid ${resolvedBorderColor}` : "none",
-          borderRight: showRightBorder ? `1px solid ${resolvedBorderColor}` : "none",
-          borderBottom: `1px solid ${resolvedBorderColor}`,
+          borderLeft: showBorder && showLeftBorder ? `1px solid ${resolvedBorderColor}` : "none",
+          borderRight: showBorder && showRightBorder ? `1px solid ${resolvedBorderColor}` : "none",
+          borderBottom: showBorder ? `1px solid ${resolvedBorderColor}` : "none",
           background: headerBackground,
           color: headerTextColor,
           boxSizing: "border-box",
@@ -266,9 +284,11 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
           aria-hidden={isCollapsed}
         >
           <VerticalGapContext.Provider value={resolvedVerticalGap}>
-            <AnimationSuspensionProvider suspended={suspendChildren}>
-              {children}
-            </AnimationSuspensionProvider>
+            <PanelThemeContext.Provider value={resolvedTheme}>
+              <AnimationSuspensionProvider suspended={suspendChildren}>
+                {children}
+              </AnimationSuspensionProvider>
+            </PanelThemeContext.Provider>
           </VerticalGapContext.Provider>
         </div>
       )}

@@ -246,15 +246,31 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     if (!surfaceSize) return null;
     const width = Math.max(1, Math.ceil(surfaceSize.width));
     const height = Math.max(1, Math.ceil(surfaceSize.height));
-    const holes = surfaceOverlayRects.map((rect) => (
-      `M${rect.x} ${rect.y}H${rect.x + rect.width}V${rect.y + rect.height}H${rect.x}Z`
-    ));
+    const makeHolePath = (rect: { x: number; y: number; width: number; height: number }) => {
+      const rawRadius = Math.min(resolvedRadius, rect.width / 2, rect.height / 2);
+      const radius = Math.max(0, Math.floor(rawRadius));
+      if (radius <= 0) {
+        return `M${rect.x} ${rect.y}H${rect.x + rect.width}V${rect.y + rect.height}H${rect.x}Z`;
+      }
+      const right = rect.x + rect.width;
+      const bottom = rect.y + rect.height;
+      return [
+        `M${rect.x} ${rect.y}`,
+        `H${right}`,
+        `V${bottom - radius}`,
+        `A${radius} ${radius} 0 0 1 ${right - radius} ${bottom}`,
+        `H${rect.x + radius}`,
+        `A${radius} ${radius} 0 0 1 ${rect.x} ${bottom - radius}`,
+        "Z",
+      ].join("");
+    };
+    const holes = surfaceOverlayRects.map((rect) => makeHolePath(rect));
     return {
       width,
       height,
       path: `M0 0H${width}V${height}H0Z${holes.length ? ` ${holes.join(" ")}` : ""}`,
     };
-  }, [surfaceOverlayRects, surfaceSize]);
+  }, [resolvedRadius, surfaceOverlayRects, surfaceSize]);
   const panelSurfaceValue = React.useMemo(() => ({
     opacity: surfaceOpacity,
     blur: surfaceBlur,
@@ -484,6 +500,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
           cursor: draggable ? (isDragging ? "grabbing" : "grab") : "default",
           userSelect: "none",
           touchAction: "none",
+          position: "relative",
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -505,6 +522,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
             overflow: "hidden",
             display: resolvedCollapsed ? "none" : "block",
             boxSizing: "border-box",
+            position: "relative",
           }}
           aria-hidden={resolvedCollapsed}
         >
@@ -517,49 +535,49 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
               position: "relative",
             }}
           >
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: surfaceBlur > 0 ? "rgba(0,0,0,0.001)" : "transparent",
-              backdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
-              WebkitBackdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
-              pointerEvents: "none",
-              zIndex: 0,
-            }}
-          />
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              inset: 0,
-              pointerEvents: "none",
-              zIndex: 1,
-            }}
-          >
-            {surfacePathData ? (
-              <svg
-                width="100%"
-                height="100%"
-                viewBox={`0 0 ${surfacePathData.width} ${surfacePathData.height}`}
-                preserveAspectRatio="none"
-                style={{ display: "block" }}
-              >
-                <path d={surfacePathData.path} fill={colorWithAlpha(colorB, surfaceOpacity)} fillRule="evenodd" />
-              </svg>
-            ) : (
-              <div
-                aria-hidden
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: colorWithAlpha(colorB, surfaceOpacity),
-                  pointerEvents: "none",
-                }}
-              />
-            )}
-          </div>
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: surfaceBlur > 0 ? "rgba(0,0,0,0.001)" : "transparent",
+                backdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
+                WebkitBackdropFilter: surfaceBlur > 0 ? `blur(${surfaceBlur}px)` : "none",
+                pointerEvents: "none",
+                zIndex: 0,
+              }}
+            />
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            >
+              {surfacePathData ? (
+                <svg
+                  width="100%"
+                  height="100%"
+                  viewBox={`0 0 ${surfacePathData.width} ${surfacePathData.height}`}
+                  preserveAspectRatio="none"
+                  style={{ display: "block" }}
+                >
+                  <path d={surfacePathData.path} fill={colorWithAlpha(colorB, surfaceOpacity)} fillRule="evenodd" />
+                </svg>
+              ) : (
+                <div
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: colorWithAlpha(colorB, surfaceOpacity),
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+            </div>
             <VerticalGapContext.Provider value={resolvedVerticalGap}>
               <PanelSurfaceContext.Provider value={panelSurfaceValue}>
                 <AnimationSuspensionProvider suspended={suspendChildren}>

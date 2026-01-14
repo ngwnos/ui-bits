@@ -6,6 +6,7 @@
   touch-action: none;
   font-family: "IBM Plex Mono", monospace;
   font-size: var(--vk-font-size, 12px);
+  box-sizing: border-box;
 }
 
 .ui-bits-virtual-keyboard__header {

@@ -7,6 +7,7 @@ import "./dial.css";
 export type DialBorderStyle = "a" | "b" | "none";
 export type DialBorderMask = Partial<Record<"top" | "right" | "bottom" | "left", boolean>>;
 export type DialControlMode = "angle" | "xy";
+export type DialIndicatorStyle = "arc" | "dot";
 
 export interface DialProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, "color" | "onChange"> {
@@ -23,6 +24,7 @@ export interface DialProps
   borderMask?: DialBorderMask;
   fontSize?: number;
   formatDisplayValue?: (value: number) => string;
+  indicatorStyle?: DialIndicatorStyle;
   controlMode?: DialControlMode;
   defaultControlMode?: DialControlMode;
   onControlModeChange?: (mode: DialControlMode) => void;
@@ -59,10 +61,11 @@ export default function Dial({
   onUserChange,
   colorA = FALLBACK_COLOR_A,
   colorB = FALLBACK_COLOR_B,
-  borderStyle = "a",
+  borderStyle = "none",
   borderMask,
   fontSize = 12,
   formatDisplayValue,
+  indicatorStyle = "arc",
   controlMode,
   defaultControlMode = "xy",
   onControlModeChange,
@@ -283,6 +286,11 @@ export default function Dial({
   const ratio = splitFromValue(resolvedValue, min, max);
   const activeLength = sweepLength * ratio;
   const startRotation = ARC_START_DEG - 90;
+  const dotAngle = toRadians(startRotation + ARC_SWEEP_DEG * ratio);
+  const dotRadius = Math.max(2, Math.round(strokeWidth * 0.75));
+  const dotTrackRadius = Math.max(0, radius + strokeWidth / 2 - dotRadius);
+  const dotCx = resolvedSize / 2 + dotTrackRadius * Math.cos(dotAngle);
+  const dotCy = resolvedSize / 2 + dotTrackRadius * Math.sin(dotAngle);
   const displayValue = formatDisplayValue ? formatDisplayValue(resolvedValue) : `${Math.round(resolvedValue)}`;
   const digitCount = Math.max(1, displayValue.replace(/[^0-9]/g, "").length + (displayValue.startsWith("-") ? 1 : 0));
   const resolvedBorderColor = borderStyle === "a"
@@ -324,6 +332,7 @@ export default function Dial({
         borderBottomColor: resolvedBorderMask.bottom ? resolvedBorderColor : maskedBorderColor,
         borderLeftColor: resolvedBorderMask.left ? resolvedBorderColor : maskedBorderColor,
         "--dial-stroke": `${strokeWidth}px`,
+        "--dial-border-width": `${SLIDER_BORDER_WIDTH}px`,
         ...(disabled ? { opacity: 0.5 } : null),
         ...(style ?? {}),
       } as React.CSSProperties}
@@ -352,15 +361,24 @@ export default function Dial({
           strokeDashoffset="0"
           transform={`rotate(${startRotation} ${resolvedSize / 2} ${resolvedSize / 2})`}
         />
-        <circle
-          className="ui-bits-dial__indicator"
-          cx={resolvedSize / 2}
-          cy={resolvedSize / 2}
-          r={radius}
-          strokeDasharray={`${activeLength} ${circumference}`}
-          strokeDashoffset="0"
-          transform={`rotate(${startRotation} ${resolvedSize / 2} ${resolvedSize / 2})`}
-        />
+        {indicatorStyle === "arc" ? (
+          <circle
+            className="ui-bits-dial__indicator"
+            cx={resolvedSize / 2}
+            cy={resolvedSize / 2}
+            r={radius}
+            strokeDasharray={`${activeLength} ${circumference}`}
+            strokeDashoffset="0"
+            transform={`rotate(${startRotation} ${resolvedSize / 2} ${resolvedSize / 2})`}
+          />
+        ) : (
+          <circle
+            className="ui-bits-dial__dot"
+            cx={dotCx}
+            cy={dotCy}
+            r={dotRadius}
+          />
+        )}
       </svg>
       <span className="ui-bits-dial__value" data-digits={digitCount}>
         {displayValue}

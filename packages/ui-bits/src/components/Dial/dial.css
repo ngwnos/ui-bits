@@ -15,7 +15,7 @@
 
 .ui-bits-dial__arc {
   position: absolute;
-  inset: 0;
+  inset: calc(var(--dial-border-width, 1px) * -1);
 }
 
 .ui-bits-dial__track {
@@ -31,6 +31,10 @@
   stroke: currentColor;
   stroke-width: var(--dial-stroke, 2px);
   stroke-linecap: round;
+}
+
+.ui-bits-dial__dot {
+  fill: currentColor;
 }
 
 .ui-bits-dial__value {

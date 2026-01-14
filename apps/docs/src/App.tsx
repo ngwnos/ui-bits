@@ -1344,6 +1344,49 @@ function App() {
                       width="100%"
                       showLfoControls
                     />
+                    <Folder
+                      label="Modulators"
+                      borderStyle="none"
+                      colorA={flexoki.red['500']}
+                      colorB={flexoki.red['100']}
+                    >
+                      <LFOSlider
+                        label="Drive"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0.25}
+                        width="100%"
+                        showLfoControls
+                      />
+                      <LFOSlider
+                        label="Tone"
+                        min={0}
+                        max={100}
+                        step={1}
+                        defaultValue={55}
+                        width="100%"
+                        showLfoControls
+                      />
+                      <LFOSlider
+                        label="Width"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        defaultValue={0.4}
+                        width="100%"
+                        showLfoControls
+                      />
+                    </Folder>
+                    <LFOSlider
+                      label="Output"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={0.8}
+                      width="100%"
+                      showLfoControls
+                    />
                   </FloatingPanel>
                 </PresetStoreProvider>
                 <CodeBlock code={activeRoute.code} />

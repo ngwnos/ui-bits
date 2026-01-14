@@ -883,6 +883,7 @@ export default function VirtualKeyboard({
           value={startIndex}
           onChange={handleStartIndexChange}
           fontSize={resolvedFontSize}
+          indicatorStyle="dot"
           ariaLabel="Keyboard start note"
           formatDisplayValue={(value) => {
             const index = Math.max(MIN_START_INDEX, Math.min(maxStartIndex, Math.round(value)));
@@ -900,6 +901,7 @@ export default function VirtualKeyboard({
           value={resolvedNoteCountClamped}
           onChange={handleNoteCountChange}
           fontSize={resolvedFontSize}
+          indicatorStyle="dot"
           ariaLabel="Keyboard note count"
           formatDisplayValue={(value) => `${Math.round(value)}`}
         />
@@ -914,6 +916,7 @@ export default function VirtualKeyboard({
             value={resolvedHeightUnitsClamped}
             onChange={handleHeightChange}
             fontSize={resolvedFontSize}
+            indicatorStyle="dot"
             ariaLabel="Keyboard height"
           />
         </div>

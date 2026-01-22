@@ -1,6 +1,6 @@
 # ui-bits
 
-You really shouldn't use this. It's public only for my own convenience.
+You probably shouldn't use this unless you're me.
 
 ## Install
 

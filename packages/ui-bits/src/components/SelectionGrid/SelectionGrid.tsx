@@ -283,6 +283,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     Math.round(previewFontSize + previewPaddingPx * 1.5),
   );
   const cellSizePx = baseCellSize * resolvedSquareScale;
+  const headerHeightPx = baseCellSize;
   const rowCapacity = containerWidth ? Math.max(1, Math.floor(containerWidth / cellSizePx)) : 1;
   const containerWidthPx = rowCapacity * cellSizePx;
 
@@ -315,12 +316,13 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const gridCellCount = visibleEntries.length;
 
   type GridRow =
-    | { type: "header"; folderIndex: number; alignmentOffsetPx: number }
-    | { type: "items"; startIndex: number; count: number; alignmentOffsetPx: number };
+    | { type: "header"; folderIndex: number; alignmentOffsetPx: number; height: number; top: number }
+    | { type: "items"; startIndex: number; count: number; alignmentOffsetPx: number; height: number; top: number };
 
   const gridRows = React.useMemo(() => {
+    const rows: GridRow[] = [];
+    let top = 0;
     if (!usesFolders) {
-      const rows: GridRow[] = [];
       for (let start = 0; start < gridCellCount; start += rowCapacity) {
         const count = Math.min(rowCapacity, gridCellCount - start);
         const leftoverSlots = rowCapacity - count;
@@ -331,14 +333,28 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
               ? leftoverSlots * cellSizePx
               : 0
           : 0;
-        rows.push({ type: "items", startIndex: start, count, alignmentOffsetPx });
+        rows.push({
+          type: "items",
+          startIndex: start,
+          count,
+          alignmentOffsetPx,
+          height: cellSizePx,
+          top,
+        });
+        top += cellSizePx;
       }
       return rows;
     }
-    const rows: GridRow[] = [];
     let cursor = 0;
     resolvedFolders.forEach((folder, folderIndex) => {
-      rows.push({ type: "header", folderIndex, alignmentOffsetPx: 0 });
+      rows.push({
+        type: "header",
+        folderIndex,
+        alignmentOffsetPx: 0,
+        height: headerHeightPx,
+        top,
+      });
+      top += headerHeightPx;
       const collapsed = folder.collapsed ?? internalFolderCollapsed[folder.id] ?? false;
       if (collapsed) return;
       const itemsForFolder = resolvedFolderItems.get(folder.id) ?? folder.items;
@@ -353,7 +369,15 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
               ? leftoverSlots * cellSizePx
               : 0
           : 0;
-        rows.push({ type: "items", startIndex: cursor + start, count, alignmentOffsetPx });
+        rows.push({
+          type: "items",
+          startIndex: cursor + start,
+          count,
+          alignmentOffsetPx,
+          height: cellSizePx,
+          top,
+        });
+        top += cellSizePx;
       }
       cursor += visibleCount;
     });
@@ -361,6 +385,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   }, [
     cellSizePx,
     gridCellCount,
+    headerHeightPx,
     internalFolderCollapsed,
     resolvedFolderItems,
     resolvedFolders,
@@ -370,12 +395,14 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   ]);
 
   const rowCount = gridRows.length;
-  const totalGridHeightPx = rowCount * cellSizePx;
+  const totalGridHeightPx = rowCount > 0
+    ? gridRows[rowCount - 1]!.top + gridRows[rowCount - 1]!.height
+    : 0;
 
   const resolvedMaxHeightUnits = typeof maxHeightUnits === "number" && Number.isFinite(maxHeightUnits) && maxHeightUnits > 0
     ? maxHeightUnits
     : null;
-  const totalRowUnits = rowCount * resolvedSquareScale;
+  const totalRowUnits = gridRows.reduce((sum, row) => sum + row.height / baseCellSize, 0);
   const gridMaxHeightPx = resolvedMaxHeightUnits != null ? resolvedMaxHeightUnits * baseCellSize : null;
   const clampGridHeight = resolvedMaxHeightUnits != null && totalRowUnits > resolvedMaxHeightUnits;
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
@@ -567,14 +594,33 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     return () => node.removeEventListener("scroll", handleScroll);
   }, [requestRender]);
 
+  const findRowIndex = (y: number) => {
+    if (gridRows.length === 0) return -1;
+    let low = 0;
+    let high = gridRows.length - 1;
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const row = gridRows[mid]!;
+      if (y < row.top) {
+        high = mid - 1;
+      } else if (y >= row.top + row.height) {
+        low = mid + 1;
+      } else {
+        return mid;
+      }
+    }
+    return Math.max(0, Math.min(gridRows.length - 1, low));
+  };
+
   drawRef.current = () => {
     const canvas = canvasRef.current;
     const scrollNode = scrollRef.current;
     if (!canvas || !scrollNode) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const viewportWidth = Math.max(1, Math.round(containerWidthPx));
+    const viewportWidth = Math.max(1, Math.round(scrollNode.clientWidth || containerWidthPx));
     const viewportHeight = Math.max(1, Math.round(scrollNode.clientHeight || totalGridHeightPx));
+    const gridOffsetX = Math.max(0, (viewportWidth - containerWidthPx) / 2);
     const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
     const pixelWidth = Math.max(1, Math.round(viewportWidth * dpr));
     const pixelHeight = Math.max(1, Math.round(viewportHeight * dpr));
@@ -592,8 +638,8 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     if (gridCellCount === 0) return;
 
     const scrollTop = scrollNode.scrollTop;
-    const startRow = Math.max(0, Math.floor(scrollTop / cellSizePx) - 1);
-    const endRow = Math.min(rowCount - 1, Math.floor((scrollTop + viewportHeight) / cellSizePx) + 1);
+    const startRow = Math.max(0, findRowIndex(scrollTop) - 1);
+    const endRow = Math.min(rowCount - 1, findRowIndex(scrollTop + viewportHeight) + 1);
     const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
     const previews: SelectionGridPreview[] = new Array(gridCellCount);
     const tileKeys: string[] = new Array(gridCellCount);
@@ -671,10 +717,10 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     for (let row = startRow; row <= endRow; row += 1) {
       const rowModel = gridRows[row];
       if (!rowModel || rowModel.type !== "items") continue;
-      const rowOffset = rowModel.alignmentOffsetPx;
+      const rowOffset = gridOffsetX + rowModel.alignmentOffsetPx;
       const rowCellCount = rowModel.count;
       const rowBaseIndex = rowModel.startIndex;
-      const y = row * cellSizePx - scrollTop;
+      const y = rowModel.top - scrollTop;
 
       for (let col = 0; col < rowCellCount; col += 1) {
         const index = rowBaseIndex + col;
@@ -807,11 +853,13 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top + scrollNode.scrollTop;
     if (x < 0 || y < 0) return;
-    const row = Math.floor(y / cellSizePx);
+    const row = findRowIndex(y);
     if (row < 0 || row >= rowCount) return;
     const rowModel = gridRows[row];
     if (!rowModel || rowModel.type !== "items") return;
-    const rowOffset = rowModel.alignmentOffsetPx;
+    const scrollWidth = scrollNode.clientWidth || containerWidthPx;
+    const gridOffsetX = Math.max(0, (scrollWidth - containerWidthPx) / 2);
+    const rowOffset = gridOffsetX + rowModel.alignmentOffsetPx;
     const rowCellCount = rowModel.count;
     if (x < rowOffset || x > rowOffset + rowCellCount * cellSizePx) return;
     const col = Math.floor((x - rowOffset) / cellSizePx);
@@ -847,10 +895,10 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     if (!usesFolders) return [];
     return gridRows.flatMap((row, rowIndex) => (
       row.type === "header"
-        ? [{ rowIndex, folderIndex: row.folderIndex, top: rowIndex * cellSizePx }]
+        ? [{ rowIndex, folderIndex: row.folderIndex, top: row.top, height: row.height }]
         : []
     ));
-  }, [cellSizePx, gridRows, usesFolders]);
+  }, [gridRows, usesFolders]);
 
   return (
     <div ref={wrapperRef} className={className} style={wrapperStyle}>
@@ -860,7 +908,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
             display: "inline-flex",
             flexDirection: "column",
             alignItems: "stretch",
-            width: `${containerWidthPx}px`,
+            width: "100%",
             borderRadius: 3,
             overflow: "hidden",
           }}
@@ -930,7 +978,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
                         top: `${header.top}px`,
                         left: 0,
                         width: "100%",
-                        height: `${cellSizePx}px`,
+                        height: `${header.height}px`,
                         pointerEvents: "auto",
                       }}
                     >
@@ -947,12 +995,12 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
                         colorB={folder.colorB ?? colorB}
                         borderStyle={folder.borderStyle ?? "none"}
                         fontSize={previewFontSize}
-                        headerHeight={cellSizePx}
+                        headerHeight={header.height}
                         padding={0}
                         verticalGap={0}
                         keepMounted={false}
                         showBody={false}
-                        style={{ height: `${cellSizePx}px` }}
+                        style={{ height: `${header.height}px` }}
                       />
                     </div>
                   );

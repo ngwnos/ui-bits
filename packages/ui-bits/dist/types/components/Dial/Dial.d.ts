@@ -1,0 +1,31 @@
+import React from "react";
+import "./dial.css";
+export type DialBorderStyle = "a" | "b" | "none";
+export type DialBorderMask = Partial<Record<"top" | "right" | "bottom" | "left", boolean>>;
+export type DialControlMode = "angle" | "xy";
+export type DialIndicatorStyle = "arc" | "dot";
+export interface DialProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "color" | "onChange"> {
+    min?: number;
+    max?: number;
+    step?: number;
+    value?: number;
+    defaultValue?: number;
+    onChange?: (value: number) => void;
+    onUserChange?: (value: number) => void;
+    colorA?: string;
+    colorB?: string;
+    borderStyle?: DialBorderStyle;
+    borderMask?: DialBorderMask;
+    fontSize?: number;
+    formatDisplayValue?: (value: number) => string;
+    indicatorStyle?: DialIndicatorStyle;
+    indicatorColor?: string;
+    controlMode?: DialControlMode;
+    defaultControlMode?: DialControlMode;
+    onControlModeChange?: (mode: DialControlMode) => void;
+    disabled?: boolean;
+    suspended?: boolean;
+    ariaLabel?: string;
+    controlId?: string;
+}
+export default function Dial({ min, max, step, value, defaultValue, onChange, onUserChange, colorA, colorB, borderStyle, borderMask, fontSize, formatDisplayValue, indicatorStyle, indicatorColor, controlMode, defaultControlMode, onControlModeChange, disabled, suspended, ariaLabel, className, style, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onDoubleClick, onKeyDown, onWheel, controlId, ...rest }: DialProps): import("react/jsx-runtime").JSX.Element;

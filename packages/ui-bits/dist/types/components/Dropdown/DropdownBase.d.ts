@@ -1,0 +1,47 @@
+import React from "react";
+import { type DropdownOption } from "./types";
+import "./dropdown.css";
+export interface DropdownTriggerRenderProps {
+    id: string;
+    labelId?: string;
+    listboxId: string;
+    open: boolean;
+    disabled: boolean;
+    buttonRef: React.RefObject<HTMLButtonElement | null>;
+    displayLabel: string;
+    showPlaceholder: boolean;
+    activeOption?: DropdownOption;
+    onTriggerClick: () => void;
+    onTriggerKeyDown: React.KeyboardEventHandler<HTMLButtonElement>;
+    ariaLabel?: string;
+    ariaLabelledBy?: string;
+    ariaControls?: string;
+}
+export interface DropdownBaseProps {
+    label?: string;
+    showLabel?: boolean;
+    ariaLabel?: string;
+    options: DropdownOption[];
+    value?: string;
+    defaultValue?: string;
+    placeholder?: string;
+    onChange?: (value: string, option: DropdownOption) => void;
+    open?: boolean;
+    defaultOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    colorA?: string;
+    colorB?: string;
+    borderStyle?: "a" | "b" | "none";
+    borderMask?: Partial<Record<"top" | "right" | "bottom" | "left", boolean>>;
+    borderRadius?: number;
+    width?: number | string;
+    fontSize?: number;
+    showOptionIcons?: boolean;
+    returnFocusOnSelect?: boolean;
+    disabled?: boolean;
+    controlId?: string;
+    className?: string;
+    style?: React.CSSProperties;
+    renderTrigger: (props: DropdownTriggerRenderProps) => React.ReactNode;
+}
+export default function DropdownBase({ label, showLabel, ariaLabel, options, value, defaultValue, placeholder, onChange, open, defaultOpen, onOpenChange, colorA, colorB, borderStyle, borderMask, borderRadius, width, fontSize, showOptionIcons, returnFocusOnSelect, disabled, controlId, className, style, renderTrigger, }: DropdownBaseProps): import("react/jsx-runtime").JSX.Element;

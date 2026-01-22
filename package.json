@@ -3,18 +3,35 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "./packages/ui-bits/src/library.ts",
-  "module": "./packages/ui-bits/src/library.ts",
-  "style": "./packages/ui-bits/src/style.css",
+  "main": "./packages/ui-bits/dist/lfoslider.cjs.js",
+  "module": "./packages/ui-bits/dist/lfoslider.es.js",
+  "types": "./packages/ui-bits/dist/types/library.d.ts",
+  "style": "./packages/ui-bits/dist/ui-bits-internal.css",
   "files": [
-    "packages/ui-bits/src"
+    "packages/ui-bits/dist"
   ],
   "exports": {
-    ".": "./packages/ui-bits/src/library.ts",
-    "./style.css": "./packages/ui-bits/src/style.css",
-    "./components/LFOSlider": "./packages/ui-bits/src/components/LFOSlider/index.ts",
-    "./components/SelectionGrid": "./packages/ui-bits/src/components/SelectionGrid/index.ts",
-    "./components/Dropdown": "./packages/ui-bits/src/components/Dropdown/index.ts",
+    ".": {
+      "types": "./packages/ui-bits/dist/types/library.d.ts",
+      "import": "./packages/ui-bits/dist/lfoslider.es.js",
+      "require": "./packages/ui-bits/dist/lfoslider.cjs.js"
+    },
+    "./style.css": "./packages/ui-bits/dist/ui-bits-internal.css",
+    "./components/LFOSlider": {
+      "types": "./packages/ui-bits/dist/types/components/LFOSlider/LFOSlider.d.ts",
+      "import": "./packages/ui-bits/dist/lfoslider.es.js",
+      "require": "./packages/ui-bits/dist/lfoslider.cjs.js"
+    },
+    "./components/SelectionGrid": {
+      "types": "./packages/ui-bits/dist/types/components/SelectionGrid/SelectionGrid.d.ts",
+      "import": "./packages/ui-bits/dist/lfoslider.es.js",
+      "require": "./packages/ui-bits/dist/lfoslider.cjs.js"
+    },
+    "./components/Dropdown": {
+      "types": "./packages/ui-bits/dist/types/components/Dropdown/Dropdown.d.ts",
+      "import": "./packages/ui-bits/dist/lfoslider.es.js",
+      "require": "./packages/ui-bits/dist/lfoslider.cjs.js"
+    },
     "./package.json": "./package.json"
   },
   "workspaces": [

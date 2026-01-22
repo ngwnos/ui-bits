@@ -24,3 +24,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+!packages/ui-bits/dist/
+!packages/ui-bits/dist/**

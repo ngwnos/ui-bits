@@ -1,8 +1,22 @@
 {
-  "name": "ui-bits-workspace",
+  "name": "ui-bits",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "./packages/ui-bits/src/library.ts",
+  "module": "./packages/ui-bits/src/library.ts",
+  "style": "./packages/ui-bits/src/style.css",
+  "files": [
+    "packages/ui-bits/src"
+  ],
+  "exports": {
+    ".": "./packages/ui-bits/src/library.ts",
+    "./style.css": "./packages/ui-bits/src/style.css",
+    "./components/LFOSlider": "./packages/ui-bits/src/components/LFOSlider/index.ts",
+    "./components/SelectionGrid": "./packages/ui-bits/src/components/SelectionGrid/index.ts",
+    "./components/Dropdown": "./packages/ui-bits/src/components/Dropdown/index.ts",
+    "./package.json": "./package.json"
+  },
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -16,5 +30,15 @@
     "lint:demo": "bun --cwd apps/demo lint",
     "preview": "bun --cwd apps/docs build && bun --cwd apps/docs preview",
     "preview:demo": "bun --cwd apps/demo build && bun --cwd apps/demo preview"
+  },
+  "peerDependencies": {
+    "lucide-react": "^0.552.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "typegpu": "^0.8.1"
+  },
+  "dependencies": {
+    "soundfont-player": "^0.12.0",
+    "tone": "^15.1.22"
   }
 }

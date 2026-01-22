@@ -15,7 +15,7 @@
     "react-dom": "^19.2.0",
     "shiki": "^1.25.1",
     "typegpu": "^0.8.1",
-    "ui-bits": "workspace:*"
+    "ui-bits": "file:../.."
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -1,12 +1,12 @@
 {
-  "name": "ui-bits",
+  "name": "ui-bits-internal",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/lfoslider.cjs.js",
   "module": "./dist/lfoslider.es.js",
   "types": "./dist/types/library.d.ts",
-  "style": "./dist/ui-bits.css",
+  "style": "./dist/ui-bits-internal.css",
   "files": [
     "dist"
   ],
@@ -16,7 +16,7 @@
       "import": "./dist/lfoslider.es.js",
       "require": "./dist/lfoslider.cjs.js"
     },
-    "./style.css": "./dist/ui-bits.css",
+    "./style.css": "./dist/ui-bits-internal.css",
     "./components/LFOSlider": {
       "types": "./dist/types/components/LFOSlider/LFOSlider.d.ts",
       "import": "./dist/lfoslider.es.js",

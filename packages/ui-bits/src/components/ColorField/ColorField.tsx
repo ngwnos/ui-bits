@@ -5,6 +5,7 @@ import { usePanelTheme } from "../../panelGap";
 import ColorPicker from "../ColorPicker";
 import LFOSlider from "../LFOSlider";
 import SegmentBar from "../SegmentBar";
+import ColorFieldWorker from "./color-field.worker?worker&inline";
 import "./color-field.css";
 
 export type ColorFieldBorderStyle = "a" | "b" | "none";
@@ -37,9 +38,7 @@ const SLIDER_PAD_Y_EM = 0.35;
 const SLIDER_BORDER_WIDTH = 1;
 const DEFAULT_PICKER_HEIGHT_UNITS = 6;
 const OKLCH_MAX_CHROMA = 0.4;
-const createColorFieldWorker = () => (
-  new Worker(new URL("./color-field.worker.ts", import.meta.url), { type: "module" })
-);
+const createColorFieldWorker = () => new ColorFieldWorker();
 
 function resolveSize(value?: number | string): string | undefined {
   if (value == null) return undefined;

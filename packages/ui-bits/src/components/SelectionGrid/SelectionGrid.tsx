@@ -1,4 +1,5 @@
 import React from "react";
+import SelectionGridWorker from "./selectionGrid.worker?worker&inline";
 import "./selectionGrid.css";
 
 const CELL_CORNER_RADIUS_PX = 3;
@@ -79,7 +80,7 @@ function buildRoundedRectPath(
 }
 
 function createSelectionGridWorker() {
-  return new Worker(new URL("./selectionGrid.worker.ts", import.meta.url), { type: "module" });
+  return new SelectionGridWorker();
 }
 
 export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>) {

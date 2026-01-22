@@ -17,6 +17,7 @@ import {
 } from "../../gradients/matplotlib";
 import { loadTerrainTileAssets, type TerrainTileAsset } from "../../assets/terrain/tiles";
 import IconButton from "../IconButton";
+import SelectionGridWorker from "./selectionGrid.worker?worker&inline";
 import "./selectionGrid.css";
 
 type PaletteInfo = {
@@ -91,7 +92,7 @@ function buildRoundedRectPath(
 }
 
 function createSelectionGridWorker() {
-  return new Worker(new URL("./selectionGrid.worker.ts", import.meta.url), { type: "module" });
+  return new SelectionGridWorker();
 }
 
 type TileAssignment = {

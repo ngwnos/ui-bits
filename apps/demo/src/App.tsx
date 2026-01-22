@@ -1583,6 +1583,7 @@ function EditableRectPOC() {
               <SelectionPreviewModeIcon size={controlIconSize} strokeWidth={2} />
             </button>
             <SelectionGrid
+              variant="gradient"
               gridId={DEFAULT_SELECTION_GRID_ID}
               previewDarkMode={previewDarkMode}
               layoutGap={layoutGap}

@@ -66,7 +66,14 @@ export {
   type AudioControlsSource,
   type AudioFFTWindowProps,
 } from "./components/AudioControls";
-export { default as SelectionGrid, type SelectionGridProps } from "./components/SelectionGrid";
+export {
+  default as SelectionGrid,
+  type SelectionGridProps,
+  type SelectionGridGridProps,
+  type SelectionGridGradientProps,
+  type SelectionGridItemRenderState,
+  type SelectionGridVariant,
+} from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";
 export { default as IconDropdown, type IconDropdownProps, type IconDropdownOption } from "./components/IconDropdown";
 export {

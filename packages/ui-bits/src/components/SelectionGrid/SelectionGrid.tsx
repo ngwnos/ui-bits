@@ -79,6 +79,15 @@ function buildRoundedRectPath(
   ctx.closePath();
 }
 
+function resolveWorkerUrl(src: string) {
+  if (typeof window === "undefined") return src;
+  try {
+    return new URL(src, window.location.href).href;
+  } catch {
+    return src;
+  }
+}
+
 function createSelectionGridWorker() {
   return new SelectionGridWorker();
 }
@@ -350,7 +359,8 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
           ctx.fill();
         } else {
           const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
-          const cacheKey = `${preview.src}|${targetSize}`;
+          const resolvedSrc = resolveWorkerUrl(preview.src);
+          const cacheKey = `${resolvedSrc}|${targetSize}`;
           let entry = cacheRef.current.get(cacheKey);
           if (!entry) {
             entry = { status: "loading" };
@@ -367,7 +377,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
                 worker.postMessage({
                   type: "image",
                   id: cacheKey,
-                  src: preview.src,
+                  src: resolvedSrc,
                   size: targetSize,
                 });
               }

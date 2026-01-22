@@ -62,6 +62,15 @@ type CornerRadii = {
   bl: number;
 };
 
+function resolveWorkerUrl(src: string) {
+  if (typeof window === "undefined") return src;
+  try {
+    return new URL(src, window.location.href).href;
+  } catch {
+    return src;
+  }
+}
+
 function buildRoundedRectPath(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -497,8 +506,9 @@ function GradientSelectionGridContent({
         const x = rowOffset + col * cellSizePx;
         const palette = invertGradients ? base.inverted.data : base.normal.data;
         const tileUrl = renderMode === "height" && usesTerrainTiles && visual.tileUrl ? visual.tileUrl : undefined;
+        const resolvedTileUrl = tileUrl ? resolveWorkerUrl(tileUrl) : undefined;
         const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
-        const cacheKey = `${visual.name}|${invertGradients ? "inv" : "norm"}|${renderMode}|${targetSize}|${tileUrl ?? "plain"}`;
+        const cacheKey = `${visual.name}|${invertGradients ? "inv" : "norm"}|${renderMode}|${targetSize}|${resolvedTileUrl ?? "plain"}`;
 
         let entry = cacheRef.current.get(cacheKey);
         if (!entry) {
@@ -521,7 +531,7 @@ function GradientSelectionGridContent({
                 id: cacheKey,
                 palette,
                 size: targetSize,
-                tileUrl,
+                tileUrl: resolvedTileUrl,
               });
             }
           }

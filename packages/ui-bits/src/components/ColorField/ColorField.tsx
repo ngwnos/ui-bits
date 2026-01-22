@@ -1,9 +1,11 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { useControlValue, useResolvedControlId } from "../../controlStore";
 import { usePanelTheme } from "../../panelGap";
 import ColorPicker from "../ColorPicker";
 import LFOSlider from "../LFOSlider";
 import SegmentBar from "../SegmentBar";
+import ColorFieldWorker from "./color-field.worker.ts?worker&inline";
 import "./color-field.css";
 
 export type ColorFieldBorderStyle = "a" | "b" | "none";
@@ -391,6 +393,8 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   const popoverRadius = Math.max(2, Math.round(resolvedFontSize * 0.25));
   const fieldRef = React.useRef<HTMLDivElement | null>(null);
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const popoverRef = React.useRef<HTMLDivElement | null>(null);
+  const [canvasNode, setCanvasNode] = React.useState<HTMLCanvasElement | null>(null);
   const workerPoolRef = React.useRef<Worker[]>([]);
   const paintTokenRef = React.useRef(0);
   const canvasSizeRef = React.useRef({ width: 0, height: 0 });
@@ -414,7 +418,12 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   const oklchRef = React.useRef(oklchState);
   const [colorMode, setColorMode] = React.useState<"hsv" | "rgb" | "oklch">("oklch");
   const [isPickerOpen, setIsPickerOpen] = React.useState(false);
-  const [popoverPlacement, setPopoverPlacement] = React.useState<"below" | "above">("below");
+  const [popoverMetrics, setPopoverMetrics] = React.useState<{
+    top: number;
+    left: number;
+    width: number;
+    placement: "below" | "above";
+  } | null>(null);
 
   React.useEffect(() => {
     hsvRef.current = hsvState;
@@ -465,45 +474,70 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   React.useEffect(() => {
     if (!isPickerOpen) return;
     const handlePointerDown = (event: MouseEvent) => {
-      if (!fieldRef.current || !event.target) return;
-      if (fieldRef.current.contains(event.target as Node)) return;
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (fieldRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
       setIsPickerOpen(false);
     };
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [isPickerOpen]);
 
-  const updatePopoverPlacement = React.useCallback(() => {
+  const updatePopoverMetrics = React.useCallback(() => {
     if (!fieldRef.current || typeof window === "undefined") return;
     const rect = fieldRef.current.getBoundingClientRect();
     const nextPlacement = rect.top + popoverOffset + popoverHeight > window.innerHeight
       ? "above"
       : "below";
-    setPopoverPlacement((prev) => (prev === nextPlacement ? prev : nextPlacement));
+    const nextTop = nextPlacement === "above"
+      ? rect.top - popoverHeight - popoverOffset
+      : rect.bottom + popoverOffset;
+    const nextLeft = rect.left;
+    const nextWidth = rect.width;
+    setPopoverMetrics((prev) => {
+      if (
+        prev
+        && prev.top === nextTop
+        && prev.left === nextLeft
+        && prev.width === nextWidth
+        && prev.placement === nextPlacement
+      ) {
+        return prev;
+      }
+      return {
+        top: nextTop,
+        left: nextLeft,
+        width: nextWidth,
+        placement: nextPlacement,
+      };
+    });
   }, [popoverHeight, popoverOffset]);
 
   React.useEffect(() => {
-    if (!isPickerOpen || typeof window === "undefined") return;
-    const handleUpdate = () => updatePopoverPlacement();
-    const frame = window.requestAnimationFrame(handleUpdate);
+    if (!isPickerOpen || typeof window === "undefined") {
+      setPopoverMetrics(null);
+      return;
+    }
+    const handleUpdate = () => updatePopoverMetrics();
+    handleUpdate();
     window.addEventListener("resize", handleUpdate);
     window.addEventListener("scroll", handleUpdate, true);
     return () => {
-      window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", handleUpdate);
       window.removeEventListener("scroll", handleUpdate, true);
     };
-  }, [isPickerOpen, updatePopoverPlacement]);
+  }, [isPickerOpen, updatePopoverMetrics]);
 
   React.useEffect(() => {
     if (!isPickerOpen) return;
-    const canvas = canvasRef.current;
+    const canvas = canvasNode ?? canvasRef.current;
     if (!canvas) return;
     if (lastCanvasRef.current !== canvas) {
       canvasSizeRef.current = { width: 0, height: 0 };
       lastCanvasRef.current = canvas;
     }
-  }, [isPickerOpen]);
+  }, [canvasNode, isPickerOpen]);
 
   React.useEffect(() => {
     if (!isPickerOpen || typeof window === "undefined") return;
@@ -515,13 +549,13 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
         extras.forEach((worker) => worker.terminate());
       } else {
         for (let i = pool.length; i < count; i += 1) {
-          pool.push(new Worker(new URL("./color-field.worker.ts", import.meta.url), { type: "module" }));
+          pool.push(new ColorFieldWorker());
         }
       }
       return pool;
     };
 
-    const canvas = canvasRef.current;
+    const canvas = canvasNode ?? canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -595,6 +629,7 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [
+    canvasNode,
     isPickerOpen,
     resolvedFontSize,
     hsvState.h,
@@ -624,6 +659,10 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
       (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
     }
   }, [ref]);
+  const handleCanvasRef = React.useCallback((node: HTMLCanvasElement | null) => {
+    canvasRef.current = node;
+    setCanvasNode(node);
+  }, []);
 
   const updateFromPointer = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (!canvasRef.current) return;
@@ -789,124 +828,126 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
         formatDisplayValue={(value) => `${Math.round(value)}`}
         style={{ flex: `0 0 ${alphaWidth}px` }}
       />
-      {isPickerOpen ? (
-        <div
-          style={{
-            position: "absolute",
-            top: popoverPlacement === "above"
-              ? -(popoverHeight + popoverOffset)
-              : popoverOffset,
-            left: 0,
-            width: "100%",
-            height: popoverHeight,
-            borderRadius: popoverRadius,
-            borderStyle: "solid",
-            borderWidth: 1,
-            borderColor: popoverBorderColor,
-            background: resolvedColorA,
-            boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
-            boxSizing: "border-box",
-            zIndex: 20,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <SegmentBar
-            options={[
-              { value: "hsv", label: "HSV" },
-              { value: "rgb", label: "RGB" },
-              { value: "oklch", label: "OKLCH" },
-            ]}
-            value={colorMode}
-            onChange={(next) => setColorMode(next as "hsv" | "rgb" | "oklch")}
-            colorA={resolvedColorA}
-            colorB={resolvedColorB}
-            borderStyle={resolvedBorderStyle}
-            borderMask={{ top: false, left: false, right: false, bottom: true }}
-            fontSize={resolvedFontSize}
-          />
+      {isPickerOpen && popoverMetrics && typeof document !== "undefined"
+        ? createPortal(
           <div
+            ref={popoverRef}
             style={{
-              flex: 1,
-              position: "relative",
-              overflow: "hidden",
-              borderBottomLeftRadius: popoverRadius,
-              borderBottomRightRadius: popoverRadius,
-              touchAction: "none",
+              position: "fixed",
+              top: popoverMetrics.top,
+              left: popoverMetrics.left,
+              width: popoverMetrics.width,
+              height: popoverHeight,
+              borderRadius: popoverRadius,
+              borderStyle: "solid",
+              borderWidth: 1,
+              borderColor: popoverBorderColor,
+              background: resolvedColorA,
+              boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
+              boxSizing: "border-box",
+              zIndex: 1000,
+              display: "flex",
+              flexDirection: "column",
             }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
           >
-            <canvas
-              ref={canvasRef}
-              style={{
-                display: "block",
-                width: "100%",
-                height: "100%",
-              }}
+            <SegmentBar
+              options={[
+                { value: "hsv", label: "HSV" },
+                { value: "rgb", label: "RGB" },
+                { value: "oklch", label: "OKLCH" },
+              ]}
+              value={colorMode}
+              onChange={(next) => setColorMode(next as "hsv" | "rgb" | "oklch")}
+              colorA={resolvedColorA}
+              colorB={resolvedColorB}
+              borderStyle={resolvedBorderStyle}
+              borderMask={{ top: false, left: false, right: false, bottom: true }}
+              fontSize={resolvedFontSize}
             />
-            {canvasMetrics.width > 0 && canvasMetrics.height > 0 ? (
-              (() => {
-                const planeMode = colorMode;
-                const planeHeight = Math.max(1, canvasMetrics.height - canvasMetrics.barHeight);
-                // OKLCH: X = Hue, Y = Chroma (high at top)
-                // Others: X = S or R, Y = V or G (inverted)
-                const planeX = planeMode === "oklch"
-                  ? clamp01(oklchState.h / 360) * canvasMetrics.width
-                  : planeMode === "rgb"
-                    ? clamp01(rgbState.r / 255) * canvasMetrics.width
-                    : clamp01(hsvState.s) * canvasMetrics.width;
-                const planeY = planeMode === "oklch"
-                  ? clamp01(1 - oklchState.c / OKLCH_MAX_CHROMA) * planeHeight
-                  : planeMode === "rgb"
-                    ? clamp01(1 - rgbState.g / 255) * planeHeight
-                    : clamp01(1 - hsvState.v) * planeHeight;
-                // OKLCH bar: Lightness, Others: Hue or Blue
-                const barValue = planeMode === "oklch"
-                  ? oklchState.l
-                  : planeMode === "rgb"
-                    ? rgbState.b / 255
-                    : hsvState.h / 360;
-                const barX = clamp01(barValue) * canvasMetrics.width;
-                return (
-                  <>
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: `${planeX}px`,
-                        top: `${planeY}px`,
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        border: "2px solid rgba(255,255,255,0.85)",
-                        boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
-                        transform: "translate(-50%, -50%)",
-                        pointerEvents: "none",
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: `${barX}px`,
-                        top: `${Math.max(1, canvasMetrics.height - canvasMetrics.barHeight) + canvasMetrics.barHeight / 2}px`,
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        border: "2px solid rgba(255,255,255,0.85)",
-                        boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
-                        transform: "translate(-50%, -50%)",
-                        pointerEvents: "none",
-                      }}
-                    />
-                  </>
-                );
-              })()
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+            <div
+              style={{
+                flex: 1,
+                position: "relative",
+                overflow: "hidden",
+                borderBottomLeftRadius: popoverRadius,
+                borderBottomRightRadius: popoverRadius,
+                touchAction: "none",
+              }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+            >
+              <canvas
+                ref={handleCanvasRef}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  height: "100%",
+                }}
+              />
+              {canvasMetrics.width > 0 && canvasMetrics.height > 0 ? (
+                (() => {
+                  const planeMode = colorMode;
+                  const planeHeight = Math.max(1, canvasMetrics.height - canvasMetrics.barHeight);
+                  // OKLCH: X = Hue, Y = Chroma (high at top)
+                  // Others: X = S or R, Y = V or G (inverted)
+                  const planeX = planeMode === "oklch"
+                    ? clamp01(oklchState.h / 360) * canvasMetrics.width
+                    : planeMode === "rgb"
+                      ? clamp01(rgbState.r / 255) * canvasMetrics.width
+                      : clamp01(hsvState.s) * canvasMetrics.width;
+                  const planeY = planeMode === "oklch"
+                    ? clamp01(1 - oklchState.c / OKLCH_MAX_CHROMA) * planeHeight
+                    : planeMode === "rgb"
+                      ? clamp01(1 - rgbState.g / 255) * planeHeight
+                      : clamp01(1 - hsvState.v) * planeHeight;
+                  // OKLCH bar: Lightness, Others: Hue or Blue
+                  const barValue = planeMode === "oklch"
+                    ? oklchState.l
+                    : planeMode === "rgb"
+                      ? rgbState.b / 255
+                      : hsvState.h / 360;
+                  const barX = clamp01(barValue) * canvasMetrics.width;
+                  return (
+                    <>
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: `${planeX}px`,
+                          top: `${planeY}px`,
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          border: "2px solid rgba(255,255,255,0.85)",
+                          boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                          transform: "translate(-50%, -50%)",
+                          pointerEvents: "none",
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: `${barX}px`,
+                          top: `${Math.max(1, canvasMetrics.height - canvasMetrics.barHeight) + canvasMetrics.barHeight / 2}px`,
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          border: "2px solid rgba(255,255,255,0.85)",
+                          boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                          transform: "translate(-50%, -50%)",
+                          pointerEvents: "none",
+                        }}
+                      />
+                    </>
+                  );
+                })()
+              ) : null}
+            </div>
+          </div>,
+          document.body,
+        )
+        : null}
     </div>
   );
 });

@@ -96,7 +96,32 @@ const ROUTES = [
     id: 'selection-grid',
     label: 'Selection Grid',
     title: 'Selection Grid',
-    code: `<SelectionGrid
+    code: `const items = [
+  { id: "rose", label: "Rose", color: "#D14D41" },
+  { id: "sun", label: "Sun", color: "#E2C37C" },
+  { id: "mint", label: "Mint", color: "#73A27E" },
+  { id: "sky", label: "Sky", color: "#5B88B3" },
+];
+
+const [selectedKey, setSelectedKey] = useState(items[0]?.id ?? null);
+
+<SelectionGrid
+  variant="grid"
+  items={items}
+  getKey={(item) => item.id}
+  getLabel={(item) => item.label}
+  renderItem={(item) => (
+    <div style={{ width: "100%", height: "100%", background: item.color }} />
+  )}
+  selectedKey={selectedKey}
+  onSelect={(key) => setSelectedKey(key)}
+  layoutGap="6px"
+  colorA={flexoki.base["50"]}
+  colorB={flexoki.base["100"]}
+/>
+
+<SelectionGrid
+  variant="gradient"
   previewDarkMode
   layoutGap="6px"
   colorA={flexoki.base["50"]}
@@ -236,15 +261,72 @@ const buildRandomCombos = (
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
 
+const selectionGridSwatches = [
+  { id: 'rose', label: 'Rose', color: flexoki.red['400'] },
+  { id: 'sun', label: 'Sun', color: flexoki.yellow['300'] },
+  { id: 'mint', label: 'Mint', color: flexoki.green['400'] },
+  { id: 'sky', label: 'Sky', color: flexoki.blue['400'] },
+  { id: 'iris', label: 'Iris', color: flexoki.purple['400'] },
+  { id: 'berry', label: 'Berry', color: flexoki.magenta['400'] },
+  { id: 'ocean', label: 'Ocean', color: flexoki.cyan['400'] },
+  { id: 'ember', label: 'Ember', color: flexoki.orange['400'] },
+]
+
 const AudioBinsDriver = ({ onFrame }: { onFrame: (nowSec: number, dtSec: number) => void }) => {
   useFrame(onFrame)
   return null
 }
 
 const SelectionGridDemo = () => {
+  const [selectedSwatch, setSelectedSwatch] = useState<string | null>(selectionGridSwatches[0]?.id ?? null)
+  const activeSwatch = selectionGridSwatches.find((swatch) => swatch.id === selectedSwatch)
   return (
     <>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          fontSize: 12,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: flexoki.base['200'],
+        }}
+      >
+        <div
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: 4,
+            border: `1px solid ${flexoki.base['600']}`,
+            background: activeSwatch?.color ?? flexoki.base['600'],
+          }}
+        />
+        {activeSwatch?.label ?? 'None'}
+      </div>
       <SelectionGrid
+        variant="grid"
+        items={selectionGridSwatches}
+        getKey={(item) => item.id}
+        getLabel={(item) => item.label}
+        renderItem={(item) => (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              background: item.color,
+            }}
+          />
+        )}
+        selectedKey={selectedSwatch}
+        onSelect={(key) => setSelectedSwatch(key)}
+        layoutGap="6px"
+        colorA={flexoki.base['50']}
+        colorB={flexoki.base['100']}
+        maxHeightUnits={12}
+      />
+      <SelectionGrid
+        variant="gradient"
         previewDarkMode
         layoutGap="6px"
         colorA={flexoki.base['50']}
@@ -1237,14 +1319,15 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  SelectionGrid is a rich palette selector with built-in gradient previews and
-                  optional terrain rendering. It manages its own store unless you supply one via the
-                  shared slider store context.
+                  SelectionGrid supports two variants: <code>grid</code> for generic square
+                  pickers, and <code>gradient</code> for the built-in palette + terrain previews.
+                  The gradient variant manages its own store unless you supply one via the shared
+                  slider store context.
                 </p>
                 <p>
                   Keep the layout gap and colors aligned with your other controls so the grid feels
-                  like part of the same instrument panel. Terrain previews are opt-in via the
-                  built-in preview mode toggle.
+                  like part of the same instrument panel. Terrain previews are toggled from the
+                  gradient header.
                 </p>
               </div>
             </>

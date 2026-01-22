@@ -6,6 +6,7 @@ const CELL_CORNER_RADIUS_PX = 3;
 const FALLBACK_COLOR_A = "var(--ui-bits-color-a, #2f2f2f)";
 const FALLBACK_COLOR_B = "var(--ui-bits-color-b, #f0f0f0)";
 const MAX_ATLAS_DIMENSION = 4096;
+const MAX_TILE_INFLIGHT = 6;
 
 export type SelectionGridAlignment = "left" | "center" | "right";
 
@@ -39,12 +40,16 @@ export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
 
 export type SelectionGridProps<Item = unknown> = SelectionGridGridProps<Item>;
 
-type CachedAtlas = {
+type CachedTile = {
   status: "loading" | "ready" | "error";
   bitmap?: ImageBitmap;
+};
+
+type AtlasLayout = {
+  key: string;
   columns: number;
-  size: number;
-  count: number;
+  rows: number;
+  tileSize: number;
 };
 
 type CornerRadii = {
@@ -98,6 +103,14 @@ function computeAtlasColumns(count: number, size: number) {
   const maxRows = Math.max(1, Math.floor(MAX_ATLAS_DIMENSION / safeSize));
   if (count <= 0) return 1;
   return Math.min(maxColumns, Math.max(1, Math.ceil(count / maxRows)));
+}
+
+function createAtlasCanvas(width: number, height: number) {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
 }
 
 function createSelectionGridWorker() {
@@ -232,10 +245,18 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   };
 
   const workerRef = React.useRef<Worker | null>(null);
-  const atlasRef = React.useRef<Map<string, CachedAtlas>>(new Map());
+  const tileCacheRef = React.useRef<Map<string, CachedTile>>(new Map());
   const pendingRef = React.useRef<Set<string>>(new Set());
+  const queuedRef = React.useRef<Set<string>>(new Set());
+  const queueRef = React.useRef<string[]>([]);
+  const tileRequestRef = React.useRef<Map<string, { src: string; size: number }>>(new Map());
+  const atlasCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const atlasContextRef = React.useRef<CanvasRenderingContext2D | null>(null);
+  const atlasLayoutRef = React.useRef<AtlasLayout | null>(null);
   const renderTokenRef = React.useRef(0);
   const atlasSignatureRef = React.useRef<string | null>(null);
+  const prefetchSignatureRef = React.useRef<string | null>(null);
+  const drawnIndexRef = React.useRef<string[]>([]);
   const drawRef = React.useRef<() => void>(() => undefined);
 
   const requestRender = React.useCallback(() => {
@@ -248,6 +269,26 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     });
   }, []);
 
+  const flushQueue = React.useCallback(() => {
+    const worker = workerRef.current;
+    if (!worker) return;
+    while (pendingRef.current.size < MAX_TILE_INFLIGHT && queueRef.current.length > 0) {
+      const nextKey = queueRef.current.shift();
+      if (!nextKey) break;
+      queuedRef.current.delete(nextKey);
+      if (pendingRef.current.has(nextKey)) continue;
+      const request = tileRequestRef.current.get(nextKey);
+      if (!request) continue;
+      pendingRef.current.add(nextKey);
+      worker.postMessage({
+        type: "imageTile",
+        id: nextKey,
+        src: request.src,
+        size: request.size,
+      });
+    }
+  }, []);
+
   React.useEffect(() => {
     if (typeof window === "undefined") return undefined;
     const worker = createSelectionGridWorker();
@@ -256,28 +297,36 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
       const { id, bitmap, error } = event.data ?? {};
       if (!id) return;
       pendingRef.current.delete(id);
-      const entry = atlasRef.current.get(id);
-      if (!entry) {
-        bitmap?.close();
-        return;
+      const entry = tileCacheRef.current.get(id);
+      if (entry?.bitmap && entry.bitmap !== bitmap) {
+        entry.bitmap.close();
       }
       if (error) {
-        entry.status = "error";
-        entry.bitmap = undefined;
+        tileCacheRef.current.set(id, { status: "error" });
+        bitmap?.close();
       } else if (bitmap) {
-        entry.status = "ready";
-        entry.bitmap = bitmap;
+        tileCacheRef.current.set(id, { status: "ready", bitmap });
       }
+      flushQueue();
       requestRender();
     };
     return () => {
       worker.terminate();
       workerRef.current = null;
-      atlasRef.current.forEach((entry) => entry.bitmap?.close());
-      atlasRef.current.clear();
+      tileCacheRef.current.forEach((entry) => entry.bitmap?.close());
+      tileCacheRef.current.clear();
       pendingRef.current.clear();
+      queuedRef.current.clear();
+      queueRef.current = [];
+      tileRequestRef.current.clear();
+      atlasCanvasRef.current = null;
+      atlasContextRef.current = null;
+      atlasLayoutRef.current = null;
+      atlasSignatureRef.current = null;
+      prefetchSignatureRef.current = null;
+      drawnIndexRef.current = [];
     };
-  }, [requestRender]);
+  }, [flushQueue, requestRender]);
 
   React.useEffect(() => {
     requestRender();
@@ -333,50 +382,69 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     const endRow = Math.min(rowCount - 1, Math.floor((scrollTop + viewportHeight) / cellSizePx) + 1);
     const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
     const previews: SelectionGridPreview[] = new Array(gridCellCount);
-    const atlasItems: Array<{ kind: "color"; color: string } | { kind: "image"; src: string }> = [];
-    const atlasSignature: string[] = new Array(gridCellCount);
+    const tileKeys: string[] = new Array(gridCellCount);
+    const activeImageKeys = new Set<string>();
     for (let index = 0; index < gridCellCount; index += 1) {
       const preview = getPreview(items[index], index);
       previews[index] = preview;
       if (preview.type === "color") {
-        atlasItems.push({ kind: "color", color: preview.color });
-        atlasSignature[index] = `c:${preview.color}`;
+        tileKeys[index] = `color:${preview.color}`;
       } else {
         const resolvedSrc = resolveWorkerUrl(preview.src);
-        atlasItems.push({ kind: "image", src: resolvedSrc });
-        atlasSignature[index] = `i:${resolvedSrc}`;
+        const tileKey = `image:${resolvedSrc}|${targetSize}`;
+        tileKeys[index] = tileKey;
+        activeImageKeys.add(tileKey);
+        tileRequestRef.current.set(tileKey, { src: resolvedSrc, size: targetSize });
       }
     }
     const atlasColumns = computeAtlasColumns(gridCellCount, targetSize);
-    const atlasKey = `${targetSize}|${atlasColumns}|${atlasSignature.join("|")}`;
+    const atlasRows = Math.max(1, Math.ceil(gridCellCount / atlasColumns));
+    const atlasKey = `${targetSize}|${atlasColumns}|${tileKeys.join("|")}`;
     if (atlasSignatureRef.current !== atlasKey) {
       atlasSignatureRef.current = atlasKey;
-      atlasRef.current.forEach((entry) => entry.bitmap?.close());
-      atlasRef.current.clear();
-      pendingRef.current.clear();
-    }
-    let atlasEntry = atlasRef.current.get(atlasKey);
-    if (!atlasEntry) {
-      atlasEntry = {
-        status: "loading",
+      prefetchSignatureRef.current = null;
+      const atlasWidth = atlasColumns * targetSize;
+      const atlasHeight = atlasRows * targetSize;
+      const atlasCanvas = createAtlasCanvas(atlasWidth, atlasHeight);
+      atlasCanvasRef.current = atlasCanvas;
+      atlasContextRef.current = atlasCanvas?.getContext("2d") ?? null;
+      atlasLayoutRef.current = {
+        key: atlasKey,
         columns: atlasColumns,
-        size: targetSize,
-        count: gridCellCount,
+        rows: atlasRows,
+        tileSize: targetSize,
       };
-      atlasRef.current.set(atlasKey, atlasEntry);
-    }
-    if (atlasEntry.status === "loading" && !pendingRef.current.has(atlasKey)) {
-      const worker = workerRef.current;
-      if (worker) {
-        pendingRef.current.add(atlasKey);
-        worker.postMessage({
-          type: "atlas",
-          id: atlasKey,
-          size: targetSize,
-          columns: atlasColumns,
-          items: atlasItems,
-        });
+      drawnIndexRef.current = new Array(gridCellCount).fill("");
+      if (atlasContextRef.current) {
+        atlasContextRef.current.clearRect(0, 0, atlasWidth, atlasHeight);
+        for (let index = 0; index < gridCellCount; index += 1) {
+          const preview = previews[index];
+          if (preview.type !== "color") continue;
+          const x = (index % atlasColumns) * targetSize;
+          const y = Math.floor(index / atlasColumns) * targetSize;
+          atlasContextRef.current.fillStyle = preview.color;
+          atlasContextRef.current.fillRect(x, y, targetSize, targetSize);
+          drawnIndexRef.current[index] = tileKeys[index];
+        }
       }
+      tileCacheRef.current.forEach((entry, key) => {
+        if (!activeImageKeys.has(key)) {
+          entry.bitmap?.close();
+          tileCacheRef.current.delete(key);
+        }
+      });
+      pendingRef.current.forEach((key) => {
+        if (!activeImageKeys.has(key)) {
+          pendingRef.current.delete(key);
+        }
+      });
+      queueRef.current = queueRef.current.filter((key) => activeImageKeys.has(key));
+      queuedRef.current = new Set(queueRef.current);
+      tileRequestRef.current.forEach((_, key) => {
+        if (!activeImageKeys.has(key)) {
+          tileRequestRef.current.delete(key);
+        }
+      });
     }
 
     for (let row = startRow; row <= endRow; row += 1) {
@@ -405,18 +473,44 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
         const x = rowOffset + col * cellSizePx;
 
         const preview = previews[index];
-        if (atlasEntry.status === "ready" && atlasEntry.bitmap) {
-          const srcX = (index % atlasEntry.columns) * atlasEntry.size;
-          const srcY = Math.floor(index / atlasEntry.columns) * atlasEntry.size;
+        const tileKey = tileKeys[index];
+        const atlasCanvas = atlasCanvasRef.current;
+        const atlasLayout = atlasLayoutRef.current;
+        const atlasCtx = atlasContextRef.current;
+        let tileDrawn = drawnIndexRef.current[index] === tileKey;
+
+        if (preview.type === "image") {
+          const tileEntry = tileCacheRef.current.get(tileKey);
+          if (tileEntry?.status === "ready" && tileEntry.bitmap && atlasCtx && atlasLayout && !tileDrawn) {
+            const atlasX = (index % atlasLayout.columns) * atlasLayout.tileSize;
+            const atlasY = Math.floor(index / atlasLayout.columns) * atlasLayout.tileSize;
+            atlasCtx.drawImage(tileEntry.bitmap, atlasX, atlasY, atlasLayout.tileSize, atlasLayout.tileSize);
+            drawnIndexRef.current[index] = tileKey;
+            tileDrawn = true;
+          }
+          if (!tileEntry) {
+            tileCacheRef.current.set(tileKey, { status: "loading" });
+          }
+          if (!tileEntry || tileEntry.status === "loading") {
+            if (!pendingRef.current.has(tileKey) && !queuedRef.current.has(tileKey)) {
+              queueRef.current.push(tileKey);
+              queuedRef.current.add(tileKey);
+            }
+          }
+        }
+
+        if (atlasCanvas && atlasLayout && tileDrawn) {
+          const srcX = (index % atlasLayout.columns) * atlasLayout.tileSize;
+          const srcY = Math.floor(index / atlasLayout.columns) * atlasLayout.tileSize;
           ctx.save();
           buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
           ctx.clip();
           ctx.drawImage(
-            atlasEntry.bitmap,
+            atlasCanvas,
             srcX,
             srcY,
-            atlasEntry.size,
-            atlasEntry.size,
+            atlasLayout.tileSize,
+            atlasLayout.tileSize,
             x,
             y,
             cellSizePx,
@@ -443,6 +537,23 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
         }
       }
     }
+
+    if (prefetchSignatureRef.current !== atlasKey) {
+      prefetchSignatureRef.current = atlasKey;
+      for (let index = 0; index < gridCellCount; index += 1) {
+        const preview = previews[index];
+        if (preview.type !== "image") continue;
+        const tileKey = tileKeys[index];
+        const entry = tileCacheRef.current.get(tileKey);
+        if (entry?.status === "ready" || entry?.status === "error" || entry?.status === "loading") continue;
+        if (pendingRef.current.has(tileKey) || queuedRef.current.has(tileKey)) continue;
+        queueRef.current.push(tileKey);
+        queuedRef.current.add(tileKey);
+        tileCacheRef.current.set(tileKey, { status: "loading" });
+      }
+    }
+
+    flushQueue();
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {

@@ -1,46 +1,21 @@
 /// <reference lib="webworker" />
 
-type ImageRequest = {
-  type: "image";
+type ImageTileRequest = {
+  type: "imageTile";
   id: string;
   src: string;
   size: number;
 };
 
-type GradientRequest = {
-  type: "gradient";
+type GradientTileRequest = {
+  type: "gradientTile";
   id: string;
   palette: Uint8ClampedArray;
   size: number;
   tileUrl?: string;
 };
 
-type AtlasItem =
-  | { kind: "image"; src: string }
-  | { kind: "color"; color: string };
-
-type AtlasRequest = {
-  type: "atlas";
-  id: string;
-  size: number;
-  columns: number;
-  items: AtlasItem[];
-};
-
-type GradientAtlasItem = {
-  palette: Uint8ClampedArray;
-  tileUrl?: string;
-};
-
-type GradientAtlasRequest = {
-  type: "gradientAtlas";
-  id: string;
-  size: number;
-  columns: number;
-  items: GradientAtlasItem[];
-};
-
-type WorkerRequest = ImageRequest | GradientRequest | AtlasRequest | GradientAtlasRequest;
+type WorkerRequest = ImageTileRequest | GradientTileRequest;
 
 type WorkerResponse = {
   id: string;
@@ -53,26 +28,14 @@ const workerScope = self as DedicatedWorkerGlobalScope;
 workerScope.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const payload = event.data;
   if (!payload) return;
-  if (payload.type === "image") {
-    handleImage(payload).catch((error) => {
+  if (payload.type === "imageTile") {
+    handleImageTile(payload).catch((error) => {
       postError(payload.id, error);
     });
     return;
   }
-  if (payload.type === "gradient") {
-    handleGradient(payload).catch((error) => {
-      postError(payload.id, error);
-    });
-    return;
-  }
-  if (payload.type === "atlas") {
-    handleAtlas(payload).catch((error) => {
-      postError(payload.id, error);
-    });
-    return;
-  }
-  if (payload.type === "gradientAtlas") {
-    handleGradientAtlas(payload).catch((error) => {
+  if (payload.type === "gradientTile") {
+    handleGradientTile(payload).catch((error) => {
       postError(payload.id, error);
     });
   }
@@ -84,7 +47,7 @@ function postError(id: string, error: unknown) {
   workerScope.postMessage(response);
 }
 
-async function handleImage({ id, src, size }: ImageRequest) {
+async function handleImageTile({ id, src, size }: ImageTileRequest) {
   const response = await fetch(src, { cache: "force-cache" });
   if (!response.ok) {
     throw new Error(`Failed to fetch image (${response.status})`);
@@ -128,22 +91,10 @@ async function createCoverBitmap(blob: Blob, size: number): Promise<ImageBitmap>
   return canvas.transferToImageBitmap();
 }
 
-async function handleGradient({ id, palette, size, tileUrl }: GradientRequest) {
+async function handleGradientTile({ id, palette, size, tileUrl }: GradientTileRequest) {
   const bitmap = tileUrl
     ? await renderTerrainPreview(tileUrl, palette, size)
     : await renderGradientPreview(palette, size);
-  const result: WorkerResponse = { id, bitmap };
-  workerScope.postMessage(result, [bitmap]);
-}
-
-async function handleAtlas({ id, size, columns, items }: AtlasRequest) {
-  const bitmap = await renderAtlas(items, size, columns);
-  const result: WorkerResponse = { id, bitmap };
-  workerScope.postMessage(result, [bitmap]);
-}
-
-async function handleGradientAtlas({ id, size, columns, items }: GradientAtlasRequest) {
-  const bitmap = await renderGradientAtlas(items, size, columns);
   const result: WorkerResponse = { id, bitmap };
   workerScope.postMessage(result, [bitmap]);
 }
@@ -164,77 +115,6 @@ async function renderGradientPreview(palette: Uint8ClampedArray, size: number): 
     }
   }
   return await createImageBitmap(imageData);
-}
-
-async function renderAtlas(items: AtlasItem[], size: number, columns: number): Promise<ImageBitmap> {
-  if (typeof OffscreenCanvas === "undefined") {
-    throw new Error("OffscreenCanvas unsupported");
-  }
-  const safeColumns = Math.max(1, Math.floor(columns));
-  const rows = Math.max(1, Math.ceil(items.length / safeColumns));
-  const canvas = new OffscreenCanvas(safeColumns * size, rows * size);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Failed to create atlas context");
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    const col = index % safeColumns;
-    const row = Math.floor(index / safeColumns);
-    const x = col * size;
-    const y = row * size;
-    if (item.kind === "color") {
-      ctx.fillStyle = item.color;
-      ctx.fillRect(x, y, size, size);
-      continue;
-    }
-    try {
-      const response = await fetch(item.src, { cache: "force-cache" });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image (${response.status})`);
-      }
-      const blob = await response.blob();
-      const bitmap = await createCoverBitmap(blob, size);
-      ctx.drawImage(bitmap, x, y, size, size);
-      bitmap.close();
-    } catch {
-      ctx.clearRect(x, y, size, size);
-    }
-  }
-
-  return canvas.transferToImageBitmap();
-}
-
-async function renderGradientAtlas(items: GradientAtlasItem[], size: number, columns: number): Promise<ImageBitmap> {
-  if (typeof OffscreenCanvas === "undefined") {
-    throw new Error("OffscreenCanvas unsupported");
-  }
-  const safeColumns = Math.max(1, Math.floor(columns));
-  const rows = Math.max(1, Math.ceil(items.length / safeColumns));
-  const canvas = new OffscreenCanvas(safeColumns * size, rows * size);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Failed to create atlas context");
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    const col = index % safeColumns;
-    const row = Math.floor(index / safeColumns);
-    const x = col * size;
-    const y = row * size;
-    let bitmap: ImageBitmap | null = null;
-    try {
-      bitmap = item.tileUrl
-        ? await renderTerrainPreview(item.tileUrl, item.palette, size)
-        : await renderGradientPreview(item.palette, size);
-    } catch {
-      bitmap = await renderGradientPreview(item.palette, size);
-    }
-    ctx.drawImage(bitmap, x, y, size, size);
-    bitmap.close();
-  }
-
-  return canvas.transferToImageBitmap();
 }
 
 async function renderTerrainPreview(tileUrl: string, palette: Uint8ClampedArray, size: number): Promise<ImageBitmap> {

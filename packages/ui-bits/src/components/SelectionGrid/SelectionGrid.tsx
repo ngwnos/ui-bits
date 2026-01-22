@@ -7,11 +7,9 @@ const FALLBACK_COLOR_B = "var(--ui-bits-color-b, #f0f0f0)";
 
 export type SelectionGridAlignment = "left" | "center" | "right";
 
-export type SelectionGridItemRenderState = {
-  index: number;
-  selected: boolean;
-  size: number;
-};
+export type SelectionGridPreview =
+  | { type: "color"; color: string }
+  | { type: "image"; src: string };
 
 export type SelectionGridBaseProps = {
   layoutGap?: string;
@@ -25,7 +23,7 @@ export type SelectionGridBaseProps = {
 export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
   items: Item[];
   getKey: (item: Item, index: number) => string;
-  renderItem: (item: Item, state: SelectionGridItemRenderState) => React.ReactNode;
+  getPreview: (item: Item, index: number) => SelectionGridPreview;
   getLabel?: (item: Item, index: number) => string;
   selectedKey?: string | null;
   defaultSelectedKey?: string | null;
@@ -39,11 +37,56 @@ export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
 
 export type SelectionGridProps<Item = unknown> = SelectionGridGridProps<Item>;
 
+type CachedBitmap = {
+  status: "loading" | "ready" | "error";
+  bitmap?: ImageBitmap;
+};
+
+type CornerRadii = {
+  tl: number;
+  tr: number;
+  br: number;
+  bl: number;
+};
+
+function buildRoundedRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  radii: CornerRadii,
+) {
+  const maxRadius = size / 2;
+  const tl = Math.min(maxRadius, Math.max(0, radii.tl));
+  const tr = Math.min(maxRadius, Math.max(0, radii.tr));
+  const br = Math.min(maxRadius, Math.max(0, radii.br));
+  const bl = Math.min(maxRadius, Math.max(0, radii.bl));
+  ctx.beginPath();
+  ctx.moveTo(x + tl, y);
+  ctx.lineTo(x + size - tr, y);
+  if (tr > 0) ctx.quadraticCurveTo(x + size, y, x + size, y + tr);
+  else ctx.lineTo(x + size, y);
+  ctx.lineTo(x + size, y + size - br);
+  if (br > 0) ctx.quadraticCurveTo(x + size, y + size, x + size - br, y + size);
+  else ctx.lineTo(x + size, y + size);
+  ctx.lineTo(x + bl, y + size);
+  if (bl > 0) ctx.quadraticCurveTo(x, y + size, x, y + size - bl);
+  else ctx.lineTo(x, y + size);
+  ctx.lineTo(x, y + tl);
+  if (tl > 0) ctx.quadraticCurveTo(x, y, x + tl, y);
+  else ctx.lineTo(x, y);
+  ctx.closePath();
+}
+
+function createSelectionGridWorker() {
+  return new Worker(new URL("./selectionGrid.worker.ts", import.meta.url), { type: "module" });
+}
+
 export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>) {
   const {
     items,
     getKey,
-    renderItem,
+    getPreview,
     getLabel,
     selectedKey,
     defaultSelectedKey = null,
@@ -82,6 +125,8 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   }, [isControlled, itemKeys, resolvedSelectedKey]);
 
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const [containerWidth, setContainerWidth] = React.useState<number>(360);
 
   React.useEffect(() => {
@@ -142,6 +187,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const totalRowUnits = rowCount * resolvedSquareScale;
   const gridMaxHeightPx = resolvedMaxHeightUnits != null ? resolvedMaxHeightUnits * baseCellSize : null;
   const clampGridHeight = resolvedMaxHeightUnits != null && totalRowUnits > resolvedMaxHeightUnits;
+  const totalGridHeightPx = rowCount * cellSizePx;
 
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
 
@@ -163,88 +209,225 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     onSelect?.(key, item, index);
   };
 
-  const cells = items.map((item, index) => {
-    const itemKey = itemKeys[index] ?? String(index);
-    const row = rowCapacity ? Math.floor(index / rowCapacity) : 0;
-    const col = rowCapacity ? index % rowCapacity : 0;
-    const isLastRow = row === lastRowIndex;
-    const marginLeft = isLastRow && col === 0 ? alignmentOffsetPx : 0;
-    const isSelected = resolvedSelectedKey != null && itemKey === resolvedSelectedKey;
-    const hasTopNeighbor = index - rowCapacity >= 0;
-    const hasBottomNeighbor = index + rowCapacity < gridCellCount;
-    const hasLeftNeighbor = col > 0;
-    const hasRightNeighbor = col < rowCapacity - 1
-      && index + 1 < gridCellCount
-      && Math.floor((index + 1) / rowCapacity) === row;
-    const topLeftRadius = (hasTopNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
-    const topRightRadius = (hasTopNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
-    const bottomLeftRadius = (hasBottomNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
-    const bottomRightRadius = (hasBottomNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
-    const borderRadiusValue = `${topLeftRadius}px ${topRightRadius}px ${bottomRightRadius}px ${bottomLeftRadius}px`;
-    const label = getLabel?.(item, index);
-    return (
-      <div
-        key={itemKey}
-        style={{
-          width: `${cellSizePx}px`,
-          height: `${cellSizePx}px`,
-          flex: `0 0 ${cellSizePx}px`,
-          borderRadius: borderRadiusValue,
-          boxSizing: "border-box",
-          marginLeft,
-          cursor: "pointer",
-          outline: "none",
-          position: "relative",
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "stretch",
-          justifyContent: "stretch",
-          color: colorA,
-        }}
-        role="button"
-        tabIndex={0}
-        aria-pressed={isSelected}
-        aria-label={label}
-        title={label}
-        onClick={() => {
-          if (isSelected) {
-            if (allowEmptySelection) {
-              commitSelection(null, null, null);
-            }
-            return;
+  const workerRef = React.useRef<Worker | null>(null);
+  const cacheRef = React.useRef<Map<string, CachedBitmap>>(new Map());
+  const pendingRef = React.useRef<Set<string>>(new Set());
+  const renderTokenRef = React.useRef(0);
+  const drawRef = React.useRef<() => void>(() => undefined);
+
+  const requestRender = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    renderTokenRef.current += 1;
+    const token = renderTokenRef.current;
+    window.requestAnimationFrame(() => {
+      if (token !== renderTokenRef.current) return;
+      drawRef.current();
+    });
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const worker = createSelectionGridWorker();
+    workerRef.current = worker;
+    worker.onmessage = (event: MessageEvent<{ id: string; bitmap?: ImageBitmap; error?: string }>) => {
+      const { id, bitmap, error } = event.data ?? {};
+      if (!id) return;
+      pendingRef.current.delete(id);
+      const entry = cacheRef.current.get(id);
+      if (!entry) {
+        bitmap?.close();
+        return;
+      }
+      if (error) {
+        entry.status = "error";
+        entry.bitmap = undefined;
+      } else if (bitmap) {
+        entry.status = "ready";
+        entry.bitmap = bitmap;
+      }
+      requestRender();
+    };
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+      cacheRef.current.forEach((entry) => entry.bitmap?.close());
+      cacheRef.current.clear();
+      pendingRef.current.clear();
+    };
+  }, [requestRender]);
+
+  React.useEffect(() => {
+    cacheRef.current.forEach((entry) => entry.bitmap?.close());
+    cacheRef.current.clear();
+    pendingRef.current.clear();
+    requestRender();
+  }, [cellSizePx, requestRender]);
+
+  React.useEffect(() => {
+    requestRender();
+  }, [
+    items,
+    resolvedSelectedKey,
+    containerWidth,
+    cellSizePx,
+    colorA,
+    colorB,
+    alignmentOffsetPx,
+    rowCapacity,
+    rowCount,
+    lastRowCount,
+    gridCellCount,
+    requestRender,
+  ]);
+
+  React.useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return undefined;
+    const handleScroll = () => requestRender();
+    node.addEventListener("scroll", handleScroll, { passive: true });
+    return () => node.removeEventListener("scroll", handleScroll);
+  }, [requestRender]);
+
+  drawRef.current = () => {
+    const canvas = canvasRef.current;
+    const scrollNode = scrollRef.current;
+    if (!canvas || !scrollNode) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const viewportWidth = Math.max(1, Math.round(containerWidthPx));
+    const viewportHeight = Math.max(1, Math.round(scrollNode.clientHeight || totalGridHeightPx));
+    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    const pixelWidth = Math.max(1, Math.round(viewportWidth * dpr));
+    const pixelHeight = Math.max(1, Math.round(viewportHeight * dpr));
+
+    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+      canvas.style.width = `${viewportWidth}px`;
+      canvas.style.height = `${viewportHeight}px`;
+    }
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+
+    if (gridCellCount === 0) return;
+
+    const scrollTop = scrollNode.scrollTop;
+    const startRow = Math.max(0, Math.floor(scrollTop / cellSizePx) - 1);
+    const endRow = Math.min(rowCount - 1, Math.floor((scrollTop + viewportHeight) / cellSizePx) + 1);
+
+    for (let row = startRow; row <= endRow; row += 1) {
+      const rowOffset = row === lastRowIndex ? alignmentOffsetPx : 0;
+      const rowCellCount = row === lastRowIndex ? lastRowCount : rowCapacity;
+      const rowBaseIndex = row * rowCapacity;
+      const y = row * cellSizePx - scrollTop;
+
+      for (let col = 0; col < rowCellCount; col += 1) {
+        const index = rowBaseIndex + col;
+        if (index >= gridCellCount) break;
+        const item = items[index];
+        const itemKey = itemKeys[index] ?? String(index);
+        const isSelected = resolvedSelectedKey != null && itemKey === resolvedSelectedKey;
+        const hasTopNeighbor = index - rowCapacity >= 0;
+        const hasBottomNeighbor = index + rowCapacity < gridCellCount;
+        const hasLeftNeighbor = col > 0;
+        const hasRightNeighbor = col < rowCapacity - 1
+          && index + 1 < gridCellCount
+          && Math.floor((index + 1) / rowCapacity) === row;
+        const radii: CornerRadii = {
+          tl: (hasTopNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
+          tr: (hasTopNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
+          br: (hasBottomNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
+          bl: (hasBottomNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
+        };
+        const x = rowOffset + col * cellSizePx;
+
+        const preview = getPreview(item, index);
+        if (preview.type === "color") {
+          buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
+          ctx.fillStyle = preview.color;
+          ctx.fill();
+        } else {
+          const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
+          const cacheKey = `${preview.src}|${targetSize}`;
+          let entry = cacheRef.current.get(cacheKey);
+          if (!entry) {
+            entry = { status: "loading" };
+            cacheRef.current.set(cacheKey, entry);
           }
-          commitSelection(itemKey, item, index);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            if (isSelected) {
-              if (allowEmptySelection) {
-                commitSelection(null, null, null);
+          if (entry.status !== "ready" || !entry.bitmap) {
+            buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
+            ctx.fillStyle = colorA;
+            ctx.fill();
+            if (entry.status === "loading" && !pendingRef.current.has(cacheKey)) {
+              const worker = workerRef.current;
+              if (worker) {
+                pendingRef.current.add(cacheKey);
+                worker.postMessage({
+                  type: "image",
+                  id: cacheKey,
+                  src: preview.src,
+                  size: targetSize,
+                });
               }
-              return;
             }
-            commitSelection(itemKey, item, index);
+          } else {
+            ctx.save();
+            buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
+            ctx.clip();
+            ctx.drawImage(entry.bitmap, x, y, cellSizePx, cellSizePx);
+            ctx.restore();
           }
-        }}
-      >
-        <div style={{ width: "100%", height: "100%", pointerEvents: "none" }}>
-          {renderItem(item, { index, selected: isSelected, size: cellSizePx })}
-        </div>
-        {isSelected ? (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: borderRadiusValue,
-              boxShadow: `inset 0 0 0 2px ${colorB}`,
-              pointerEvents: "none",
-            }}
-          />
-        ) : null}
-      </div>
-    );
-  });
+        }
+
+        if (isSelected) {
+          ctx.save();
+          ctx.strokeStyle = colorB;
+          ctx.lineWidth = 2;
+          buildRoundedRectPath(ctx, x + 1, y + 1, cellSizePx - 2, radii);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    const scrollNode = scrollRef.current;
+    if (!canvas || !scrollNode) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top + scrollNode.scrollTop;
+    if (x < 0 || y < 0) return;
+    const row = Math.floor(y / cellSizePx);
+    if (row < 0 || row >= rowCount) return;
+    const rowOffset = row === lastRowIndex ? alignmentOffsetPx : 0;
+    const rowCellCount = row === lastRowIndex ? lastRowCount : rowCapacity;
+    if (x < rowOffset || x > rowOffset + rowCellCount * cellSizePx) return;
+    const col = Math.floor((x - rowOffset) / cellSizePx);
+    if (col < 0 || col >= rowCellCount) return;
+    const index = row * rowCapacity + col;
+    if (index < 0 || index >= items.length) return;
+    const item = items[index];
+    const key = itemKeys[index] ?? String(index);
+    const isSelected = resolvedSelectedKey != null && key === resolvedSelectedKey;
+    if (isSelected) {
+      if (allowEmptySelection) {
+        commitSelection(null, null, null);
+      }
+      return;
+    }
+    commitSelection(key, item, index);
+  };
+
+  const hoverTitle = React.useMemo(() => {
+    if (!getLabel) return undefined;
+    if (resolvedSelectedKey == null) return undefined;
+    const index = itemKeys.indexOf(resolvedSelectedKey);
+    if (index < 0) return undefined;
+    return getLabel(items[index], index);
+  }, [getLabel, itemKeys, items, resolvedSelectedKey]);
 
   return (
     <div ref={wrapperRef} className={className} style={wrapperStyle}>
@@ -260,24 +443,36 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
           }}
         >
           <div
-            className="selection-grid__cells"
+            ref={scrollRef}
+            className="selection-grid__scroll"
             style={{
-              display: "inline-flex",
-              flexWrap: "wrap",
-              gap: 0,
-              alignContent: "flex-start",
+              position: "relative",
               width: "100%",
-              ...(gridMaxHeightPx != null
-                ? {
-                  maxHeight: `${gridMaxHeightPx}px`,
-                  overflowY: clampGridHeight ? "auto" : undefined,
-                  msOverflowStyle: "none",
-                  scrollbarWidth: "none",
-                }
-                : {}),
+              height: clampGridHeight && gridMaxHeightPx != null
+                ? `${gridMaxHeightPx}px`
+                : `${totalGridHeightPx}px`,
+              maxHeight: gridMaxHeightPx != null ? `${gridMaxHeightPx}px` : undefined,
+              overflowY: clampGridHeight ? "auto" : "hidden",
+              msOverflowStyle: "none",
+              scrollbarWidth: "none",
             }}
+            title={hoverTitle}
           >
-            {cells}
+            <canvas
+              ref={canvasRef}
+              className="selection-grid__canvas"
+              style={{
+                position: "sticky",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                cursor: "pointer",
+                touchAction: "manipulation",
+              }}
+              onPointerDown={handlePointerDown}
+            />
+            <div style={{ width: "100%", height: `${totalGridHeightPx}px` }} />
           </div>
         </div>
       </div>

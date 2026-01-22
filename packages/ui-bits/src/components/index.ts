@@ -42,7 +42,7 @@ export {
   type SelectionGridProps,
   type SelectionGridGridProps,
   type SelectionGridGradientProps,
-  type SelectionGridItemRenderState,
+  type SelectionGridPreview,
 } from "./SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./Dropdown";
 export { default as IconDropdown, type IconDropdownProps, type IconDropdownOption } from "./IconDropdown";

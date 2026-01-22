@@ -3,6 +3,6 @@ export {
   type SelectionGridAlignment,
   type SelectionGridProps,
   type SelectionGridGridProps,
-  type SelectionGridItemRenderState,
+  type SelectionGridPreview,
 } from "./SelectionGrid";
 export { default as GradientSelectionGrid, type SelectionGridGradientProps } from "./SelectionGridGradient";

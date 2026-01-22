@@ -110,9 +110,7 @@ const [selectedKey, setSelectedKey] = useState(items[0]?.id ?? null);
   items={items}
   getKey={(item) => item.id}
   getLabel={(item) => item.label}
-  renderItem={(item) => (
-    <div style={{ width: "100%", height: "100%", background: item.color }} />
-  )}
+  getPreview={(item) => ({ type: "color", color: item.color })}
   selectedKey={selectedKey}
   onSelect={(key) => setSelectedKey(key)}
   layoutGap="6px"
@@ -307,15 +305,7 @@ const SelectionGridDemo = () => {
         items={selectionGridSwatches}
         getKey={(item) => item.id}
         getLabel={(item) => item.label}
-        renderItem={(item) => (
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              background: item.color,
-            }}
-          />
-        )}
+        getPreview={(item) => ({ type: 'color', color: item.color })}
         selectedKey={selectedSwatch}
         onSelect={(key) => setSelectedSwatch(key)}
         layoutGap="6px"

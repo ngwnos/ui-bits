@@ -1,10 +1,12 @@
 import React from "react";
 import "./selectionGrid.css";
 export type SelectionGridAlignment = "left" | "center" | "right";
-export type SelectionGridItemRenderState = {
-    index: number;
-    selected: boolean;
-    size: number;
+export type SelectionGridPreview = {
+    type: "color";
+    color: string;
+} | {
+    type: "image";
+    src: string;
 };
 export type SelectionGridBaseProps = {
     layoutGap?: string;
@@ -17,7 +19,7 @@ export type SelectionGridBaseProps = {
 export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
     items: Item[];
     getKey: (item: Item, index: number) => string;
-    renderItem: (item: Item, state: SelectionGridItemRenderState) => React.ReactNode;
+    getPreview: (item: Item, index: number) => SelectionGridPreview;
     getLabel?: (item: Item, index: number) => string;
     selectedKey?: string | null;
     defaultSelectedKey?: string | null;

@@ -1,5 +1,4 @@
 import React from "react";
-import tgpu from "typegpu";
 import { Columns4, Mountain } from "lucide-react";
 import { SliderStoreProvider } from "../../sliderStore";
 import { SliderStoreContext } from "../../sliderStore/context";
@@ -16,7 +15,6 @@ import {
   createGradientCss,
   type GradientDefinition,
 } from "../../gradients/matplotlib";
-import { loadHeightTexture, type HeightTextureEntry } from "../../utils/loadHeightTexture";
 import { loadTerrainTileAssets, type TerrainTileAsset } from "../../assets/terrain/tiles";
 import IconButton from "../IconButton";
 import "./selectionGrid.css";
@@ -38,12 +36,10 @@ type GradientVisual = {
   tile: string;
   tileUrl: string;
   normal: {
-    textureUrl: string | null;
     paletteCss: string[];
     cssFallback: string;
   };
   inverted: {
-    textureUrl: string | null;
     paletteCss: string[];
     cssFallback: string;
   };
@@ -52,6 +48,51 @@ type GradientVisual = {
 const CELL_CORNER_RADIUS_PX = 3;
 const FALLBACK_COLOR_A = "var(--ui-bits-color-a, #2f2f2f)";
 const FALLBACK_COLOR_B = "var(--ui-bits-color-b, #f0f0f0)";
+
+type CachedBitmap = {
+  status: "loading" | "ready" | "error";
+  bitmap?: ImageBitmap;
+};
+
+type CornerRadii = {
+  tl: number;
+  tr: number;
+  br: number;
+  bl: number;
+};
+
+function buildRoundedRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  radii: CornerRadii,
+) {
+  const maxRadius = size / 2;
+  const tl = Math.min(maxRadius, Math.max(0, radii.tl));
+  const tr = Math.min(maxRadius, Math.max(0, radii.tr));
+  const br = Math.min(maxRadius, Math.max(0, radii.br));
+  const bl = Math.min(maxRadius, Math.max(0, radii.bl));
+  ctx.beginPath();
+  ctx.moveTo(x + tl, y);
+  ctx.lineTo(x + size - tr, y);
+  if (tr > 0) ctx.quadraticCurveTo(x + size, y, x + size, y + tr);
+  else ctx.lineTo(x + size, y);
+  ctx.lineTo(x + size, y + size - br);
+  if (br > 0) ctx.quadraticCurveTo(x + size, y + size, x + size - br, y + size);
+  else ctx.lineTo(x + size, y + size);
+  ctx.lineTo(x + bl, y + size);
+  if (bl > 0) ctx.quadraticCurveTo(x, y + size, x, y + size - bl);
+  else ctx.lineTo(x, y + size);
+  ctx.lineTo(x, y + tl);
+  if (tl > 0) ctx.quadraticCurveTo(x, y, x + tl, y);
+  else ctx.lineTo(x, y);
+  ctx.closePath();
+}
+
+function createSelectionGridWorker() {
+  return new Worker(new URL("./selectionGrid.worker.ts", import.meta.url), { type: "module" });
+}
 
 type TileAssignment = {
   url: string;
@@ -68,215 +109,6 @@ const PREVIEW_MODE_TITLE: Record<SelectionGridPreviewMode, string> = {
   terrainHeight: "Terrain height previews",
 };
 
-type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
-let sharedRoot: TypeGpuRoot | null = null;
-let sharedRootPromise: Promise<TypeGpuRoot | null> | null = null;
-
-let sharedPipeline: {
-  renderPipeline: GPURenderPipeline;
-  sampler: GPUSampler;
-  format: GPUTextureFormat;
-  device: GPUDevice;
-} | null = null;
-let sharedLinearHeightTexture: HeightTextureEntry | null = null;
-let sharedFallbackHeightTexture: HeightTextureEntry | null = null;
-
-async function getSharedRoot(): Promise<TypeGpuRoot | null> {
-  if (!navigator.gpu) return null;
-  if (sharedRoot) return sharedRoot;
-  if (!sharedRootPromise) {
-    sharedRootPromise = tgpu.init().then((root) => {
-      sharedRoot = root;
-      return root;
-    }).catch((error) => {
-      console.error('TypeGPU initialization failed', error);
-      sharedRootPromise = null;
-      return null;
-    });
-  }
-  return sharedRootPromise;
-}
-
-function getSharedPipeline(device: GPUDevice, format: GPUTextureFormat): { renderPipeline: GPURenderPipeline; sampler: GPUSampler } {
-  if (sharedPipeline && sharedPipeline.device === device && sharedPipeline.format === format) {
-    return { renderPipeline: sharedPipeline.renderPipeline, sampler: sharedPipeline.sampler };
-  }
-  const shaderModule = device.createShaderModule({
-    code: `
-struct VertexOutput {
-  @builtin(position) position : vec4<f32>,
-  @location(0) uv : vec2<f32>,
-};
-
-@vertex
-fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
-  var positions = array<vec2<f32>, 6>(
-    vec2<f32>(-1.0, 1.0),
-    vec2<f32>(-1.0, -1.0),
-    vec2<f32>(1.0, 1.0),
-    vec2<f32>(1.0, 1.0),
-    vec2<f32>(-1.0, -1.0),
-    vec2<f32>(1.0, -1.0)
-  );
-  var uvs = array<vec2<f32>, 6>(
-    vec2<f32>(0.0, 0.0),
-    vec2<f32>(0.0, 1.0),
-    vec2<f32>(1.0, 0.0),
-    vec2<f32>(1.0, 0.0),
-    vec2<f32>(0.0, 1.0),
-    vec2<f32>(1.0, 1.0)
-  );
-  var out : VertexOutput;
-  out.position = vec4<f32>(positions[vertexIndex], 0.0, 1.0);
-  out.uv = uvs[vertexIndex];
-  return out;
-}
-
-struct RenderUniforms {
-  params0 : vec4<f32>,
-  params1 : vec4<f32>,
-  params2 : vec4<f32>,
-};
-
-@group(0) @binding(0) var heightTexture : texture_2d<f32>;
-@group(0) @binding(1) var tileSampler : sampler;
-@group(0) @binding(2) var gradientTexture : texture_2d<f32>;
-@group(0) @binding(3) var<uniform> uniforms : RenderUniforms;
-
-fn quantizeUv(uv : vec2<f32>, texelSize : vec2<f32>) -> vec2<i32> {
-  let width = max(1, i32(round(1.0 / texelSize.x)));
-  let height = max(1, i32(round(1.0 / texelSize.y)));
-  let x = clamp(i32(round(uv.x * f32(width - 1))), 0, width - 1);
-  let y = clamp(i32(round(uv.y * f32(height - 1))), 0, height - 1);
-  return vec2<i32>(x, y);
-}
-
-fn sampleHeight(uv : vec2<f32>, texelSize : vec2<f32>) -> f32 {
-  let coords = quantizeUv(uv, texelSize);
-  return textureLoad(heightTexture, coords, 0).r;
-}
-
-fn safeSample(uv : vec2<f32>) -> vec2<f32> {
-  return clamp(uv, vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 1.0));
-}
-
-@fragment
-fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
-  let texelSize = uniforms.params0.yz;
-  let heightMin = uniforms.params1.w;
-  let heightRange = max(uniforms.params2.x, 1e-6);
-  let uv = safeSample(in.uv);
-
-  let hC = sampleHeight(uv, texelSize);
-  let normalizedHeight = clamp((hC - heightMin) / heightRange, 0.0, 1.0);
-  let remapped = textureSample(gradientTexture, tileSampler, vec2<f32>(normalizedHeight, 0.5));
-  return remapped;
-}
-`,
-  });
-
-  const renderPipeline = device.createRenderPipeline({
-    layout: 'auto',
-    vertex: { module: shaderModule, entryPoint: 'vs_main' },
-    fragment: { module: shaderModule, entryPoint: 'fs_main', targets: [{ format }] },
-    primitive: { topology: 'triangle-list' },
-  });
-
-  const sampler = device.createSampler({ magFilter: 'nearest', minFilter: 'nearest' });
-  sharedPipeline = {
-    renderPipeline,
-    sampler,
-    format,
-    device,
-  };
-  return { renderPipeline, sampler };
-}
-
-function getLinearHeightTexture(device: GPUDevice): HeightTextureEntry {
-  if (sharedLinearHeightTexture) return sharedLinearHeightTexture;
-  const size = 256;
-  const data = new Float32Array(size * size);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const value = x / (size - 1);
-      data[y * size + x] = value;
-    }
-  }
-  const texture = device.createTexture({
-    size: [size, size, 1],
-    format: "r32float",
-    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-  });
-  device.queue.writeTexture(
-    { texture },
-    data,
-    { bytesPerRow: size * Float32Array.BYTES_PER_ELEMENT },
-    [size, size, 1],
-  );
-  sharedLinearHeightTexture = {
-    texture,
-    width: size,
-    height: size,
-    min: 0,
-    max: 1,
-  };
-  return sharedLinearHeightTexture;
-}
-
-function getFallbackHeightTexture(device: GPUDevice): HeightTextureEntry {
-  if (sharedFallbackHeightTexture) return sharedFallbackHeightTexture;
-  const size = 128;
-  const data = new Float32Array(size * size);
-  let min = Number.POSITIVE_INFINITY;
-  let max = Number.NEGATIVE_INFINITY;
-  const tau = Math.PI * 2;
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const nx = x / (size - 1);
-      const ny = y / (size - 1);
-      const value = 0.5 + 0.5 * (
-        Math.sin(nx * tau * 2) * 0.6
-        + Math.cos(ny * tau * 3) * 0.4
-        + Math.sin((nx + ny) * tau * 1.5) * 0.3
-      );
-      const clamped = Math.min(1, Math.max(0, value));
-      data[y * size + x] = clamped;
-      if (clamped < min) min = clamped;
-      if (clamped > max) max = clamped;
-    }
-  }
-  const texture = device.createTexture({
-    size: [size, size, 1],
-    format: "r32float",
-    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-  });
-  device.queue.writeTexture(
-    { texture },
-    data,
-    { bytesPerRow: size * Float32Array.BYTES_PER_ELEMENT },
-    [size, size, 1],
-  );
-  sharedFallbackHeightTexture = {
-    texture,
-    width: size,
-    height: size,
-    min: Number.isFinite(min) ? min : 0,
-    max: Number.isFinite(max) ? max : 1,
-  };
-  return sharedFallbackHeightTexture;
-}
-
-function uploadGradientToTexture(device: GPUDevice, texture: GPUTexture, stops: GradientDefinition['stops'], invert: boolean) {
-  const palette = buildPalette(stops, invert);
-  device.queue.writeTexture(
-    { texture },
-    Uint8Array.from(palette.data),
-    { bytesPerRow: 256 * 4 },
-    [256, 1, 1],
-  );
-}
-
-
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -286,6 +118,34 @@ function shuffle<T>(items: T[]): T[] {
     copy[j] = temp;
   }
   return copy;
+}
+
+function normalizeStops(stops: GradientDefinition["stops"], invert: boolean) {
+  if (!invert) return stops;
+  return stops
+    .slice()
+    .reverse()
+    .map((stop) => ({
+      ...stop,
+      stop: 100 - stop.stop,
+    }));
+}
+
+function drawGradientFallback(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  stops: GradientDefinition["stops"],
+  invert: boolean,
+) {
+  const gradient = ctx.createLinearGradient(x, y, x + size, y);
+  const orderedStops = normalizeStops(stops, invert);
+  orderedStops.forEach((stop) => {
+    gradient.addColorStop(stop.stop / 100, stop.color);
+  });
+  ctx.fillStyle = gradient;
+  ctx.fillRect(x, y, size, size);
 }
 
 const GRADIENT_BASE_DATA: GradientBase[] = MATPLOTLIB_GRADIENTS.map((definition) => ({
@@ -388,12 +248,10 @@ function GradientSelectionGridContent({
       tile: tileName,
       tileUrl,
       normal: {
-        textureUrl: null,
         paletteCss: [...base.normal.css],
         cssFallback: createGradientCss(base.stops, false),
       },
       inverted: {
-        textureUrl: null,
         paletteCss: [...base.inverted.css],
         cssFallback: createGradientCss(base.stops, true),
       },
@@ -403,13 +261,60 @@ function GradientSelectionGridContent({
   const gridCellCount = gradientVisuals.length;
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const labelRef = React.useRef<HTMLDivElement | null>(null);
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const [containerWidth, setContainerWidth] = React.useState<number>(360);
   const [labelLineHeight, setLabelLineHeight] = React.useState<number>(fontSize ?? 16);
   const paletteSignatureRef = React.useRef<string | null>(null);
+  const workerRef = React.useRef<Worker | null>(null);
+  const cacheRef = React.useRef<Map<string, CachedBitmap>>(new Map());
+  const pendingRef = React.useRef<Set<string>>(new Set());
+  const renderTokenRef = React.useRef(0);
+  const drawRef = React.useRef<() => void>(() => undefined);
+  const requestRender = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    renderTokenRef.current += 1;
+    const token = renderTokenRef.current;
+    window.requestAnimationFrame(() => {
+      if (token !== renderTokenRef.current) return;
+      drawRef.current();
+    });
+  }, []);
 
   React.useEffect(() => {
     selectionGridActions.registerSelectionGrid(gridId, { allowEmptySelection });
   }, [gridId, allowEmptySelection, selectionGridActions]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const worker = createSelectionGridWorker();
+    workerRef.current = worker;
+    worker.onmessage = (event: MessageEvent<{ id: string; bitmap?: ImageBitmap; error?: string }>) => {
+      const { id, bitmap, error } = event.data ?? {};
+      if (!id) return;
+      pendingRef.current.delete(id);
+      const entry = cacheRef.current.get(id);
+      if (!entry) {
+        bitmap?.close();
+        return;
+      }
+      if (error) {
+        entry.status = "error";
+        entry.bitmap = undefined;
+      } else if (bitmap) {
+        entry.status = "ready";
+        entry.bitmap = bitmap;
+      }
+      requestRender();
+    };
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+      cacheRef.current.forEach((entry) => entry.bitmap?.close());
+      cacheRef.current.clear();
+      pendingRef.current.clear();
+    };
+  }, [requestRender]);
 
   React.useEffect(() => {
     if (allowEmptySelection !== undefined && stateAllowEmptySelection !== allowEmptySelection) {
@@ -500,98 +405,144 @@ function GradientSelectionGridContent({
         : 0
     : 0;
   const containerWidthPx = rowCapacity * cellSizePx;
+  const resolvedMaxHeightUnits = typeof maxHeightUnits === "number" && Number.isFinite(maxHeightUnits) && maxHeightUnits > 0
+    ? maxHeightUnits
+    : null;
+  const totalRowUnits = rowCount * squareScale;
+  const gridMaxHeightPx = resolvedMaxHeightUnits != null ? resolvedMaxHeightUnits * baseCellSize : null;
+  const clampGridHeight = resolvedMaxHeightUnits != null && totalRowUnits > resolvedMaxHeightUnits;
+  const totalGridHeightPx = rowCount * cellSizePx;
 
-  const cells = gradientVisuals.map((visual, index) => {
-    const row = rowCapacity ? Math.floor(index / rowCapacity) : 0;
-    const col = rowCapacity ? index % rowCapacity : 0;
-    const isLastRow = row === lastRowIndex;
-    const marginLeft = isLastRow && col === 0 ? alignmentOffsetPx : 0;
-    const isSelected = selectedIndex === index;
-    const appearance = invertGradients ? visual.inverted : visual.normal;
-    const hasTopNeighbor = index - rowCapacity >= 0;
-    const hasBottomNeighbor = index + rowCapacity < gridCellCount;
-    const hasLeftNeighbor = col > 0;
-    const hasRightNeighbor = col < rowCapacity - 1 && index + 1 < gridCellCount && Math.floor((index + 1) / rowCapacity) === row;
-    const topLeftRadius = (hasTopNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
-    const topRightRadius = (hasTopNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
-    const bottomLeftRadius = (hasBottomNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
-    const bottomRightRadius = (hasBottomNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX;
-    const gradientStops = GRADIENT_BASE_DATA[index].stops;
-    const borderRadiusValue = `${topLeftRadius}px ${topRightRadius}px ${bottomRightRadius}px ${bottomLeftRadius}px`;
-    const fallbackBackground = appearance.cssFallback;
-    return (
-      <div
-        key={`${visual.name}-${visual.tile}-${index}`}
-        style={{
-          width: `${cellSizePx}px`,
-          height: `${cellSizePx}px`,
-          flex: `0 0 ${cellSizePx}px`,
-          borderRadius: borderRadiusValue,
-          boxSizing: "border-box",
-          marginLeft,
-          cursor: "pointer",
-          outline: "none",
-          position: "relative",
-          overflow: "hidden",
-          ...(usesTerrainTiles
-            ? {}
-            : {
-              backgroundImage: fallbackBackground,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-            }),
-        }}
-        role="button"
-        tabIndex={0}
-        aria-pressed={isSelected}
-        onClick={() => {
-          if (selectedIndex === index) {
-            if (stateAllowEmptySelection) {
-              selectionGridActions.setSelectionGridSelectedIndex(gridId, null);
+  React.useEffect(() => {
+    cacheRef.current.forEach((entry) => entry.bitmap?.close());
+    cacheRef.current.clear();
+    pendingRef.current.clear();
+    requestRender();
+  }, [cellSizePx, invertGradients, renderMode, tileAssignments, requestRender]);
+
+  React.useEffect(() => {
+    requestRender();
+  }, [
+    gradientVisuals,
+    selectedIndex,
+    invertGradients,
+    containerWidth,
+    cellSizePx,
+    renderMode,
+    alignmentOffsetPx,
+    requestRender,
+  ]);
+
+  React.useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return undefined;
+    const handleScroll = () => requestRender();
+    node.addEventListener("scroll", handleScroll, { passive: true });
+    return () => node.removeEventListener("scroll", handleScroll);
+  }, [requestRender]);
+
+  drawRef.current = () => {
+    const canvas = canvasRef.current;
+    const scrollNode = scrollRef.current;
+    if (!canvas || !scrollNode) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const viewportWidth = Math.max(1, Math.round(containerWidthPx));
+    const viewportHeight = Math.max(1, Math.round(scrollNode.clientHeight || totalGridHeightPx));
+    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    const pixelWidth = Math.max(1, Math.round(viewportWidth * dpr));
+    const pixelHeight = Math.max(1, Math.round(viewportHeight * dpr));
+
+    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+      canvas.style.width = `${viewportWidth}px`;
+      canvas.style.height = `${viewportHeight}px`;
+    }
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+
+    if (gridCellCount === 0) return;
+
+    const scrollTop = scrollNode.scrollTop;
+    const startRow = Math.max(0, Math.floor(scrollTop / cellSizePx) - 1);
+    const endRow = Math.min(rowCount - 1, Math.floor((scrollTop + viewportHeight) / cellSizePx) + 1);
+
+    for (let row = startRow; row <= endRow; row += 1) {
+      const rowOffset = row === lastRowIndex ? alignmentOffsetPx : 0;
+      const rowCellCount = row === lastRowIndex ? lastRowCount : rowCapacity;
+      const rowBaseIndex = row * rowCapacity;
+      const y = row * cellSizePx - scrollTop;
+
+      for (let col = 0; col < rowCellCount; col += 1) {
+        const index = rowBaseIndex + col;
+        if (index >= gridCellCount) break;
+        const base = GRADIENT_BASE_DATA[index];
+        const visual = gradientVisuals[index];
+        const isSelected = selectedIndex === index;
+        const hasTopNeighbor = index - rowCapacity >= 0;
+        const hasBottomNeighbor = index + rowCapacity < gridCellCount;
+        const hasLeftNeighbor = col > 0;
+        const hasRightNeighbor = col < rowCapacity - 1
+          && index + 1 < gridCellCount
+          && Math.floor((index + 1) / rowCapacity) === row;
+        const radii: CornerRadii = {
+          tl: (hasTopNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
+          tr: (hasTopNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
+          br: (hasBottomNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
+          bl: (hasBottomNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
+        };
+        const x = rowOffset + col * cellSizePx;
+        const palette = invertGradients ? base.inverted.data : base.normal.data;
+        const tileUrl = renderMode === "height" && usesTerrainTiles && visual.tileUrl ? visual.tileUrl : undefined;
+        const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
+        const cacheKey = `${visual.name}|${invertGradients ? "inv" : "norm"}|${renderMode}|${targetSize}|${tileUrl ?? "plain"}`;
+
+        let entry = cacheRef.current.get(cacheKey);
+        if (!entry) {
+          entry = { status: "loading" };
+          cacheRef.current.set(cacheKey, entry);
+        }
+
+        if (entry.status !== "ready" || !entry.bitmap) {
+          ctx.save();
+          buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
+          ctx.clip();
+          drawGradientFallback(ctx, x, y, cellSizePx, base.stops, invertGradients);
+          ctx.restore();
+          if (entry.status === "loading" && !pendingRef.current.has(cacheKey)) {
+            const worker = workerRef.current;
+            if (worker) {
+              pendingRef.current.add(cacheKey);
+              worker.postMessage({
+                type: "gradient",
+                id: cacheKey,
+                palette,
+                size: targetSize,
+                tileUrl,
+              });
             }
-            return;
           }
-          selectionGridActions.setSelectionGridSelectedIndex(gridId, index);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            if (selectedIndex === index) {
-              if (stateAllowEmptySelection) {
-                selectionGridActions.setSelectionGridSelectedIndex(gridId, null);
-              }
-              return;
-            }
-            selectionGridActions.setSelectionGridSelectedIndex(gridId, index);
-          }
-        }}
-      >
-        {renderMode !== "plain" ? (
-          <GradientTileCanvas
-            mode={renderMode}
-            tileUrl={usesTerrainTiles ? visual.tileUrl : undefined}
-            stops={gradientStops}
-            invert={invertGradients}
-            size={cellSizePx}
-            borderRadius={borderRadiusValue}
-            fallbackBackground={fallbackBackground}
-          />
-        ) : null}
-        {isSelected ? (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: borderRadiusValue,
-              boxShadow: `inset 0 0 0 2px ${colorB}`,
-              pointerEvents: "none",
-            }}
-          />
-        ) : null}
-      </div>
-    );
-  });
+        } else {
+          ctx.save();
+          buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
+          ctx.clip();
+          ctx.drawImage(entry.bitmap, x, y, cellSizePx, cellSizePx);
+          ctx.restore();
+        }
+
+        if (isSelected) {
+          ctx.save();
+          ctx.strokeStyle = colorB;
+          ctx.lineWidth = 2;
+          buildRoundedRectPath(ctx, x + 1, y + 1, cellSizePx - 2, radii);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+  };
 
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
 
@@ -634,13 +585,6 @@ function GradientSelectionGridContent({
     title: PREVIEW_MODE_TITLE[mode],
   }));
 
-  const resolvedMaxHeightUnits = typeof maxHeightUnits === "number" && Number.isFinite(maxHeightUnits) && maxHeightUnits > 0
-    ? maxHeightUnits
-    : null;
-  const totalRowUnits = rowCount * squareScale;
-  const gridMaxHeightPx = resolvedMaxHeightUnits != null ? resolvedMaxHeightUnits * baseCellSize : null;
-  const clampGridHeight = resolvedMaxHeightUnits != null && totalRowUnits > resolvedMaxHeightUnits;
-
   const activeGradient = selectedIndex != null ? MATPLOTLIB_GRADIENTS[selectedIndex] : null;
   const previewGradient = activeGradient ? createGradientCss(activeGradient.stops, invertGradients) : "transparent";
   const previewLabelBase = activeGradient ? activeGradient.name : "None";
@@ -650,6 +594,32 @@ function GradientSelectionGridContent({
       : invertGradients
         ? `<-${previewLabelBase}-<`
         : `>-${previewLabelBase}->`;
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    const scrollNode = scrollRef.current;
+    if (!canvas || !scrollNode) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top + scrollNode.scrollTop;
+    if (x < 0 || y < 0) return;
+    const row = Math.floor(y / cellSizePx);
+    if (row < 0 || row >= rowCount) return;
+    const rowOffset = row === lastRowIndex ? alignmentOffsetPx : 0;
+    const rowCellCount = row === lastRowIndex ? lastRowCount : rowCapacity;
+    if (x < rowOffset || x > rowOffset + rowCellCount * cellSizePx) return;
+    const col = Math.floor((x - rowOffset) / cellSizePx);
+    if (col < 0 || col >= rowCellCount) return;
+    const index = row * rowCapacity + col;
+    if (index < 0 || index >= gridCellCount) return;
+    if (selectedIndex === index) {
+      if (stateAllowEmptySelection) {
+        selectionGridActions.setSelectionGridSelectedIndex(gridId, null);
+      }
+      return;
+    }
+    selectionGridActions.setSelectionGridSelectedIndex(gridId, index);
+  };
 
   return (
     <div ref={wrapperRef} className={className} style={wrapperStyle}>
@@ -730,272 +700,39 @@ function GradientSelectionGridContent({
             </div>
           </div>
           <div
-            className="selection-grid__cells"
+            ref={scrollRef}
+            className="selection-grid__scroll"
             style={{
-              display: "inline-flex",
-              flexWrap: "wrap",
-              gap: 0,
-              alignContent: "flex-start",
+              position: "relative",
               width: "100%",
-              ...(gridMaxHeightPx != null
-                ? {
-                  maxHeight: `${gridMaxHeightPx}px`,
-                  overflowY: clampGridHeight ? "auto" : undefined,
-                  msOverflowStyle: "none",
-                  scrollbarWidth: "none",
-                }
-                : {}),
+              height: clampGridHeight && gridMaxHeightPx != null
+                ? `${gridMaxHeightPx}px`
+                : `${totalGridHeightPx}px`,
+              maxHeight: gridMaxHeightPx != null ? `${gridMaxHeightPx}px` : undefined,
+              overflowY: clampGridHeight ? "auto" : "hidden",
+              msOverflowStyle: "none",
+              scrollbarWidth: "none",
             }}
           >
-            {cells}
+            <canvas
+              ref={canvasRef}
+              className="selection-grid__canvas"
+              style={{
+                position: "sticky",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                cursor: "pointer",
+                touchAction: "manipulation",
+              }}
+              onPointerDown={handlePointerDown}
+            />
+            <div style={{ width: "100%", height: `${totalGridHeightPx}px` }} />
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function GradientTileCanvas({
-  mode,
-  tileUrl,
-  stops,
-  invert,
-  size,
-  borderRadius,
-  fallbackBackground,
-}: {
-  mode: "plain" | "height";
-  tileUrl?: string;
-  stops: GradientDefinition['stops'];
-  invert: boolean;
-  size: number;
-  borderRadius: string;
-  fallbackBackground: string;
-}) {
-  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  const hasRenderedRef = React.useRef(false);
-  const contextRef = React.useRef<GPUCanvasContext | null>(null);
-  const configuredSizeRef = React.useRef<{ width: number; height: number } | null>(null);
-  const resourcesRef = React.useRef<{
-    gradientTexture: GPUTexture;
-    uniformBuffer: GPUBuffer;
-    uniformSize: number;
-  } | null>(null);
-  const [hasRendered, setHasRendered] = React.useState<boolean>(false);
-  const [terrainReady, setTerrainReady] = React.useState(mode === "plain");
-  const isPlainMode = mode === "plain";
-
-  React.useEffect(() => {
-    if (!tileUrl || isPlainMode) return;
-    let cancelled = false;
-    (async () => {
-      const root = await getSharedRoot();
-      if (!root || cancelled) return;
-      await loadHeightTexture(root.device, tileUrl).catch(() => {});
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [tileUrl, isPlainMode]);
-  React.useEffect(() => {
-    if (isPlainMode) {
-      setTerrainReady(true);
-    } else if (!hasRenderedRef.current) {
-      setTerrainReady(false);
-    }
-  }, [isPlainMode, mode]);
-  React.useEffect(() => {
-    if (isPlainMode) {
-      return;
-    }
-    let disposed = false;
-
-    const run = async () => {
-      const root = await getSharedRoot();
-      if (!root || disposed) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const device = root.device;
-      const format = navigator.gpu.getPreferredCanvasFormat();
-      let context = contextRef.current;
-      if (!context) {
-        context = canvas.getContext('webgpu');
-        contextRef.current = context;
-      }
-      if (!context) return;
-
-      const dimension = Math.max(1, Math.floor(size));
-      if (canvas.width !== dimension || canvas.height !== dimension) {
-        canvas.width = dimension;
-        canvas.height = dimension;
-      }
-      if (canvas.style.width !== `${dimension}px`) {
-        canvas.style.width = `${dimension}px`;
-      }
-      if (canvas.style.height !== `${dimension}px`) {
-        canvas.style.height = `${dimension}px`;
-      }
-
-      const previousSize = configuredSizeRef.current;
-      if (!previousSize || previousSize.width !== dimension || previousSize.height !== dimension) {
-        const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST;
-        try {
-          context.configure({ device, format, alphaMode: 'opaque', usage });
-          configuredSizeRef.current = { width: dimension, height: dimension };
-        } catch (configurationError) {
-          console.error("Failed to configure WebGPU context", configurationError);
-          return;
-        }
-      }
-
-      let heightEntry: HeightTextureEntry | null = null;
-  if (mode === "height") {
-    heightEntry = tileUrl
-      ? await loadHeightTexture(device, tileUrl)
-      : getFallbackHeightTexture(device);
-  } else {
-    heightEntry = getLinearHeightTexture(device);
-  }
-      if (!heightEntry || disposed) return;
-
-      const { renderPipeline, sampler } = getSharedPipeline(device, format);
-      const targetWidth = Math.max(1, heightEntry.width);
-      const targetHeight = Math.max(1, heightEntry.height);
-
-      const gradientTexture = device.createTexture({
-        size: [256, 1, 1],
-        format: 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      });
-      uploadGradientToTexture(device, gradientTexture, stops, invert);
-
-      const heightMin = heightEntry.min;
-      const heightRange = Math.max(1e-6, heightEntry.max - heightEntry.min);
-      const texelSizeX = 1 / targetWidth;
-      const texelSizeY = 1 / targetHeight;
-      const cellSizeMeters = 3;
-      const verticalExaggeration = 8;
-      const heightScale = verticalExaggeration / (cellSizeMeters * 8);
-      const uniformArray = new Float32Array(16);
-      uniformArray[0] = 0;
-      uniformArray[1] = texelSizeX;
-      uniformArray[2] = texelSizeY;
-      uniformArray[3] = heightScale;
-      uniformArray[7] = heightMin;
-      uniformArray[8] = heightRange;
-      const uniformData = uniformArray;
-      let resources = resourcesRef.current;
-      if (!resources || resources.uniformSize !== uniformData.byteLength) {
-        if (resources) {
-          resources.gradientTexture.destroy();
-          resources.uniformBuffer.destroy();
-        }
-        const gradientTexture = device.createTexture({
-          size: [256, 1, 1],
-          format: 'rgba8unorm',
-          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        });
-        const uniformBuffer = device.createBuffer({
-          size: uniformData.byteLength,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        resources = {
-          gradientTexture,
-          uniformBuffer,
-          uniformSize: uniformData.byteLength,
-        };
-        resourcesRef.current = resources;
-      }
-      uploadGradientToTexture(device, resources.gradientTexture, stops, invert);
-      device.queue.writeBuffer(resources.uniformBuffer, 0, uniformData);
-
-      const renderBindGroup = device.createBindGroup({
-        layout: renderPipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: heightEntry.texture.createView() },
-          { binding: 1, resource: sampler },
-          { binding: 2, resource: resources.gradientTexture.createView() },
-          { binding: 3, resource: { buffer: resources.uniformBuffer } },
-        ],
-      });
-
-      const commandEncoder = device.createCommandEncoder();
-      const textureView = context.getCurrentTexture().createView();
-      const pass = commandEncoder.beginRenderPass({
-        colorAttachments: [{
-          view: textureView,
-          loadOp: 'load',
-          storeOp: 'store',
-        }],
-      });
-      pass.setPipeline(renderPipeline);
-      pass.setBindGroup(0, renderBindGroup);
-      pass.draw(6, 1, 0, 0);
-      pass.end();
-      device.queue.submit([commandEncoder.finish()]);
-
-      if (!disposed && !hasRenderedRef.current) {
-        hasRenderedRef.current = true;
-        setHasRendered(true);
-      }
-      if (!disposed) {
-        setTerrainReady(true);
-      }
-    };
-
-    run().catch((error) => {
-      console.error('Failed to render gradient preview', error);
-    });
-
-    return () => {
-      disposed = true;
-      const resources = resourcesRef.current;
-      if (resources) {
-        resources.gradientTexture.destroy();
-        resources.uniformBuffer.destroy();
-        resourcesRef.current = null;
-      }
-    };
-  }, [mode, tileUrl, stops, invert, size, isPlainMode]);
-
-  if (isPlainMode) {
-    return null;
-  }
-
-  return (
-    <>
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          borderRadius,
-          pointerEvents: 'none',
-          backgroundImage: fallbackBackground,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          opacity: terrainReady ? 0 : 1,
-          transition: 'opacity 80ms ease',
-        }}
-      />
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          opacity: hasRendered ? 1 : 0,
-          borderRadius,
-          pointerEvents: 'none',
-          transition: hasRendered ? 'opacity 40ms linear' : 'none',
-        }}
-      />
-    </>
   );
 }
 

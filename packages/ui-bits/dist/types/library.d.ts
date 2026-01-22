@@ -15,7 +15,7 @@ export { MATPLOTLIB_GRADIENTS, buildPalette, createGradientCss, type GradientDef
 export { DEFAULT_SELECTION_GRID_ID } from "./selectionGridIds";
 export { loadHeightTexture, type HeightTextureEntry } from "./utils/loadHeightTexture";
 export { AudioControls, AudioFFTWindow, type AudioControlsProps, type AudioControlsControlIds, type AudioControlsBorder, type AudioControlsBinInterpolation, type AudioControlsSource, type AudioFFTWindowProps, } from "./components/AudioControls";
-export { default as SelectionGrid, GradientSelectionGrid, type SelectionGridAlignment, type SelectionGridProps, type SelectionGridGridProps, type SelectionGridGradientProps, type SelectionGridItemRenderState, } from "./components/SelectionGrid";
+export { default as SelectionGrid, GradientSelectionGrid, type SelectionGridAlignment, type SelectionGridProps, type SelectionGridGridProps, type SelectionGridGradientProps, type SelectionGridPreview, } from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";
 export { default as IconDropdown, type IconDropdownProps, type IconDropdownOption } from "./components/IconDropdown";
 export { default as ColorPicker, type ColorPickerProps, type ColorPickerBorderStyle, type ColorPickerBorderMask, } from "./components/ColorPicker";

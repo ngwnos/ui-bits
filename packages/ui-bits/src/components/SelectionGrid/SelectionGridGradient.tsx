@@ -569,8 +569,6 @@ function GradientSelectionGridContent({
   const previewButtonSize = Math.max(Math.round(baseCellSize - 4), Math.round(previewFontSize + previewPaddingPx));
   const previewButtonFontSize = Math.max(8, Math.round((previewButtonSize - 2) / (1 + previewPaddingEm * 2)));
   const previewIconSize = Math.max(Math.round(previewButtonSize * 0.6), 12);
-  const previewModeIndex = PREVIEW_MODE_SEQUENCE.indexOf(previewMode);
-  const nextPreviewMode = PREVIEW_MODE_SEQUENCE[(previewModeIndex + 1) % PREVIEW_MODE_SEQUENCE.length];
   const previewButtonStyle: React.CSSProperties = {
     position: "absolute",
     left: 8,
@@ -673,9 +671,11 @@ function GradientSelectionGridContent({
               colorB="transparent"
               borderStyle="none"
               style={previewButtonStyle}
+              onChange={(value) => {
+                selectionGridActions.setSelectionGridPreviewMode(gridId, value as SelectionGridPreviewMode);
+              }}
               onClick={(event) => {
                 event.stopPropagation();
-                selectionGridActions.setSelectionGridPreviewMode(gridId, nextPreviewMode);
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {

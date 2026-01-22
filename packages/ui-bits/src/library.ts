@@ -55,6 +55,7 @@ export {
 } from "./gradients/matplotlib";
 export { DEFAULT_SELECTION_GRID_ID } from "./selectionGridIds";
 export { loadHeightTexture, type HeightTextureEntry } from "./utils/loadHeightTexture";
+export { loadTerrainTileAssets, loadTerrainTileUrls, type TerrainTileAsset } from "./assets/terrain/tiles";
 
 export {
   AudioControls,

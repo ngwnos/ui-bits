@@ -14,6 +14,7 @@ export { sliderColorCombos, type SliderColorCombo } from "./sliderPalettes";
 export { MATPLOTLIB_GRADIENTS, buildPalette, createGradientCss, type GradientDefinition, } from "./gradients/matplotlib";
 export { DEFAULT_SELECTION_GRID_ID } from "./selectionGridIds";
 export { loadHeightTexture, type HeightTextureEntry } from "./utils/loadHeightTexture";
+export { loadTerrainTileAssets, loadTerrainTileUrls, type TerrainTileAsset } from "./assets/terrain/tiles";
 export { AudioControls, AudioFFTWindow, type AudioControlsProps, type AudioControlsControlIds, type AudioControlsBorder, type AudioControlsBinInterpolation, type AudioControlsSource, type AudioFFTWindowProps, } from "./components/AudioControls";
 export { default as SelectionGrid, GradientSelectionGrid, type SelectionGridAlignment, type SelectionGridProps, type SelectionGridGridProps, type SelectionGridGradientProps, type SelectionGridPreview, } from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";

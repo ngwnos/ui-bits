@@ -292,6 +292,7 @@ function GradientSelectionGridContent({
   const atlasRef = React.useRef<Map<string, CachedAtlas>>(new Map());
   const pendingRef = React.useRef<Set<string>>(new Set());
   const renderTokenRef = React.useRef(0);
+  const atlasSignatureRef = React.useRef<string | null>(null);
   const drawRef = React.useRef<() => void>(() => undefined);
   const requestRender = React.useCallback(() => {
     if (typeof window === "undefined") return;
@@ -436,13 +437,6 @@ function GradientSelectionGridContent({
   const totalGridHeightPx = rowCount * cellSizePx;
 
   React.useEffect(() => {
-    atlasRef.current.forEach((entry) => entry.bitmap?.close());
-    atlasRef.current.clear();
-    pendingRef.current.clear();
-    requestRender();
-  }, [cellSizePx, invertGradients, renderMode, tileAssignments, requestRender]);
-
-  React.useEffect(() => {
     requestRender();
   }, [
     gradientVisuals,
@@ -505,6 +499,12 @@ function GradientSelectionGridContent({
       atlasSignature[index] = tileUrl ? `t:${tileUrl}` : `g:${base.name}`;
     }
     const atlasKey = `${renderMode}|${invertGradients ? "inv" : "norm"}|${targetSize}|${atlasColumns}|${atlasSignature.join("|")}`;
+    if (atlasSignatureRef.current !== atlasKey) {
+      atlasSignatureRef.current = atlasKey;
+      atlasRef.current.forEach((entry) => entry.bitmap?.close());
+      atlasRef.current.clear();
+      pendingRef.current.clear();
+    }
     let atlasEntry = atlasRef.current.get(atlasKey);
     if (!atlasEntry) {
       atlasEntry = {

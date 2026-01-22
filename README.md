@@ -1,3 +1,45 @@
 # ui-bits
 
 You really shouldn't use this. It's public only for my own convenience.
+
+## Install
+
+```sh
+bun add github:ngwnos/ui-bits
+```
+
+## Use in a project
+
+1) Import the stylesheet once.
+2) Wrap your UI in `FrameLoopProvider`.
+3) Use the components you need.
+
+```tsx
+import { FrameLoopProvider, LFOSlider, ColorField } from "ui-bits";
+import "ui-bits/style.css";
+
+export default function App() {
+  return (
+    <FrameLoopProvider>
+      <LFOSlider
+        label="Cutoff"
+        min={20}
+        max={20000}
+        step={1}
+        defaultValue={440}
+        width={260}
+        colorA="#2f2f2f"
+        colorB="#f0f0f0"
+      />
+      <ColorField
+        label="Tint"
+        defaultValue="#ffcc66"
+        colorA="#2f2f2f"
+        colorB="#f0f0f0"
+      />
+    </FrameLoopProvider>
+  );
+}
+```
+
+If you don’t need animation updates, you can still wrap once and ignore it elsewhere. The stylesheet is required for the internal utility classes.

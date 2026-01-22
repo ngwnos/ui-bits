@@ -34,6 +34,16 @@ export type SelectionGridFolder<Item> = {
   colorA?: string;
   colorB?: string;
   borderStyle?: FolderBorderStyle;
+  addTile?: {
+    label?: string;
+    accept?: string;
+    multiple?: boolean;
+    onAdd?: (files: FileList) => void;
+    createItem?: (file: File, url: string) => Item;
+    onAddItems?: (items: Item[], files: File[]) => void;
+    autoAppend?: boolean;
+    revokeObjectUrls?: boolean;
+  };
 };
 
 export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
@@ -53,6 +63,10 @@ export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
 };
 
 export type SelectionGridProps<Item = unknown> = SelectionGridGridProps<Item>;
+
+type SelectionGridEntry<Item> =
+  | { type: "item"; item: Item; index: number; key: string }
+  | { type: "add"; folderId: string; key: string };
 
 type CachedTile = {
   status: "loading" | "ready" | "error";
@@ -156,6 +170,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
 
   const [internalSelectedKey, setInternalSelectedKey] = React.useState<string | null>(defaultSelectedKey);
   const [internalFolderCollapsed, setInternalFolderCollapsed] = React.useState<Record<string, boolean>>({});
+  const [internalFolderItems, setInternalFolderItems] = React.useState<Record<string, Item[]>>({});
   const isControlled = selectedKey !== undefined;
   const resolvedSelectedKey = isControlled ? selectedKey ?? null : internalSelectedKey;
 
@@ -166,12 +181,27 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const resolvedFolders = folders ?? [];
   const usesFolders = resolvedFolders.length > 0;
 
+  const resolvedFolderItems = React.useMemo(() => {
+    const map = new Map<string, Item[]>();
+    if (!usesFolders) return map;
+    resolvedFolders.forEach((folder) => {
+      const extraItems = internalFolderItems[folder.id] ?? [];
+      if (extraItems.length === 0) {
+        map.set(folder.id, folder.items);
+      } else {
+        map.set(folder.id, [...folder.items, ...extraItems]);
+      }
+    });
+    return map;
+  }, [internalFolderItems, resolvedFolders, usesFolders]);
+
   const allEntries = React.useMemo(() => {
     if (usesFolders) {
       const entries: Array<{ item: Item; index: number; key: string }> = [];
       let cursor = 0;
       resolvedFolders.forEach((folder) => {
-        folder.items.forEach((item) => {
+        const itemsForFolder = resolvedFolderItems.get(folder.id) ?? folder.items;
+        itemsForFolder.forEach((item) => {
           const key = getKey(item, cursor);
           entries.push({ item, index: cursor, key });
           cursor += 1;
@@ -184,7 +214,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
       index,
       key: getKey(item, index),
     }));
-  }, [getKey, resolvedFolders, resolvedItems, usesFolders]);
+  }, [getKey, resolvedFolderItems, resolvedFolders, resolvedItems, usesFolders]);
 
   const allItemKeys = React.useMemo(
     () => allEntries.map((entry) => entry.key),
@@ -241,7 +271,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
       resizeObserver?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, []);
+  }, [setInternalFolderItems]);
 
   const previewFontSize = fontSize ?? 16;
   const previewLineHeight = 1;
@@ -257,23 +287,30 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const containerWidthPx = rowCapacity * cellSizePx;
 
   const visibleEntries = React.useMemo(() => {
-    if (!usesFolders) return allEntries;
-    const entries: Array<{ item: Item; index: number; key: string }> = [];
-    let cursor = 0;
+    if (!usesFolders) {
+      return allEntries.map((entry) => ({ type: "item", ...entry })) satisfies SelectionGridEntry<Item>[];
+    }
+    const entries: SelectionGridEntry<Item>[] = [];
+    let itemIndex = 0;
     resolvedFolders.forEach((folder) => {
       const collapsed = folder.collapsed ?? internalFolderCollapsed[folder.id] ?? false;
       if (collapsed) {
-        cursor += folder.items.length;
+        const itemsForFolder = resolvedFolderItems.get(folder.id) ?? folder.items;
+        itemIndex += itemsForFolder.length;
         return;
       }
-      folder.items.forEach((item) => {
-        const key = getKey(item, cursor);
-        entries.push({ item, index: cursor, key });
-        cursor += 1;
+      const itemsForFolder = resolvedFolderItems.get(folder.id) ?? folder.items;
+      itemsForFolder.forEach((item) => {
+        const key = getKey(item, itemIndex);
+        entries.push({ type: "item", item, index: itemIndex, key });
+        itemIndex += 1;
       });
+      if (folder.addTile) {
+        entries.push({ type: "add", folderId: folder.id, key: `add:${folder.id}` });
+      }
     });
     return entries;
-  }, [allEntries, getKey, internalFolderCollapsed, resolvedFolders, usesFolders]);
+  }, [allEntries, getKey, internalFolderCollapsed, resolvedFolderItems, resolvedFolders, usesFolders]);
 
   const gridCellCount = visibleEntries.length;
 
@@ -304,7 +341,8 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
       rows.push({ type: "header", folderIndex, alignmentOffsetPx: 0 });
       const collapsed = folder.collapsed ?? internalFolderCollapsed[folder.id] ?? false;
       if (collapsed) return;
-      const visibleCount = folder.items.length;
+      const itemsForFolder = resolvedFolderItems.get(folder.id) ?? folder.items;
+      const visibleCount = itemsForFolder.length + (folder.addTile ? 1 : 0);
       for (let start = 0; start < visibleCount; start += rowCapacity) {
         const count = Math.min(rowCapacity, visibleCount - start);
         const leftoverSlots = rowCapacity - count;
@@ -324,6 +362,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     cellSizePx,
     gridCellCount,
     internalFolderCollapsed,
+    resolvedFolderItems,
     resolvedFolders,
     resolvedSquareAlignment,
     rowCapacity,
@@ -360,6 +399,8 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   };
 
   const workerRef = React.useRef<Worker | null>(null);
+  const addInputRefs = React.useRef<Map<string, HTMLInputElement | null>>(new Map());
+  const objectUrlsRef = React.useRef<Map<string, Set<string>>>(new Map());
   const tileCacheRef = React.useRef<Map<string, CachedTile>>(new Map());
   const pendingRef = React.useRef<Set<string>>(new Set());
   const queuedRef = React.useRef<Set<string>>(new Set());
@@ -373,6 +414,66 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const prefetchSignatureRef = React.useRef<string | null>(null);
   const drawnIndexRef = React.useRef<string[]>([]);
   const drawRef = React.useRef<() => void>(() => undefined);
+
+  const setAddInputRef = React.useCallback((folderId: string, node: HTMLInputElement | null) => {
+    if (node) {
+      addInputRefs.current.set(folderId, node);
+    } else {
+      addInputRefs.current.delete(folderId);
+    }
+  }, []);
+
+  const openAddDialog = React.useCallback((folderId: string) => {
+    const input = addInputRefs.current.get(folderId);
+    if (!input) return;
+    input.click();
+  }, []);
+
+  const handleAddFiles = React.useCallback((folder: SelectionGridFolder<Item>, files: FileList) => {
+    const addTile = folder.addTile;
+    if (!addTile) return;
+    addTile.onAdd?.(files);
+    if (!addTile.createItem) return;
+    const fileArray = Array.from(files);
+    const urls = fileArray.map((file) => URL.createObjectURL(file));
+    const newItems = fileArray.map((file, index) => addTile.createItem?.(file, urls[index]!)).filter(Boolean) as Item[];
+    const shouldAutoAppend = addTile.autoAppend !== false;
+    const shouldRevoke = addTile.revokeObjectUrls ?? shouldAutoAppend;
+    if (newItems.length > 0) {
+      addTile.onAddItems?.(newItems, fileArray);
+      if (shouldAutoAppend) {
+        setInternalFolderItems((prev) => ({
+          ...prev,
+          [folder.id]: [...(prev[folder.id] ?? []), ...newItems],
+        }));
+      }
+    }
+    if (shouldRevoke) {
+      const existing = objectUrlsRef.current.get(folder.id) ?? new Set<string>();
+      urls.forEach((url) => existing.add(url));
+      objectUrlsRef.current.set(folder.id, existing);
+    }
+  }, [setInternalFolderItems]);
+
+  React.useEffect(() => {
+    return () => {
+      objectUrlsRef.current.forEach((urls) => {
+        urls.forEach((url) => URL.revokeObjectURL(url));
+      });
+      objectUrlsRef.current.clear();
+    };
+  }, []);
+
+  const folderColors = React.useMemo(() => {
+    const map = new Map<string, { colorA: string; colorB: string }>();
+    resolvedFolders.forEach((folder) => {
+      map.set(folder.id, {
+        colorA: folder.colorA ?? colorA,
+        colorB: folder.colorB ?? colorB,
+      });
+    });
+    return map;
+  }, [colorA, colorB, resolvedFolders]);
 
   const requestRender = React.useCallback(() => {
     if (typeof window === "undefined") return;
@@ -499,6 +600,12 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     const activeImageKeys = new Set<string>();
     for (let index = 0; index < gridCellCount; index += 1) {
       const entry = visibleEntries[index];
+      if (entry.type === "add") {
+        const addColors = folderColors.get(entry.folderId);
+        previews[index] = { type: "color", color: addColors?.colorA ?? colorA };
+        tileKeys[index] = `add:${entry.folderId}|${targetSize}`;
+        continue;
+      }
       const preview = getPreview(entry.item, entry.index);
       previews[index] = preview;
       if (preview.type === "color") {
@@ -574,7 +681,8 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
         if (index >= gridCellCount) break;
         const entry = visibleEntries[index];
         const itemKey = entry?.key ?? String(index);
-        const isSelected = resolvedSelectedKey != null && itemKey === resolvedSelectedKey;
+        const isAddTile = entry.type === "add";
+        const isSelected = !isAddTile && resolvedSelectedKey != null && itemKey === resolvedSelectedKey;
         const aboveRow = row > 0 ? gridRows[row - 1] : null;
         const belowRow = row + 1 < gridRows.length ? gridRows[row + 1] : null;
         const hasTopNeighbor = aboveRow?.type === "items" && col < aboveRow.count;
@@ -596,7 +704,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
         const atlasCtx = atlasContextRef.current;
         let tileDrawn = drawnIndexRef.current[index] === tileKey;
 
-        if (preview.type === "image") {
+        if (!isAddTile && preview.type === "image") {
           const tileEntry = tileCacheRef.current.get(tileKey);
           if (tileEntry?.status === "ready" && tileEntry.bitmap && atlasCtx && atlasLayout && !tileDrawn) {
             const atlasX = (index % atlasLayout.columns) * atlasLayout.tileSize;
@@ -652,6 +760,24 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
           ctx.stroke();
           ctx.restore();
         }
+
+        if (isAddTile) {
+          const centerX = x + cellSizePx / 2;
+          const centerY = y + cellSizePx / 2;
+          const arm = cellSizePx * 0.22;
+          const addColors = folderColors.get(entry.folderId);
+          ctx.save();
+          ctx.strokeStyle = addColors?.colorB ?? colorB;
+          ctx.lineWidth = Math.max(1.5, cellSizePx * 0.08);
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(centerX - arm, centerY);
+          ctx.lineTo(centerX + arm, centerY);
+          ctx.moveTo(centerX, centerY - arm);
+          ctx.lineTo(centerX, centerY + arm);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
     }
 
@@ -693,6 +819,10 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     const index = rowModel.startIndex + col;
     if (index < 0 || index >= visibleEntries.length) return;
     const entry = visibleEntries[index];
+    if (entry.type === "add") {
+      openAddDialog(entry.folderId);
+      return;
+    }
     const item = entry.item;
     const key = entry.key ?? String(index);
     const isSelected = resolvedSelectedKey != null && key === resolvedSelectedKey;
@@ -833,6 +963,30 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
           </div>
         </div>
       </div>
+      {usesFolders && resolvedFolders.length > 0 && (
+        <div style={{ display: "none" }}>
+          {resolvedFolders.map((folder) => {
+            if (!folder.addTile) return null;
+            return (
+              <input
+                key={`add-input-${folder.id}`}
+                ref={(node) => setAddInputRef(folder.id, node)}
+                type="file"
+                accept={folder.addTile.accept}
+                multiple={folder.addTile.multiple}
+                aria-label={typeof folder.addTile.label === "string" ? folder.addTile.label : "Add items"}
+                onChange={(event) => {
+                  const files = event.currentTarget.files;
+                  if (files && files.length > 0) {
+                    handleAddFiles(folder, files);
+                  }
+                  event.currentTarget.value = "";
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

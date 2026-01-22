@@ -27,6 +27,16 @@ export type SelectionGridFolder<Item> = {
     colorA?: string;
     colorB?: string;
     borderStyle?: FolderBorderStyle;
+    addTile?: {
+        label?: string;
+        accept?: string;
+        multiple?: boolean;
+        onAdd?: (files: FileList) => void;
+        createItem?: (file: File, url: string) => Item;
+        onAddItems?: (items: Item[], files: File[]) => void;
+        autoAppend?: boolean;
+        revokeObjectUrls?: boolean;
+    };
 };
 export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
     items?: Item[];

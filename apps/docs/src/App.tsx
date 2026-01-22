@@ -105,6 +105,10 @@ const ROUTES = [
 ];
 
 const [selectedKey, setSelectedKey] = useState(items[0]?.id ?? null);
+const folders = [
+  { id: "warm", label: "Warm", items: [items[0], items[1]] },
+  { id: "cool", label: "Cool", items: [items[2], items[3]], defaultCollapsed: true },
+];
 
 <SelectionGrid
   items={items}
@@ -115,6 +119,18 @@ const [selectedKey, setSelectedKey] = useState(items[0]?.id ?? null);
   onSelect={(key) => setSelectedKey(key)}
   layoutGap="6px"
   colorA={flexoki.base["50"]}
+  colorB={flexoki.base["100"]}
+/>
+
+<SelectionGrid
+  folders={folders}
+  getKey={(item) => item.id}
+  getLabel={(item) => item.label}
+  getPreview={(item) => ({ type: "color", color: item.color })}
+  selectedKey={selectedKey}
+  onSelect={(key) => setSelectedKey(key)}
+  layoutGap="6px"
+  colorA={flexoki.base["700"]}
   colorB={flexoki.base["100"]}
 />
 
@@ -268,6 +284,29 @@ const selectionGridSwatches = [
   { id: 'ocean', label: 'Ocean', color: flexoki.cyan['400'] },
   { id: 'ember', label: 'Ember', color: flexoki.orange['400'] },
 ]
+const selectionGridFolders = [
+  {
+    id: 'warm',
+    label: 'Warm',
+    items: [
+      selectionGridSwatches[0],
+      selectionGridSwatches[1],
+      selectionGridSwatches[5],
+      selectionGridSwatches[7],
+    ],
+  },
+  {
+    id: 'cool',
+    label: 'Cool',
+    items: [
+      selectionGridSwatches[2],
+      selectionGridSwatches[3],
+      selectionGridSwatches[4],
+      selectionGridSwatches[6],
+    ],
+    defaultCollapsed: true,
+  },
+]
 
 const AudioBinsDriver = ({ onFrame }: { onFrame: (nowSec: number, dtSec: number) => void }) => {
   useFrame(onFrame)
@@ -276,7 +315,11 @@ const AudioBinsDriver = ({ onFrame }: { onFrame: (nowSec: number, dtSec: number)
 
 const SelectionGridDemo = () => {
   const [selectedSwatch, setSelectedSwatch] = useState<string | null>(selectionGridSwatches[0]?.id ?? null)
+  const [selectedFolderSwatch, setSelectedFolderSwatch] = useState<string | null>(
+    selectionGridFolders[0]?.items[0]?.id ?? null
+  )
   const activeSwatch = selectionGridSwatches.find((swatch) => swatch.id === selectedSwatch)
+  const activeFolderSwatch = selectionGridSwatches.find((swatch) => swatch.id === selectedFolderSwatch)
   return (
     <>
       <div
@@ -296,12 +339,12 @@ const SelectionGridDemo = () => {
             height: 18,
             borderRadius: 4,
             border: `1px solid ${flexoki.base['600']}`,
-            background: activeSwatch?.color ?? flexoki.base['600'],
-          }}
-        />
-        {activeSwatch?.label ?? 'None'}
-      </div>
-      <SelectionGrid
+          background: activeSwatch?.color ?? flexoki.base['600'],
+        }}
+      />
+      {activeSwatch?.label ?? 'None'}
+    </div>
+    <SelectionGrid
         items={selectionGridSwatches}
         getKey={(item) => item.id}
         getLabel={(item) => item.label}
@@ -309,14 +352,48 @@ const SelectionGridDemo = () => {
         selectedKey={selectedSwatch}
         onSelect={(key) => setSelectedSwatch(key)}
         layoutGap="6px"
-        colorA={flexoki.base['50']}
-        colorB={flexoki.base['100']}
-        maxHeightUnits={12}
+      colorA={flexoki.base['50']}
+      colorB={flexoki.base['100']}
+      maxHeightUnits={12}
+    />
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        fontSize: 11,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        color: flexoki.base['200'],
+      }}
+    >
+      <div
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: 4,
+          border: `1px solid ${flexoki.base['600']}`,
+          background: activeFolderSwatch?.color ?? flexoki.base['600'],
+        }}
       />
-      <GradientSelectionGrid
-        previewDarkMode
-        layoutGap="6px"
-        colorA={flexoki.base['50']}
+      {activeFolderSwatch?.label ?? 'None'}
+    </div>
+    <SelectionGrid
+      folders={selectionGridFolders}
+      getKey={(item) => item.id}
+      getLabel={(item) => item.label}
+      getPreview={(item) => ({ type: 'color', color: item.color })}
+      selectedKey={selectedFolderSwatch}
+      onSelect={(key) => setSelectedFolderSwatch(key)}
+      layoutGap="6px"
+      colorA={flexoki.base['700']}
+      colorB={flexoki.base['100']}
+      maxHeightUnits={12}
+    />
+    <GradientSelectionGrid
+      previewDarkMode
+      layoutGap="6px"
+      colorA={flexoki.base['50']}
         colorB={flexoki.base['100']}
         maxHeightUnits={20}
       />

@@ -16,6 +16,7 @@ import {
   PresetManager,
   PresetStoreProvider,
   SliderStoreProvider,
+  GradientSelectionGrid,
   SelectionGrid,
   SegmentBar,
   VirtualKeyboard,
@@ -106,7 +107,6 @@ const ROUTES = [
 const [selectedKey, setSelectedKey] = useState(items[0]?.id ?? null);
 
 <SelectionGrid
-  variant="grid"
   items={items}
   getKey={(item) => item.id}
   getLabel={(item) => item.label}
@@ -120,8 +120,7 @@ const [selectedKey, setSelectedKey] = useState(items[0]?.id ?? null);
   colorB={flexoki.base["100"]}
 />
 
-<SelectionGrid
-  variant="gradient"
+<GradientSelectionGrid
   previewDarkMode
   layoutGap="6px"
   colorA={flexoki.base["50"]}
@@ -305,7 +304,6 @@ const SelectionGridDemo = () => {
         {activeSwatch?.label ?? 'None'}
       </div>
       <SelectionGrid
-        variant="grid"
         items={selectionGridSwatches}
         getKey={(item) => item.id}
         getLabel={(item) => item.label}
@@ -325,8 +323,7 @@ const SelectionGridDemo = () => {
         colorB={flexoki.base['100']}
         maxHeightUnits={12}
       />
-      <SelectionGrid
-        variant="gradient"
+      <GradientSelectionGrid
         previewDarkMode
         layoutGap="6px"
         colorA={flexoki.base['50']}
@@ -1319,15 +1316,14 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  SelectionGrid supports two variants: <code>grid</code> for generic square
-                  pickers, and <code>gradient</code> for the built-in palette + terrain previews.
-                  The gradient variant manages its own store unless you supply one via the shared
-                  slider store context.
+                  SelectionGrid is a generic square picker. Use it for colors, thumbnails, or any
+                  item that can be shown in a square. GradientSelectionGrid is the specialized
+                  palette picker with the header, invert toggle, and terrain preview mode.
                 </p>
                 <p>
                   Keep the layout gap and colors aligned with your other controls so the grid feels
-                  like part of the same instrument panel. Terrain previews are toggled from the
-                  gradient header.
+                  like part of the same instrument panel. GradientSelectionGrid manages its own
+                  store unless you supply one via the shared slider store context.
                 </p>
               </div>
             </>

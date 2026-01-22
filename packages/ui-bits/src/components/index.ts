@@ -35,7 +35,15 @@ export {
 export { default as BasicButton, type BasicButtonProps, type BasicButtonBorderStyle } from "./BasicButton";
 export { default as Folder, type FolderProps, type FolderBorderStyle } from "./Folder";
 export { default as FloatingPanel, type FloatingPanelProps, type FloatingPanelBorderStyle } from "./FloatingPanel";
-export { default as SelectionGrid, type SelectionGridProps } from "./SelectionGrid";
+export {
+  default as SelectionGrid,
+  GradientSelectionGrid,
+  type SelectionGridAlignment,
+  type SelectionGridProps,
+  type SelectionGridGridProps,
+  type SelectionGridGradientProps,
+  type SelectionGridItemRenderState,
+} from "./SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./Dropdown";
 export { default as IconDropdown, type IconDropdownProps, type IconDropdownOption } from "./IconDropdown";
 export {

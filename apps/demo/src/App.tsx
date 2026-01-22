@@ -26,9 +26,9 @@ import {
   Folder,
   FrameLoopProvider,
   FloatingPanel,
+  GradientSelectionGrid,
   IconButton,
   LFOSlider,
-  SelectionGrid,
   SegmentBar,
   createDayOfYearFormatter,
   createTimeFormatter,
@@ -1582,8 +1582,7 @@ function EditableRectPOC() {
             >
               <SelectionPreviewModeIcon size={controlIconSize} strokeWidth={2} />
             </button>
-            <SelectionGrid
-              variant="gradient"
+            <GradientSelectionGrid
               gridId={DEFAULT_SELECTION_GRID_ID}
               previewDarkMode={previewDarkMode}
               layoutGap={layoutGap}

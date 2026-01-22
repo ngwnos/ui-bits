@@ -622,20 +622,31 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
             }}
             title={hoverTitle}
           >
-            <canvas
-              ref={canvasRef}
-              className="selection-grid__canvas"
+            <div
               style={{
                 position: "sticky",
                 top: 0,
                 left: 0,
-                width: "100%",
-                height: "100%",
-                cursor: "pointer",
-                touchAction: "manipulation",
+                height: 0,
+                overflow: "visible",
+                zIndex: 1,
               }}
-              onPointerDown={handlePointerDown}
-            />
+            >
+              <canvas
+                ref={canvasRef}
+                className="selection-grid__canvas"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  cursor: "pointer",
+                  touchAction: "manipulation",
+                }}
+                onPointerDown={handlePointerDown}
+              />
+            </div>
             <div style={{ width: "100%", height: `${totalGridHeightPx}px` }} />
           </div>
         </div>

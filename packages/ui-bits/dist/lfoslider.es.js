@@ -4502,20 +4502,33 @@ function G0(n) {
           title: dt,
           children: [
             /* @__PURE__ */ Z(
-              "canvas",
+              "div",
               {
-                ref: D,
-                className: "selection-grid__canvas",
                 style: {
                   position: "sticky",
                   top: 0,
                   left: 0,
-                  width: "100%",
-                  height: "100%",
-                  cursor: "pointer",
-                  touchAction: "manipulation"
+                  height: 0,
+                  overflow: "visible",
+                  zIndex: 1
                 },
-                onPointerDown: qe
+                children: /* @__PURE__ */ Z(
+                  "canvas",
+                  {
+                    ref: D,
+                    className: "selection-grid__canvas",
+                    style: {
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: "100%",
+                      cursor: "pointer",
+                      touchAction: "manipulation"
+                    },
+                    onPointerDown: qe
+                  }
+                )
               }
             ),
             /* @__PURE__ */ Z("div", { style: { width: "100%", height: `${ze}px` } })
@@ -5622,20 +5635,33 @@ function _f({
             },
             children: [
               /* @__PURE__ */ Z(
-                "canvas",
+                "div",
                 {
-                  ref: W,
-                  className: "selection-grid__canvas",
                   style: {
                     position: "sticky",
                     top: 0,
                     left: 0,
-                    width: "100%",
-                    height: "100%",
-                    cursor: "pointer",
-                    touchAction: "manipulation"
+                    height: 0,
+                    overflow: "visible",
+                    zIndex: 1
                   },
-                  onPointerDown: bt
+                  children: /* @__PURE__ */ Z(
+                    "canvas",
+                    {
+                      ref: W,
+                      className: "selection-grid__canvas",
+                      style: {
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: "100%",
+                        cursor: "pointer",
+                        touchAction: "manipulation"
+                      },
+                      onPointerDown: bt
+                    }
+                  )
                 }
               ),
               /* @__PURE__ */ Z("div", { style: { width: "100%", height: `${dt}px` } })

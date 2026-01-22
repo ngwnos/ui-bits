@@ -38,9 +38,17 @@ export type SelectionGridFolder<Item> = {
         revokeObjectUrls?: boolean;
     };
 };
+export type SelectionGridSelectionSlot<Item> = {
+    id: string;
+    color: string;
+    selectedKey?: string | null;
+    defaultSelectedKey?: string | null;
+    onSelect?: (key: string | null, item: Item | null, index: number | null) => void;
+};
 export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
     items?: Item[];
     folders?: SelectionGridFolder<Item>[];
+    selectionSlots?: SelectionGridSelectionSlot<Item>[];
     getKey: (item: Item, index: number) => string;
     getPreview: (item: Item, index: number) => SelectionGridPreview;
     getLabel?: (item: Item, index: number) => string;

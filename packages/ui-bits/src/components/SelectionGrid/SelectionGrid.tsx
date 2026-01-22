@@ -46,9 +46,18 @@ export type SelectionGridFolder<Item> = {
   };
 };
 
+export type SelectionGridSelectionSlot<Item> = {
+  id: string;
+  color: string;
+  selectedKey?: string | null;
+  defaultSelectedKey?: string | null;
+  onSelect?: (key: string | null, item: Item | null, index: number | null) => void;
+};
+
 export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
   items?: Item[];
   folders?: SelectionGridFolder<Item>[];
+  selectionSlots?: SelectionGridSelectionSlot<Item>[];
   getKey: (item: Item, index: number) => string;
   getPreview: (item: Item, index: number) => SelectionGridPreview;
   getLabel?: (item: Item, index: number) => string;
@@ -149,6 +158,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const {
     items,
     folders,
+    selectionSlots,
     getKey,
     getPreview,
     getLabel,
@@ -171,6 +181,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const [internalSelectedKey, setInternalSelectedKey] = React.useState<string | null>(defaultSelectedKey);
   const [internalFolderCollapsed, setInternalFolderCollapsed] = React.useState<Record<string, boolean>>({});
   const [internalFolderItems, setInternalFolderItems] = React.useState<Record<string, Item[]>>({});
+  const [internalSlotSelection, setInternalSlotSelection] = React.useState<Record<string, string | null>>({});
   const isControlled = selectedKey !== undefined;
   const resolvedSelectedKey = isControlled ? selectedKey ?? null : internalSelectedKey;
 
@@ -180,6 +191,8 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const resolvedItems = items ?? [];
   const resolvedFolders = folders ?? [];
   const usesFolders = resolvedFolders.length > 0;
+  const resolvedSelectionSlots = selectionSlots ?? [];
+  const usesMultiSelect = resolvedSelectionSlots.length > 0;
 
   const resolvedFolderItems = React.useMemo(() => {
     const map = new Map<string, Item[]>();
@@ -222,12 +235,12 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   );
 
   React.useEffect(() => {
-    if (isControlled) return;
+    if (isControlled || usesMultiSelect) return;
     if (resolvedSelectedKey == null) return;
     if (!allItemKeys.includes(resolvedSelectedKey)) {
       setInternalSelectedKey(null);
     }
-  }, [allItemKeys, isControlled, resolvedSelectedKey]);
+  }, [allItemKeys, isControlled, resolvedSelectedKey, usesMultiSelect]);
 
   React.useEffect(() => {
     if (!usesFolders) return;
@@ -244,6 +257,22 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
       return changed ? next : prev;
     });
   }, [resolvedFolders, usesFolders]);
+
+  React.useEffect(() => {
+    if (!usesMultiSelect) return;
+    setInternalSlotSelection((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      resolvedSelectionSlots.forEach((slot) => {
+        if (slot.selectedKey !== undefined) return;
+        if (next[slot.id] !== undefined) return;
+        if (slot.defaultSelectedKey === undefined) return;
+        next[slot.id] = slot.defaultSelectedKey;
+        changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [resolvedSelectionSlots, usesMultiSelect]);
 
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -424,6 +453,51 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     }
     onSelect?.(key, item, index);
   };
+
+  const resolvedSlotSelections = React.useMemo(
+    () =>
+      resolvedSelectionSlots.map((slot) => ({
+        ...slot,
+        selectedKey: slot.selectedKey ?? internalSlotSelection[slot.id] ?? null,
+      })),
+    [internalSlotSelection, resolvedSelectionSlots],
+  );
+
+  const slotByKey = React.useMemo(() => {
+    const map = new Map<string, { slotId: string; color: string }>();
+    resolvedSlotSelections.forEach((slot) => {
+      const key = slot.selectedKey;
+      if (key == null) return;
+      if (!map.has(key)) {
+        map.set(key, { slotId: slot.id, color: slot.color });
+      }
+    });
+    return map;
+  }, [resolvedSlotSelections]);
+
+  const commitSlotSelection = React.useCallback(
+    (slotId: string, nextKey: string | null, item: Item | null, index: number | null) => {
+      const slot = resolvedSlotSelections.find((candidate) => candidate.id === slotId);
+      if (!slot) return;
+      if (slot.selectedKey === undefined) {
+        setInternalSlotSelection((prev) => {
+          const next = { ...prev, [slotId]: nextKey };
+          if (nextKey != null) {
+            resolvedSlotSelections.forEach((candidate) => {
+              if (candidate.id === slotId) return;
+              if (candidate.selectedKey !== undefined) return;
+              if (next[candidate.id] === nextKey) {
+                next[candidate.id] = null;
+              }
+            });
+          }
+          return next;
+        });
+      }
+      slot.onSelect?.(nextKey, item, index);
+    },
+    [resolvedSlotSelections],
+  );
 
   const workerRef = React.useRef<Worker | null>(null);
   const addInputRefs = React.useRef<Map<string, HTMLInputElement | null>>(new Map());
@@ -728,7 +802,10 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
         const entry = visibleEntries[index];
         const itemKey = entry?.key ?? String(index);
         const isAddTile = entry.type === "add";
-        const isSelected = !isAddTile && resolvedSelectedKey != null && itemKey === resolvedSelectedKey;
+        const slotSelection = !isAddTile && usesMultiSelect ? slotByKey.get(itemKey) : null;
+        const isSelected = !isAddTile && (
+          usesMultiSelect ? Boolean(slotSelection) : resolvedSelectedKey != null && itemKey === resolvedSelectedKey
+        );
         const aboveRow = row > 0 ? gridRows[row - 1] : null;
         const belowRow = row + 1 < gridRows.length ? gridRows[row + 1] : null;
         const hasTopNeighbor = aboveRow?.type === "items" && col < aboveRow.count;
@@ -800,7 +877,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
 
         if (isSelected) {
           ctx.save();
-          ctx.strokeStyle = colorB;
+          ctx.strokeStyle = usesMultiSelect ? slotSelection?.color ?? colorB : colorB;
           ctx.lineWidth = 2;
           buildRoundedRectPath(ctx, x + 1, y + 1, cellSizePx - 2, radii);
           ctx.stroke();
@@ -873,6 +950,19 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     }
     const item = entry.item;
     const key = entry.key ?? String(index);
+    if (usesMultiSelect) {
+      const slotEntry = slotByKey.get(key);
+      if (slotEntry) {
+        if (allowEmptySelection) {
+          commitSlotSelection(slotEntry.slotId, null, null, null);
+        }
+        return;
+      }
+      const targetSlot = resolvedSlotSelections.find((slot) => slot.selectedKey == null) ?? resolvedSlotSelections[0];
+      if (!targetSlot) return;
+      commitSlotSelection(targetSlot.id, key, item, index);
+      return;
+    }
     const isSelected = resolvedSelectedKey != null && key === resolvedSelectedKey;
     if (isSelected) {
       if (allowEmptySelection) {
@@ -884,12 +974,13 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   };
 
   const hoverTitle = React.useMemo(() => {
+    if (usesMultiSelect) return undefined;
     if (!getLabel) return undefined;
     if (resolvedSelectedKey == null) return undefined;
     const entry = allEntries.find((candidate) => candidate.key === resolvedSelectedKey);
     if (!entry) return undefined;
     return getLabel(entry.item, entry.index);
-  }, [allEntries, getLabel, resolvedSelectedKey]);
+  }, [allEntries, getLabel, resolvedSelectedKey, usesMultiSelect]);
 
   const headerRows = React.useMemo(() => {
     if (!usesFolders) return [];

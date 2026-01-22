@@ -71,6 +71,7 @@ export {
   default as SelectionGrid,
   GradientSelectionGrid,
   type SelectionGridAlignment,
+  type SelectionGridSelectionSlot,
   type SelectionGridProps,
   type SelectionGridGridProps,
   type SelectionGridGradientProps,

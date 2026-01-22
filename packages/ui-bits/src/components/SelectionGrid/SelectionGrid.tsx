@@ -5,6 +5,7 @@ import "./selectionGrid.css";
 const CELL_CORNER_RADIUS_PX = 3;
 const FALLBACK_COLOR_A = "var(--ui-bits-color-a, #2f2f2f)";
 const FALLBACK_COLOR_B = "var(--ui-bits-color-b, #f0f0f0)";
+const MAX_ATLAS_DIMENSION = 4096;
 
 export type SelectionGridAlignment = "left" | "center" | "right";
 
@@ -38,9 +39,12 @@ export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
 
 export type SelectionGridProps<Item = unknown> = SelectionGridGridProps<Item>;
 
-type CachedBitmap = {
+type CachedAtlas = {
   status: "loading" | "ready" | "error";
   bitmap?: ImageBitmap;
+  columns: number;
+  size: number;
+  count: number;
 };
 
 type CornerRadii = {
@@ -86,6 +90,14 @@ function resolveWorkerUrl(src: string) {
   } catch {
     return src;
   }
+}
+
+function computeAtlasColumns(count: number, size: number) {
+  const safeSize = Math.max(1, Math.floor(size));
+  const maxColumns = Math.max(1, Math.floor(MAX_ATLAS_DIMENSION / safeSize));
+  const maxRows = Math.max(1, Math.floor(MAX_ATLAS_DIMENSION / safeSize));
+  if (count <= 0) return 1;
+  return Math.min(maxColumns, Math.max(1, Math.ceil(count / maxRows)));
 }
 
 function createSelectionGridWorker() {
@@ -220,7 +232,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   };
 
   const workerRef = React.useRef<Worker | null>(null);
-  const cacheRef = React.useRef<Map<string, CachedBitmap>>(new Map());
+  const atlasRef = React.useRef<Map<string, CachedAtlas>>(new Map());
   const pendingRef = React.useRef<Set<string>>(new Set());
   const renderTokenRef = React.useRef(0);
   const drawRef = React.useRef<() => void>(() => undefined);
@@ -243,7 +255,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
       const { id, bitmap, error } = event.data ?? {};
       if (!id) return;
       pendingRef.current.delete(id);
-      const entry = cacheRef.current.get(id);
+      const entry = atlasRef.current.get(id);
       if (!entry) {
         bitmap?.close();
         return;
@@ -260,18 +272,18 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     return () => {
       worker.terminate();
       workerRef.current = null;
-      cacheRef.current.forEach((entry) => entry.bitmap?.close());
-      cacheRef.current.clear();
+      atlasRef.current.forEach((entry) => entry.bitmap?.close());
+      atlasRef.current.clear();
       pendingRef.current.clear();
     };
   }, [requestRender]);
 
   React.useEffect(() => {
-    cacheRef.current.forEach((entry) => entry.bitmap?.close());
-    cacheRef.current.clear();
+    atlasRef.current.forEach((entry) => entry.bitmap?.close());
+    atlasRef.current.clear();
     pendingRef.current.clear();
     requestRender();
-  }, [cellSizePx, requestRender]);
+  }, [cellSizePx, items, getPreview, requestRender]);
 
   React.useEffect(() => {
     requestRender();
@@ -325,6 +337,47 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     const scrollTop = scrollNode.scrollTop;
     const startRow = Math.max(0, Math.floor(scrollTop / cellSizePx) - 1);
     const endRow = Math.min(rowCount - 1, Math.floor((scrollTop + viewportHeight) / cellSizePx) + 1);
+    const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
+    const previews: SelectionGridPreview[] = new Array(gridCellCount);
+    const atlasItems: Array<{ kind: "color"; color: string } | { kind: "image"; src: string }> = [];
+    const atlasSignature: string[] = new Array(gridCellCount);
+    for (let index = 0; index < gridCellCount; index += 1) {
+      const preview = getPreview(items[index], index);
+      previews[index] = preview;
+      if (preview.type === "color") {
+        atlasItems.push({ kind: "color", color: preview.color });
+        atlasSignature[index] = `c:${preview.color}`;
+      } else {
+        const resolvedSrc = resolveWorkerUrl(preview.src);
+        atlasItems.push({ kind: "image", src: resolvedSrc });
+        atlasSignature[index] = `i:${resolvedSrc}`;
+      }
+    }
+    const atlasColumns = computeAtlasColumns(gridCellCount, targetSize);
+    const atlasKey = `${targetSize}|${atlasColumns}|${atlasSignature.join("|")}`;
+    let atlasEntry = atlasRef.current.get(atlasKey);
+    if (!atlasEntry) {
+      atlasEntry = {
+        status: "loading",
+        columns: atlasColumns,
+        size: targetSize,
+        count: gridCellCount,
+      };
+      atlasRef.current.set(atlasKey, atlasEntry);
+    }
+    if (atlasEntry.status === "loading" && !pendingRef.current.has(atlasKey)) {
+      const worker = workerRef.current;
+      if (worker) {
+        pendingRef.current.add(atlasKey);
+        worker.postMessage({
+          type: "atlas",
+          id: atlasKey,
+          size: targetSize,
+          columns: atlasColumns,
+          items: atlasItems,
+        });
+      }
+    }
 
     for (let row = startRow; row <= endRow; row += 1) {
       const rowOffset = row === lastRowIndex ? alignmentOffsetPx : 0;
@@ -335,7 +388,6 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
       for (let col = 0; col < rowCellCount; col += 1) {
         const index = rowBaseIndex + col;
         if (index >= gridCellCount) break;
-        const item = items[index];
         const itemKey = itemKeys[index] ?? String(index);
         const isSelected = resolvedSelectedKey != null && itemKey === resolvedSelectedKey;
         const hasTopNeighbor = index - rowCapacity >= 0;
@@ -352,43 +404,33 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
         };
         const x = rowOffset + col * cellSizePx;
 
-        const preview = getPreview(item, index);
-        if (preview.type === "color") {
+        const preview = previews[index];
+        if (atlasEntry.status === "ready" && atlasEntry.bitmap) {
+          const srcX = (index % atlasEntry.columns) * atlasEntry.size;
+          const srcY = Math.floor(index / atlasEntry.columns) * atlasEntry.size;
+          ctx.save();
+          buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
+          ctx.clip();
+          ctx.drawImage(
+            atlasEntry.bitmap,
+            srcX,
+            srcY,
+            atlasEntry.size,
+            atlasEntry.size,
+            x,
+            y,
+            cellSizePx,
+            cellSizePx,
+          );
+          ctx.restore();
+        } else if (preview.type === "color") {
           buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
           ctx.fillStyle = preview.color;
           ctx.fill();
         } else {
-          const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
-          const resolvedSrc = resolveWorkerUrl(preview.src);
-          const cacheKey = `${resolvedSrc}|${targetSize}`;
-          let entry = cacheRef.current.get(cacheKey);
-          if (!entry) {
-            entry = { status: "loading" };
-            cacheRef.current.set(cacheKey, entry);
-          }
-          if (entry.status !== "ready" || !entry.bitmap) {
-            buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
-            ctx.fillStyle = colorA;
-            ctx.fill();
-            if (entry.status === "loading" && !pendingRef.current.has(cacheKey)) {
-              const worker = workerRef.current;
-              if (worker) {
-                pendingRef.current.add(cacheKey);
-                worker.postMessage({
-                  type: "image",
-                  id: cacheKey,
-                  src: resolvedSrc,
-                  size: targetSize,
-                });
-              }
-            }
-          } else {
-            ctx.save();
-            buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
-            ctx.clip();
-            ctx.drawImage(entry.bitmap, x, y, cellSizePx, cellSizePx);
-            ctx.restore();
-          }
+          buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
+          ctx.fillStyle = colorA;
+          ctx.fill();
         }
 
         if (isSelected) {

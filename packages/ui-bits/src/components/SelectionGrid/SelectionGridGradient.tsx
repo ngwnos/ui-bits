@@ -49,10 +49,14 @@ type GradientVisual = {
 const CELL_CORNER_RADIUS_PX = 3;
 const FALLBACK_COLOR_A = "var(--ui-bits-color-a, #2f2f2f)";
 const FALLBACK_COLOR_B = "var(--ui-bits-color-b, #f0f0f0)";
+const MAX_ATLAS_DIMENSION = 4096;
 
-type CachedBitmap = {
+type CachedAtlas = {
   status: "loading" | "ready" | "error";
   bitmap?: ImageBitmap;
+  columns: number;
+  size: number;
+  count: number;
 };
 
 type CornerRadii = {
@@ -69,6 +73,14 @@ function resolveWorkerUrl(src: string) {
   } catch {
     return src;
   }
+}
+
+function computeAtlasColumns(count: number, size: number) {
+  const safeSize = Math.max(1, Math.floor(size));
+  const maxColumns = Math.max(1, Math.floor(MAX_ATLAS_DIMENSION / safeSize));
+  const maxRows = Math.max(1, Math.floor(MAX_ATLAS_DIMENSION / safeSize));
+  if (count <= 0) return 1;
+  return Math.min(maxColumns, Math.max(1, Math.ceil(count / maxRows)));
 }
 
 function buildRoundedRectPath(
@@ -277,7 +289,7 @@ function GradientSelectionGridContent({
   const [labelLineHeight, setLabelLineHeight] = React.useState<number>(fontSize ?? 16);
   const paletteSignatureRef = React.useRef<string | null>(null);
   const workerRef = React.useRef<Worker | null>(null);
-  const cacheRef = React.useRef<Map<string, CachedBitmap>>(new Map());
+  const atlasRef = React.useRef<Map<string, CachedAtlas>>(new Map());
   const pendingRef = React.useRef<Set<string>>(new Set());
   const renderTokenRef = React.useRef(0);
   const drawRef = React.useRef<() => void>(() => undefined);
@@ -303,7 +315,7 @@ function GradientSelectionGridContent({
       const { id, bitmap, error } = event.data ?? {};
       if (!id) return;
       pendingRef.current.delete(id);
-      const entry = cacheRef.current.get(id);
+      const entry = atlasRef.current.get(id);
       if (!entry) {
         bitmap?.close();
         return;
@@ -320,8 +332,8 @@ function GradientSelectionGridContent({
     return () => {
       worker.terminate();
       workerRef.current = null;
-      cacheRef.current.forEach((entry) => entry.bitmap?.close());
-      cacheRef.current.clear();
+      atlasRef.current.forEach((entry) => entry.bitmap?.close());
+      atlasRef.current.clear();
       pendingRef.current.clear();
     };
   }, [requestRender]);
@@ -424,8 +436,8 @@ function GradientSelectionGridContent({
   const totalGridHeightPx = rowCount * cellSizePx;
 
   React.useEffect(() => {
-    cacheRef.current.forEach((entry) => entry.bitmap?.close());
-    cacheRef.current.clear();
+    atlasRef.current.forEach((entry) => entry.bitmap?.close());
+    atlasRef.current.clear();
     pendingRef.current.clear();
     requestRender();
   }, [cellSizePx, invertGradients, renderMode, tileAssignments, requestRender]);
@@ -478,6 +490,44 @@ function GradientSelectionGridContent({
     const scrollTop = scrollNode.scrollTop;
     const startRow = Math.max(0, Math.floor(scrollTop / cellSizePx) - 1);
     const endRow = Math.min(rowCount - 1, Math.floor((scrollTop + viewportHeight) / cellSizePx) + 1);
+    const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
+    const atlasColumns = computeAtlasColumns(gridCellCount, targetSize);
+    const atlasItems: Array<{ palette: Uint8ClampedArray; tileUrl?: string }> = [];
+    const atlasSignature: string[] = new Array(gridCellCount);
+    for (let index = 0; index < gridCellCount; index += 1) {
+      const base = GRADIENT_BASE_DATA[index];
+      const visual = gradientVisuals[index];
+      const palette = invertGradients ? base.inverted.data : base.normal.data;
+      const tileUrl = renderMode === "height" && usesTerrainTiles && visual.tileUrl
+        ? resolveWorkerUrl(visual.tileUrl)
+        : undefined;
+      atlasItems.push({ palette, tileUrl });
+      atlasSignature[index] = tileUrl ? `t:${tileUrl}` : `g:${base.name}`;
+    }
+    const atlasKey = `${renderMode}|${invertGradients ? "inv" : "norm"}|${targetSize}|${atlasColumns}|${atlasSignature.join("|")}`;
+    let atlasEntry = atlasRef.current.get(atlasKey);
+    if (!atlasEntry) {
+      atlasEntry = {
+        status: "loading",
+        columns: atlasColumns,
+        size: targetSize,
+        count: gridCellCount,
+      };
+      atlasRef.current.set(atlasKey, atlasEntry);
+    }
+    if (atlasEntry.status === "loading" && !pendingRef.current.has(atlasKey)) {
+      const worker = workerRef.current;
+      if (worker) {
+        pendingRef.current.add(atlasKey);
+        worker.postMessage({
+          type: "gradientAtlas",
+          id: atlasKey,
+          size: targetSize,
+          columns: atlasColumns,
+          items: atlasItems,
+        });
+      }
+    }
 
     for (let row = startRow; row <= endRow; row += 1) {
       const rowOffset = row === lastRowIndex ? alignmentOffsetPx : 0;
@@ -489,7 +539,6 @@ function GradientSelectionGridContent({
         const index = rowBaseIndex + col;
         if (index >= gridCellCount) break;
         const base = GRADIENT_BASE_DATA[index];
-        const visual = gradientVisuals[index];
         const isSelected = selectedIndex === index;
         const hasTopNeighbor = index - rowCapacity >= 0;
         const hasBottomNeighbor = index + rowCapacity < gridCellCount;
@@ -504,42 +553,29 @@ function GradientSelectionGridContent({
           bl: (hasBottomNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
         };
         const x = rowOffset + col * cellSizePx;
-        const palette = invertGradients ? base.inverted.data : base.normal.data;
-        const tileUrl = renderMode === "height" && usesTerrainTiles && visual.tileUrl ? visual.tileUrl : undefined;
-        const resolvedTileUrl = tileUrl ? resolveWorkerUrl(tileUrl) : undefined;
-        const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
-        const cacheKey = `${visual.name}|${invertGradients ? "inv" : "norm"}|${renderMode}|${targetSize}|${resolvedTileUrl ?? "plain"}`;
-
-        let entry = cacheRef.current.get(cacheKey);
-        if (!entry) {
-          entry = { status: "loading" };
-          cacheRef.current.set(cacheKey, entry);
-        }
-
-        if (entry.status !== "ready" || !entry.bitmap) {
+        if (atlasEntry.status === "ready" && atlasEntry.bitmap) {
+          const srcX = (index % atlasEntry.columns) * atlasEntry.size;
+          const srcY = Math.floor(index / atlasEntry.columns) * atlasEntry.size;
           ctx.save();
           buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
           ctx.clip();
-          drawGradientFallback(ctx, x, y, cellSizePx, base.stops, invertGradients);
+          ctx.drawImage(
+            atlasEntry.bitmap,
+            srcX,
+            srcY,
+            atlasEntry.size,
+            atlasEntry.size,
+            x,
+            y,
+            cellSizePx,
+            cellSizePx,
+          );
           ctx.restore();
-          if (entry.status === "loading" && !pendingRef.current.has(cacheKey)) {
-            const worker = workerRef.current;
-            if (worker) {
-              pendingRef.current.add(cacheKey);
-              worker.postMessage({
-                type: "gradient",
-                id: cacheKey,
-                palette,
-                size: targetSize,
-                tileUrl: resolvedTileUrl,
-              });
-            }
-          }
         } else {
           ctx.save();
           buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
           ctx.clip();
-          ctx.drawImage(entry.bitmap, x, y, cellSizePx, cellSizePx);
+          drawGradientFallback(ctx, x, y, cellSizePx, base.stops, invertGradients);
           ctx.restore();
         }
 

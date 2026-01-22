@@ -6699,7 +6699,7 @@ function $7({
 }
 const eP = "var(--ui-bits-color-a, #2f2f2f)", tP = "var(--ui-bits-color-b, #f0f0f0)", dl = "#ffffff", Dd = 255, nP = 1, rP = 0.35, sP = 1, oP = 6, vl = 0.4, cP = () => new Worker(new URL(
   /* @vite-ignore */
-  "/assets/color-field.worker-BwJ2UaxT.js",
+  "" + new URL("assets/color-field.worker-BwJ2UaxT.js", import.meta.url).href,
   import.meta.url
 ), { type: "module" });
 function iP(n) {

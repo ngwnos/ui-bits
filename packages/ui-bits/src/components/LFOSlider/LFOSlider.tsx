@@ -1171,6 +1171,37 @@ function SliderCore({
 
   const hasExternalValue = typeof resolvedValueProp === 'number' && Number.isFinite(resolvedValueProp);
   const hasExternalSource = hasExternalValue || Boolean(readExternal);
+  useEffect(() => {
+    if (!hasExternalValue) return;
+    if (draggingSplitRef.current || editingRef.current) return;
+    const numeric = clamp(resolvedValueProp, min, max);
+    const snapped = snapToStep(numeric, min, step);
+    const ratio = splitFromValue(snapped, min, max);
+    const rawText = snapped.toFixed(precision);
+    const formatted = formatEditingText(snapped, 'value');
+    if (Math.abs(ratio - splitRef.current) > 1e-6) {
+      splitRef.current = ratio;
+      writeSplitVars(ratio);
+      setSplit(ratio);
+    }
+    reflectValueToDom(snapped, rawText);
+    if (textRef.current !== formatted) {
+      textRef.current = formatted;
+      setText(formatted);
+      setSelection(formatted.length, formatted.length);
+    }
+  }, [
+    formatEditingText,
+    hasExternalValue,
+    max,
+    min,
+    precision,
+    reflectValueToDom,
+    resolvedValueProp,
+    setSelection,
+    step,
+    writeSplitVars,
+  ]);
   const frameFn = useCallback((nowSec: number) => {
     lastNowSecRef.current = nowSec;
     if (!Number.isFinite(drawerValueMin) || !Number.isFinite(drawerValueMax)) return;

@@ -6,10 +6,12 @@ export interface FolderProps extends React.HTMLAttributes<HTMLDivElement> {
     colorB?: string;
     borderStyle?: FolderBorderStyle;
     fontSize?: number;
+    headerHeight?: number;
     padding?: number | string;
     verticalGap?: number;
     inheritPanelSurface?: boolean;
     transparent?: boolean;
+    showBody?: boolean;
     collapsed?: boolean;
     defaultCollapsed?: boolean;
     keepMounted?: boolean;

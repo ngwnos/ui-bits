@@ -18,10 +18,12 @@ export interface FolderProps extends React.HTMLAttributes<HTMLDivElement> {
   colorB?: string;
   borderStyle?: FolderBorderStyle;
   fontSize?: number;
+  headerHeight?: number;
   padding?: number | string;
   verticalGap?: number;
   inheritPanelSurface?: boolean;
   transparent?: boolean;
+  showBody?: boolean;
   collapsed?: boolean;
   defaultCollapsed?: boolean;
   keepMounted?: boolean;
@@ -74,10 +76,12 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
     colorB,
     borderStyle,
     fontSize,
+    headerHeight,
     padding = 0,
     verticalGap,
     inheritPanelSurface,
     transparent,
+    showBody = true,
     collapsed,
     defaultCollapsed = false,
     keepMounted = true,
@@ -115,13 +119,13 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
       : "transparent";
   const rawHeaderBackground = isCollapsed ? resolvedColorA : resolvedColorB;
   const rawHeaderTextColor = isCollapsed ? resolvedColorB : resolvedColorA;
-  const headerHeight = computeHeaderHeight(resolvedFontSize);
+  const resolvedHeaderHeight = headerHeight ?? computeHeaderHeight(resolvedFontSize);
   const headerBorderWidth = showBorder ? 1 : 0;
-  const headerOuterHeight = headerHeight + headerBorderWidth;
+  const headerOuterHeight = resolvedHeaderHeight + headerBorderWidth;
   const resolvedVerticalGap = useVerticalGap(verticalGap);
   const bodyGap = resolvedVerticalGap;
   const bodyPaddingY = `${resolvedVerticalGap}px`;
-  const renderBody = !isCollapsed || keepMounted;
+  const renderBody = showBody && (!isCollapsed || keepMounted);
   const suspendChildren = Boolean(suspended || (keepMounted && isCollapsed));
   const panelEdgeBorders = usePanelEdgeBorders();
   const showLeftBorder = panelEdgeBorders?.left ?? true;
@@ -189,7 +193,7 @@ const Folder = React.forwardRef<HTMLDivElement, FolderProps>((props, ref) => {
           minHeight: headerOuterHeight,
           height: headerOuterHeight,
           display: "grid",
-          gridTemplateColumns: `${headerHeight}px 1fr ${headerHeight}px`,
+          gridTemplateColumns: `${resolvedHeaderHeight}px 1fr ${resolvedHeaderHeight}px`,
           alignItems: "center",
           padding: `0 ${resolvedPadding}`,
           borderLeft: showBorder && showLeftBorder ? `1px solid ${resolvedBorderColor}` : "none",

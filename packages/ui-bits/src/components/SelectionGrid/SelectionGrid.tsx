@@ -1,4 +1,5 @@
 import React from "react";
+import Folder, { type FolderBorderStyle } from "../Folder/Folder";
 import SelectionGridWorker from "./selectionGrid.worker?worker&inline";
 import "./selectionGrid.css";
 
@@ -23,8 +24,21 @@ export type SelectionGridBaseProps = {
   style?: React.CSSProperties;
 };
 
-export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
+export type SelectionGridFolder<Item> = {
+  id: string;
+  label: React.ReactNode;
   items: Item[];
+  collapsed?: boolean;
+  defaultCollapsed?: boolean;
+  onCollapseChange?: (collapsed: boolean) => void;
+  colorA?: string;
+  colorB?: string;
+  borderStyle?: FolderBorderStyle;
+};
+
+export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
+  items?: Item[];
+  folders?: SelectionGridFolder<Item>[];
   getKey: (item: Item, index: number) => string;
   getPreview: (item: Item, index: number) => SelectionGridPreview;
   getLabel?: (item: Item, index: number) => string;
@@ -120,6 +134,7 @@ function createSelectionGridWorker() {
 export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>) {
   const {
     items,
+    folders,
     getKey,
     getPreview,
     getLabel,
@@ -140,24 +155,65 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   } = props;
 
   const [internalSelectedKey, setInternalSelectedKey] = React.useState<string | null>(defaultSelectedKey);
+  const [internalFolderCollapsed, setInternalFolderCollapsed] = React.useState<Record<string, boolean>>({});
   const isControlled = selectedKey !== undefined;
   const resolvedSelectedKey = isControlled ? selectedKey ?? null : internalSelectedKey;
 
   const resolvedSquareScale = Number.isFinite(squareScale) && squareScale > 0 ? squareScale : 1;
   const resolvedSquareAlignment = squareAlignment ?? "left";
 
-  const itemKeys = React.useMemo(
-    () => items.map((item, index) => getKey(item, index)),
-    [getKey, items],
+  const resolvedItems = items ?? [];
+  const resolvedFolders = folders ?? [];
+  const usesFolders = resolvedFolders.length > 0;
+
+  const allEntries = React.useMemo(() => {
+    if (usesFolders) {
+      const entries: Array<{ item: Item; index: number; key: string }> = [];
+      let cursor = 0;
+      resolvedFolders.forEach((folder) => {
+        folder.items.forEach((item) => {
+          const key = getKey(item, cursor);
+          entries.push({ item, index: cursor, key });
+          cursor += 1;
+        });
+      });
+      return entries;
+    }
+    return resolvedItems.map((item, index) => ({
+      item,
+      index,
+      key: getKey(item, index),
+    }));
+  }, [getKey, resolvedFolders, resolvedItems, usesFolders]);
+
+  const allItemKeys = React.useMemo(
+    () => allEntries.map((entry) => entry.key),
+    [allEntries],
   );
 
   React.useEffect(() => {
     if (isControlled) return;
     if (resolvedSelectedKey == null) return;
-    if (!itemKeys.includes(resolvedSelectedKey)) {
+    if (!allItemKeys.includes(resolvedSelectedKey)) {
       setInternalSelectedKey(null);
     }
-  }, [isControlled, itemKeys, resolvedSelectedKey]);
+  }, [allItemKeys, isControlled, resolvedSelectedKey]);
+
+  React.useEffect(() => {
+    if (!usesFolders) return;
+    setInternalFolderCollapsed((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      resolvedFolders.forEach((folder) => {
+        if (folder.collapsed !== undefined) return;
+        if (next[folder.id] !== undefined) return;
+        if (folder.defaultCollapsed === undefined) return;
+        next[folder.id] = folder.defaultCollapsed;
+        changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [resolvedFolders, usesFolders]);
 
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -197,24 +253,85 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     Math.round(previewFontSize + previewPaddingPx * 1.5),
   );
   const cellSizePx = baseCellSize * resolvedSquareScale;
-  const gridCellCount = items.length;
   const rowCapacity = containerWidth ? Math.max(1, Math.floor(containerWidth / cellSizePx)) : 1;
-  const rowCount = gridCellCount > 0 ? Math.ceil(gridCellCount / rowCapacity) : 0;
-  const lastRowCount = gridCellCount === 0
-    ? 0
-    : rowCapacity >= gridCellCount
-      ? gridCellCount
-      : gridCellCount % rowCapacity || rowCapacity;
-  const leftoverSlots = rowCapacity > lastRowCount ? rowCapacity - lastRowCount : 0;
-  const lastRowIndex = gridCellCount === 0 ? 0 : Math.floor((gridCellCount - 1) / rowCapacity);
-  const alignmentOffsetPx = leftoverSlots > 0
-    ? resolvedSquareAlignment === "center"
-      ? (leftoverSlots * cellSizePx) / 2
-      : resolvedSquareAlignment === "right"
-        ? leftoverSlots * cellSizePx
-        : 0
-    : 0;
   const containerWidthPx = rowCapacity * cellSizePx;
+
+  const visibleEntries = React.useMemo(() => {
+    if (!usesFolders) return allEntries;
+    const entries: Array<{ item: Item; index: number; key: string }> = [];
+    let cursor = 0;
+    resolvedFolders.forEach((folder) => {
+      const collapsed = folder.collapsed ?? internalFolderCollapsed[folder.id] ?? false;
+      if (collapsed) {
+        cursor += folder.items.length;
+        return;
+      }
+      folder.items.forEach((item) => {
+        const key = getKey(item, cursor);
+        entries.push({ item, index: cursor, key });
+        cursor += 1;
+      });
+    });
+    return entries;
+  }, [allEntries, getKey, internalFolderCollapsed, resolvedFolders, usesFolders]);
+
+  const gridCellCount = visibleEntries.length;
+
+  type GridRow =
+    | { type: "header"; folderIndex: number; alignmentOffsetPx: number }
+    | { type: "items"; startIndex: number; count: number; alignmentOffsetPx: number };
+
+  const gridRows = React.useMemo(() => {
+    if (!usesFolders) {
+      const rows: GridRow[] = [];
+      for (let start = 0; start < gridCellCount; start += rowCapacity) {
+        const count = Math.min(rowCapacity, gridCellCount - start);
+        const leftoverSlots = rowCapacity - count;
+        const alignmentOffsetPx = leftoverSlots > 0
+          ? resolvedSquareAlignment === "center"
+            ? (leftoverSlots * cellSizePx) / 2
+            : resolvedSquareAlignment === "right"
+              ? leftoverSlots * cellSizePx
+              : 0
+          : 0;
+        rows.push({ type: "items", startIndex: start, count, alignmentOffsetPx });
+      }
+      return rows;
+    }
+    const rows: GridRow[] = [];
+    let cursor = 0;
+    resolvedFolders.forEach((folder, folderIndex) => {
+      rows.push({ type: "header", folderIndex, alignmentOffsetPx: 0 });
+      const collapsed = folder.collapsed ?? internalFolderCollapsed[folder.id] ?? false;
+      if (collapsed) return;
+      const visibleCount = folder.items.length;
+      for (let start = 0; start < visibleCount; start += rowCapacity) {
+        const count = Math.min(rowCapacity, visibleCount - start);
+        const leftoverSlots = rowCapacity - count;
+        const alignmentOffsetPx = leftoverSlots > 0
+          ? resolvedSquareAlignment === "center"
+            ? (leftoverSlots * cellSizePx) / 2
+            : resolvedSquareAlignment === "right"
+              ? leftoverSlots * cellSizePx
+              : 0
+          : 0;
+        rows.push({ type: "items", startIndex: cursor + start, count, alignmentOffsetPx });
+      }
+      cursor += visibleCount;
+    });
+    return rows;
+  }, [
+    cellSizePx,
+    gridCellCount,
+    internalFolderCollapsed,
+    resolvedFolders,
+    resolvedSquareAlignment,
+    rowCapacity,
+    usesFolders,
+  ]);
+
+  const rowCount = gridRows.length;
+  const totalGridHeightPx = rowCount * cellSizePx;
 
   const resolvedMaxHeightUnits = typeof maxHeightUnits === "number" && Number.isFinite(maxHeightUnits) && maxHeightUnits > 0
     ? maxHeightUnits
@@ -222,8 +339,6 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const totalRowUnits = rowCount * resolvedSquareScale;
   const gridMaxHeightPx = resolvedMaxHeightUnits != null ? resolvedMaxHeightUnits * baseCellSize : null;
   const clampGridHeight = resolvedMaxHeightUnits != null && totalRowUnits > resolvedMaxHeightUnits;
-  const totalGridHeightPx = rowCount * cellSizePx;
-
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
 
   const wrapperStyle: React.CSSProperties = {
@@ -331,16 +446,14 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   React.useEffect(() => {
     requestRender();
   }, [
-    items,
+    visibleEntries,
     resolvedSelectedKey,
     containerWidth,
     cellSizePx,
     colorA,
     colorB,
-    alignmentOffsetPx,
     rowCapacity,
     rowCount,
-    lastRowCount,
     gridCellCount,
     requestRender,
   ]);
@@ -385,7 +498,8 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     const tileKeys: string[] = new Array(gridCellCount);
     const activeImageKeys = new Set<string>();
     for (let index = 0; index < gridCellCount; index += 1) {
-      const preview = getPreview(items[index], index);
+      const entry = visibleEntries[index];
+      const preview = getPreview(entry.item, entry.index);
       previews[index] = preview;
       if (preview.type === "color") {
         tileKeys[index] = `color:${preview.color}`;
@@ -448,22 +562,25 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     }
 
     for (let row = startRow; row <= endRow; row += 1) {
-      const rowOffset = row === lastRowIndex ? alignmentOffsetPx : 0;
-      const rowCellCount = row === lastRowIndex ? lastRowCount : rowCapacity;
-      const rowBaseIndex = row * rowCapacity;
+      const rowModel = gridRows[row];
+      if (!rowModel || rowModel.type !== "items") continue;
+      const rowOffset = rowModel.alignmentOffsetPx;
+      const rowCellCount = rowModel.count;
+      const rowBaseIndex = rowModel.startIndex;
       const y = row * cellSizePx - scrollTop;
 
       for (let col = 0; col < rowCellCount; col += 1) {
         const index = rowBaseIndex + col;
         if (index >= gridCellCount) break;
-        const itemKey = itemKeys[index] ?? String(index);
+        const entry = visibleEntries[index];
+        const itemKey = entry?.key ?? String(index);
         const isSelected = resolvedSelectedKey != null && itemKey === resolvedSelectedKey;
-        const hasTopNeighbor = index - rowCapacity >= 0;
-        const hasBottomNeighbor = index + rowCapacity < gridCellCount;
+        const aboveRow = row > 0 ? gridRows[row - 1] : null;
+        const belowRow = row + 1 < gridRows.length ? gridRows[row + 1] : null;
+        const hasTopNeighbor = aboveRow?.type === "items" && col < aboveRow.count;
+        const hasBottomNeighbor = belowRow?.type === "items" && col < belowRow.count;
         const hasLeftNeighbor = col > 0;
-        const hasRightNeighbor = col < rowCapacity - 1
-          && index + 1 < gridCellCount
-          && Math.floor((index + 1) / rowCapacity) === row;
+        const hasRightNeighbor = col < rowCellCount - 1;
         const radii: CornerRadii = {
           tl: (hasTopNeighbor || hasLeftNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
           tr: (hasTopNeighbor || hasRightNeighbor) ? 0 : CELL_CORNER_RADIUS_PX,
@@ -566,15 +683,18 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     if (x < 0 || y < 0) return;
     const row = Math.floor(y / cellSizePx);
     if (row < 0 || row >= rowCount) return;
-    const rowOffset = row === lastRowIndex ? alignmentOffsetPx : 0;
-    const rowCellCount = row === lastRowIndex ? lastRowCount : rowCapacity;
+    const rowModel = gridRows[row];
+    if (!rowModel || rowModel.type !== "items") return;
+    const rowOffset = rowModel.alignmentOffsetPx;
+    const rowCellCount = rowModel.count;
     if (x < rowOffset || x > rowOffset + rowCellCount * cellSizePx) return;
     const col = Math.floor((x - rowOffset) / cellSizePx);
     if (col < 0 || col >= rowCellCount) return;
-    const index = row * rowCapacity + col;
-    if (index < 0 || index >= items.length) return;
-    const item = items[index];
-    const key = itemKeys[index] ?? String(index);
+    const index = rowModel.startIndex + col;
+    if (index < 0 || index >= visibleEntries.length) return;
+    const entry = visibleEntries[index];
+    const item = entry.item;
+    const key = entry.key ?? String(index);
     const isSelected = resolvedSelectedKey != null && key === resolvedSelectedKey;
     if (isSelected) {
       if (allowEmptySelection) {
@@ -588,10 +708,19 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const hoverTitle = React.useMemo(() => {
     if (!getLabel) return undefined;
     if (resolvedSelectedKey == null) return undefined;
-    const index = itemKeys.indexOf(resolvedSelectedKey);
-    if (index < 0) return undefined;
-    return getLabel(items[index], index);
-  }, [getLabel, itemKeys, items, resolvedSelectedKey]);
+    const entry = allEntries.find((candidate) => candidate.key === resolvedSelectedKey);
+    if (!entry) return undefined;
+    return getLabel(entry.item, entry.index);
+  }, [allEntries, getLabel, resolvedSelectedKey]);
+
+  const headerRows = React.useMemo(() => {
+    if (!usesFolders) return [];
+    return gridRows.flatMap((row, rowIndex) => (
+      row.type === "header"
+        ? [{ rowIndex, folderIndex: row.folderIndex, top: rowIndex * cellSizePx }]
+        : []
+    ));
+  }, [cellSizePx, gridRows, usesFolders]);
 
   return (
     <div ref={wrapperRef} className={className} style={wrapperStyle}>
@@ -647,6 +776,59 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
                 onPointerDown={handlePointerDown}
               />
             </div>
+            {usesFolders && headerRows.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: `${totalGridHeightPx}px`,
+                  pointerEvents: "none",
+                  zIndex: 2,
+                }}
+              >
+                {headerRows.map((header) => {
+                  const folder = resolvedFolders[header.folderIndex];
+                  if (!folder) return null;
+                  const collapsed = folder.collapsed ?? internalFolderCollapsed[folder.id] ?? false;
+                  return (
+                    <div
+                      key={`${folder.id}-${header.rowIndex}`}
+                      style={{
+                        position: "absolute",
+                        top: `${header.top}px`,
+                        left: 0,
+                        width: "100%",
+                        height: `${cellSizePx}px`,
+                        pointerEvents: "auto",
+                      }}
+                    >
+                      <Folder
+                        label={folder.label}
+                        collapsed={collapsed}
+                        onCollapseChange={(next) => {
+                          if (folder.collapsed === undefined) {
+                            setInternalFolderCollapsed((prev) => ({ ...prev, [folder.id]: next }));
+                          }
+                          folder.onCollapseChange?.(next);
+                        }}
+                        colorA={folder.colorA ?? colorA}
+                        colorB={folder.colorB ?? colorB}
+                        borderStyle={folder.borderStyle ?? "none"}
+                        fontSize={previewFontSize}
+                        headerHeight={cellSizePx}
+                        padding={0}
+                        verticalGap={0}
+                        keepMounted={false}
+                        showBody={false}
+                        style={{ height: `${cellSizePx}px` }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div style={{ width: "100%", height: `${totalGridHeightPx}px` }} />
           </div>
         </div>

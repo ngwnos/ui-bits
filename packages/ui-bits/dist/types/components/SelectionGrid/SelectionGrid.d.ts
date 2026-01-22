@@ -1,4 +1,5 @@
 import React from "react";
+import { type FolderBorderStyle } from "../Folder/Folder";
 import "./selectionGrid.css";
 export type SelectionGridAlignment = "left" | "center" | "right";
 export type SelectionGridPreview = {
@@ -16,8 +17,20 @@ export type SelectionGridBaseProps = {
     className?: string;
     style?: React.CSSProperties;
 };
-export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
+export type SelectionGridFolder<Item> = {
+    id: string;
+    label: React.ReactNode;
     items: Item[];
+    collapsed?: boolean;
+    defaultCollapsed?: boolean;
+    onCollapseChange?: (collapsed: boolean) => void;
+    colorA?: string;
+    colorB?: string;
+    borderStyle?: FolderBorderStyle;
+};
+export type SelectionGridGridProps<Item> = SelectionGridBaseProps & {
+    items?: Item[];
+    folders?: SelectionGridFolder<Item>[];
     getKey: (item: Item, index: number) => string;
     getPreview: (item: Item, index: number) => SelectionGridPreview;
     getLabel?: (item: Item, index: number) => string;

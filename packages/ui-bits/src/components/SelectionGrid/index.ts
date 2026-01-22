@@ -1,6 +1,7 @@
 export {
   default,
   type SelectionGridAlignment,
+  type SelectionGridFolder,
   type SelectionGridProps,
   type SelectionGridGridProps,
   type SelectionGridPreview,

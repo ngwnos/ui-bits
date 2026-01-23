@@ -49,7 +49,7 @@
     "preview:demo": "bun --cwd apps/demo build && bun --cwd apps/demo preview"
   },
   "peerDependencies": {
-    "lucide-react": "^0.552.0",
+    "lucide-react": "^0.562.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "typegpu": "^0.8.1"

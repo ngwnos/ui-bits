@@ -40,7 +40,7 @@
     "lint": "eslint ."
   },
   "peerDependencies": {
-    "lucide-react": "^0.552.0",
+    "lucide-react": "^0.562.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "typegpu": "^0.8.1"
@@ -56,7 +56,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
     "globals": "^16.4.0",
-    "lucide-react": "^0.552.0",
+    "lucide-react": "^0.562.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "typegpu": "^0.8.1",

@@ -182,6 +182,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const [internalFolderCollapsed, setInternalFolderCollapsed] = React.useState<Record<string, boolean>>({});
   const [internalFolderItems, setInternalFolderItems] = React.useState<Record<string, Item[]>>({});
   const [internalSlotSelection, setInternalSlotSelection] = React.useState<Record<string, string | null>>({});
+  const lastAssignedSlotIdRef = React.useRef<string | null>(null);
   const isControlled = selectedKey !== undefined;
   const resolvedSelectedKey = isControlled ? selectedKey ?? null : internalSelectedKey;
 
@@ -494,10 +495,23 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
           return next;
         });
       }
+      if (nextKey != null) {
+        lastAssignedSlotIdRef.current = slotId;
+      }
       slot.onSelect?.(nextKey, item, index);
     },
     [resolvedSlotSelections],
   );
+
+  const findNextSlot = React.useCallback((slots: SelectionGridSelectionSlot<Item>[]) => {
+    if (slots.length === 0) return null;
+    const lastAssigned = lastAssignedSlotIdRef.current;
+    if (!lastAssigned) return slots[0] ?? null;
+    const index = slots.findIndex((slot) => slot.id === lastAssigned);
+    if (index === -1) return slots[0] ?? null;
+    const nextIndex = (index + 1) % slots.length;
+    return slots[nextIndex] ?? null;
+  }, []);
 
   const workerRef = React.useRef<Worker | null>(null);
   const addInputRefs = React.useRef<Map<string, HTMLInputElement | null>>(new Map());
@@ -958,7 +972,8 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
         }
         return;
       }
-      const targetSlot = resolvedSlotSelections.find((slot) => slot.selectedKey == null) ?? resolvedSlotSelections[0];
+      const targetSlot = resolvedSlotSelections.find((slot) => slot.selectedKey == null)
+        ?? findNextSlot(resolvedSlotSelections);
       if (!targetSlot) return;
       commitSlotSelection(targetSlot.id, key, item, index);
       return;

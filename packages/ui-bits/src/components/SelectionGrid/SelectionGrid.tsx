@@ -343,7 +343,28 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     return entries;
   }, [allEntries, getKey, internalFolderCollapsed, resolvedFolderItems, resolvedFolders, usesFolders]);
 
+  const atlasEntries = React.useMemo(() => {
+    if (!usesFolders) {
+      return allEntries.map((entry) => ({ type: "item", ...entry })) satisfies SelectionGridEntry<Item>[];
+    }
+    const entries: SelectionGridEntry<Item>[] = [];
+    let itemIndex = 0;
+    resolvedFolders.forEach((folder) => {
+      const itemsForFolder = resolvedFolderItems.get(folder.id) ?? folder.items;
+      itemsForFolder.forEach((item) => {
+        const key = getKey(item, itemIndex);
+        entries.push({ type: "item", item, index: itemIndex, key });
+        itemIndex += 1;
+      });
+      if (folder.addTile) {
+        entries.push({ type: "add", folderId: folder.id, key: `add:${folder.id}` });
+      }
+    });
+    return entries;
+  }, [allEntries, getKey, resolvedFolderItems, resolvedFolders, usesFolders]);
+
   const gridCellCount = visibleEntries.length;
+  const atlasEntryCount = atlasEntries.length;
 
   type GridRow =
     | { type: "header"; folderIndex: number; alignmentOffsetPx: number; height: number; top: number }
@@ -662,6 +683,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   React.useEffect(() => {
     requestRender();
   }, [
+    atlasEntries,
     visibleEntries,
     resolvedSelectedKey,
     containerWidth,
@@ -723,63 +745,72 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, viewportWidth, viewportHeight);
 
-    if (gridCellCount === 0) return;
+    if (gridCellCount === 0 && atlasEntryCount === 0) return;
 
     const scrollTop = scrollNode.scrollTop;
     const startRow = Math.max(0, findRowIndex(scrollTop) - 1);
     const endRow = Math.min(rowCount - 1, findRowIndex(scrollTop + viewportHeight) + 1);
     const targetSize = Math.max(1, Math.round(cellSizePx * dpr));
-    const previews: SelectionGridPreview[] = new Array(gridCellCount);
-    const tileKeys: string[] = new Array(gridCellCount);
+    const atlasPreviews: SelectionGridPreview[] = new Array(atlasEntryCount);
+    const atlasTileKeys: string[] = new Array(atlasEntryCount);
+    const atlasIndexByKey = new Map<string, number>();
     const activeImageKeys = new Set<string>();
-    for (let index = 0; index < gridCellCount; index += 1) {
-      const entry = visibleEntries[index];
+    for (let index = 0; index < atlasEntryCount; index += 1) {
+      const entry = atlasEntries[index];
+      atlasIndexByKey.set(entry.key, index);
       if (entry.type === "add") {
         const addColors = folderColors.get(entry.folderId);
-        previews[index] = { type: "color", color: addColors?.colorA ?? colorA };
-        tileKeys[index] = `add:${entry.folderId}|${targetSize}`;
+        atlasPreviews[index] = { type: "color", color: addColors?.colorA ?? colorA };
+        atlasTileKeys[index] = `add:${entry.folderId}|${targetSize}`;
         continue;
       }
       const preview = getPreview(entry.item, entry.index);
-      previews[index] = preview;
+      atlasPreviews[index] = preview;
       if (preview.type === "color") {
-        tileKeys[index] = `color:${preview.color}`;
+        atlasTileKeys[index] = `color:${preview.color}`;
       } else {
         const resolvedSrc = resolveWorkerUrl(preview.src);
         const tileKey = `image:${resolvedSrc}|${targetSize}`;
-        tileKeys[index] = tileKey;
+        atlasTileKeys[index] = tileKey;
         activeImageKeys.add(tileKey);
         tileRequestRef.current.set(tileKey, { src: resolvedSrc, size: targetSize });
       }
     }
-    const atlasColumns = computeAtlasColumns(gridCellCount, targetSize);
-    const atlasRows = Math.max(1, Math.ceil(gridCellCount / atlasColumns));
-    const atlasKey = `${targetSize}|${atlasColumns}|${tileKeys.join("|")}`;
+    const atlasColumns = computeAtlasColumns(Math.max(1, atlasEntryCount), targetSize);
+    const atlasRows = Math.max(1, Math.ceil(Math.max(1, atlasEntryCount) / atlasColumns));
+    const atlasKey = `${targetSize}|${atlasColumns}|${atlasTileKeys.join("|")}`;
     if (atlasSignatureRef.current !== atlasKey) {
       atlasSignatureRef.current = atlasKey;
       prefetchSignatureRef.current = null;
-      const atlasWidth = atlasColumns * targetSize;
-      const atlasHeight = atlasRows * targetSize;
-      const atlasCanvas = createAtlasCanvas(atlasWidth, atlasHeight);
-      atlasCanvasRef.current = atlasCanvas;
-      atlasContextRef.current = atlasCanvas?.getContext("2d") ?? null;
-      atlasLayoutRef.current = {
-        key: atlasKey,
-        columns: atlasColumns,
-        rows: atlasRows,
-        tileSize: targetSize,
-      };
-      drawnIndexRef.current = new Array(gridCellCount).fill("");
-      if (atlasContextRef.current) {
-        atlasContextRef.current.clearRect(0, 0, atlasWidth, atlasHeight);
-        for (let index = 0; index < gridCellCount; index += 1) {
-          const preview = previews[index];
-          if (preview.type !== "color") continue;
-          const x = (index % atlasColumns) * targetSize;
-          const y = Math.floor(index / atlasColumns) * targetSize;
-          atlasContextRef.current.fillStyle = preview.color;
-          atlasContextRef.current.fillRect(x, y, targetSize, targetSize);
-          drawnIndexRef.current[index] = tileKeys[index];
+      if (atlasEntryCount === 0) {
+        atlasCanvasRef.current = null;
+        atlasContextRef.current = null;
+        atlasLayoutRef.current = null;
+        drawnIndexRef.current = [];
+      } else {
+        const atlasWidth = atlasColumns * targetSize;
+        const atlasHeight = atlasRows * targetSize;
+        const atlasCanvas = createAtlasCanvas(atlasWidth, atlasHeight);
+        atlasCanvasRef.current = atlasCanvas;
+        atlasContextRef.current = atlasCanvas?.getContext("2d") ?? null;
+        atlasLayoutRef.current = {
+          key: atlasKey,
+          columns: atlasColumns,
+          rows: atlasRows,
+          tileSize: targetSize,
+        };
+        drawnIndexRef.current = new Array(atlasEntryCount).fill("");
+        if (atlasContextRef.current) {
+          atlasContextRef.current.clearRect(0, 0, atlasWidth, atlasHeight);
+          for (let index = 0; index < atlasEntryCount; index += 1) {
+            const preview = atlasPreviews[index];
+            if (preview.type !== "color") continue;
+            const x = (index % atlasColumns) * targetSize;
+            const y = Math.floor(index / atlasColumns) * targetSize;
+            atlasContextRef.current.fillStyle = preview.color;
+            atlasContextRef.current.fillRect(x, y, targetSize, targetSize);
+            drawnIndexRef.current[index] = atlasTileKeys[index];
+          }
         }
       }
       tileCacheRef.current.forEach((entry, key) => {
@@ -834,20 +865,38 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
         };
         const x = rowOffset + col * cellSizePx;
 
-        const preview = previews[index];
-        const tileKey = tileKeys[index];
+        const addColors = isAddTile ? folderColors.get(entry.folderId) : null;
+        const atlasIndex = atlasIndexByKey.get(entry.key);
+        const preview = atlasIndex != null
+          ? atlasPreviews[atlasIndex]
+          : isAddTile
+            ? ({ type: "color", color: addColors?.colorA ?? colorA } as SelectionGridPreview)
+            : getPreview(entry.item, entry.index);
+        let tileKey = atlasIndex != null ? atlasTileKeys[atlasIndex] : "";
+        if (!tileKey) {
+          if (preview.type === "color") {
+            tileKey = `color:${preview.color}`;
+          } else if (isAddTile) {
+            tileKey = `add:${entry.folderId}|${targetSize}`;
+          } else if (preview.type === "image") {
+            const resolvedSrc = resolveWorkerUrl(preview.src);
+            tileKey = `image:${resolvedSrc}|${targetSize}`;
+            activeImageKeys.add(tileKey);
+            tileRequestRef.current.set(tileKey, { src: resolvedSrc, size: targetSize });
+          }
+        }
         const atlasCanvas = atlasCanvasRef.current;
         const atlasLayout = atlasLayoutRef.current;
         const atlasCtx = atlasContextRef.current;
-        let tileDrawn = drawnIndexRef.current[index] === tileKey;
+        let tileDrawn = atlasIndex != null && drawnIndexRef.current[atlasIndex] === tileKey;
 
         if (!isAddTile && preview.type === "image") {
           const tileEntry = tileCacheRef.current.get(tileKey);
-          if (tileEntry?.status === "ready" && tileEntry.bitmap && atlasCtx && atlasLayout && !tileDrawn) {
-            const atlasX = (index % atlasLayout.columns) * atlasLayout.tileSize;
-            const atlasY = Math.floor(index / atlasLayout.columns) * atlasLayout.tileSize;
+          if (tileEntry?.status === "ready" && tileEntry.bitmap && atlasCtx && atlasLayout && !tileDrawn && atlasIndex != null) {
+            const atlasX = (atlasIndex % atlasLayout.columns) * atlasLayout.tileSize;
+            const atlasY = Math.floor(atlasIndex / atlasLayout.columns) * atlasLayout.tileSize;
             atlasCtx.drawImage(tileEntry.bitmap, atlasX, atlasY, atlasLayout.tileSize, atlasLayout.tileSize);
-            drawnIndexRef.current[index] = tileKey;
+            drawnIndexRef.current[atlasIndex] = tileKey;
             tileDrawn = true;
           }
           if (!tileEntry) {
@@ -861,9 +910,9 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
           }
         }
 
-        if (atlasCanvas && atlasLayout && tileDrawn) {
-          const srcX = (index % atlasLayout.columns) * atlasLayout.tileSize;
-          const srcY = Math.floor(index / atlasLayout.columns) * atlasLayout.tileSize;
+        if (atlasCanvas && atlasLayout && tileDrawn && atlasIndex != null) {
+          const srcX = (atlasIndex % atlasLayout.columns) * atlasLayout.tileSize;
+          const srcY = Math.floor(atlasIndex / atlasLayout.columns) * atlasLayout.tileSize;
           ctx.save();
           buildRoundedRectPath(ctx, x, y, cellSizePx, radii);
           ctx.clip();
@@ -902,7 +951,6 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
           const centerX = x + cellSizePx / 2;
           const centerY = y + cellSizePx / 2;
           const arm = cellSizePx * 0.22;
-          const addColors = folderColors.get(entry.folderId);
           ctx.save();
           ctx.strokeStyle = addColors?.colorB ?? colorB;
           ctx.lineWidth = Math.max(1.5, cellSizePx * 0.08);
@@ -921,11 +969,14 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     if (prefetchSignatureRef.current !== atlasKey) {
       prefetchSignatureRef.current = atlasKey;
       for (let index = 0; index < gridCellCount; index += 1) {
-        const preview = previews[index];
+        const visibleEntry = visibleEntries[index];
+        const atlasIndex = visibleEntry ? atlasIndexByKey.get(visibleEntry.key) : null;
+        if (atlasIndex == null) continue;
+        const preview = atlasPreviews[atlasIndex];
         if (preview.type !== "image") continue;
-        const tileKey = tileKeys[index];
-        const entry = tileCacheRef.current.get(tileKey);
-        if (entry?.status === "ready" || entry?.status === "error" || entry?.status === "loading") continue;
+        const tileKey = atlasTileKeys[atlasIndex];
+        const cacheEntry = tileCacheRef.current.get(tileKey);
+        if (cacheEntry?.status === "ready" || cacheEntry?.status === "error" || cacheEntry?.status === "loading") continue;
         if (pendingRef.current.has(tileKey) || queuedRef.current.has(tileKey)) continue;
         queueRef.current.push(tileKey);
         queuedRef.current.add(tileKey);

@@ -8,6 +8,15 @@ You probably shouldn't use this unless you're me.
 bun add github:ngwnos/ui-bits
 ```
 
+## Development
+
+```sh
+bun install
+bun run dev
+```
+
+The primary playground lives in `apps/docs/`. The installable package entrypoints live at the repo root (`ui-bits`) and export the committed build output under `packages/ui-bits/dist/`.
+
 ## Use in a project
 
 1) Import the stylesheet once.

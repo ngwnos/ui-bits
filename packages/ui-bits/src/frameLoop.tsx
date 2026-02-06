@@ -32,7 +32,6 @@ export const FrameLoopProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   return <FrameLoopContext.Provider value={api}>{children}</FrameLoopContext.Provider>;
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useFrame(fn: FrameSubscriber | null) {
   const ctx = useContext(FrameLoopContext);
   useEffect(() => {

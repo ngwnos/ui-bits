@@ -60,7 +60,7 @@ function loadStoredPresets(raw: string | null): PresetStorePreset[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.map(normalizePreset).filter(Boolean) as PresetStorePreset[];
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -180,7 +180,7 @@ export function PresetStoreProvider({
     });
     try {
       resolvedStorage.setItem(storageKey, JSON.stringify(persistable));
-    } catch (error) {
+    } catch {
       // Ignore storage failures (private mode, quota, etc).
     }
   }, [defaultPresetKeys, internalPresets, isControlled, resolvedStorage, storageKey]);

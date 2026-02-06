@@ -217,7 +217,7 @@ const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((prop
         await navigator.clipboard.writeText(payload);
         return;
       }
-    } catch (error) {
+    } catch {
       // Fall back to legacy copy path.
     }
     const textarea = document.createElement("textarea");

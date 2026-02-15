@@ -103,10 +103,8 @@
 }
 
 .dropdown-root--icon .dropdown-menu {
-  left: 0;
-  right: auto;
   width: max-content;
-  min-width: var(--dropdown-menu-width, 100%);
+  min-width: max(var(--dropdown-menu-width, 100%), var(--dropdown-anchor-width, 0px));
   border-top-width: 1px;
   border-top-color: var(--dropdown-border);
   border-radius: var(--dropdown-radius, 3px);
@@ -117,16 +115,12 @@
 }
 
 .dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  position: fixed;
   box-sizing: border-box;
   background: transparent;
   border-style: solid;
   border-width: 1px;
   border-color: var(--dropdown-border);
-  border-top-width: 0;
   border-right-color: var(--dropdown-border-right, var(--dropdown-border));
   border-bottom-color: var(--dropdown-border-bottom, var(--dropdown-border));
   border-left-color: var(--dropdown-border-left, var(--dropdown-border));
@@ -137,9 +131,65 @@
   flex-direction: column;
   gap: 0;
   max-height: 240px;
-  overflow-y: auto;
   overflow: hidden;
-  z-index: 30;
+  z-index: 1000;
+}
+
+.dropdown-menu__viewport {
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dropdown-menu__viewport::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.dropdown-menu__scrollbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.dropdown-menu:hover .dropdown-menu__scrollbar {
+  opacity: 1;
+}
+
+.dropdown-menu__scrollbar-thumb {
+  width: 100%;
+  border-radius: 999px;
+  background: var(--dropdown-text);
+}
+
+.dropdown-menu[data-placement="down"] {
+  border-top-width: 0;
+  border-radius: 0 0 var(--dropdown-radius, 3px) var(--dropdown-radius, 3px);
+}
+
+.dropdown-menu[data-placement="up"] {
+  transform: translateY(-100%);
+  border-top-width: 1px;
+  border-bottom-width: 0;
+  border-radius: var(--dropdown-radius, 3px) var(--dropdown-radius, 3px) 0 0;
+}
+
+.dropdown-root--icon .dropdown-menu[data-placement="down"] {
+  border-top-width: 1px;
+  border-radius: var(--dropdown-radius, 3px);
+}
+
+.dropdown-root--icon .dropdown-menu[data-placement="up"] {
+  border-bottom-width: 1px;
+  border-radius: var(--dropdown-radius, 3px);
 }
 
 .dropdown-option {

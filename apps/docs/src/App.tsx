@@ -648,6 +648,15 @@ function App() {
     { value: 'triangle', label: 'Triangle' },
     { value: 'square', label: 'Square', disabled: true },
   ]), [])
+  const nestedDropdownOptions = useMemo(() => (
+    Array.from({ length: 24 }, (_, index) => {
+      const number = String(index + 1).padStart(2, '0')
+      return {
+        value: `destination-${number}`,
+        label: `Destination ${number} - Macro ${number}`,
+      }
+    })
+  ), [])
   const iconDropdownOptions = useMemo(() => ([
     { value: 'drizzle', label: 'Drizzle', icon: <CloudDrizzle /> },
     { value: 'lightning', label: 'Lightning', icon: <CloudLightning /> },
@@ -656,6 +665,7 @@ function App() {
   ]), [])
   const [waveformValue, setWaveformValue] = useState('sine')
   const [iconDropdownValue, setIconDropdownValue] = useState('drizzle')
+  const [nestedDropdownValue, setNestedDropdownValue] = useState('destination-01')
   const themeOptions = useMemo(() => ([
     {
       value: 'dark',
@@ -1525,6 +1535,35 @@ function App() {
                     width={200}
                     showMenuIcons
                   />
+                  <FloatingPanel
+                    title="Nested Dropdown Demo"
+                    colorA={flexoki.purple['600']}
+                    colorB={flexoki.purple['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                    width={320}
+                    verticalGap={6}
+                    paddingLeft={3}
+                    paddingRight={3}
+                    paddingBottom={3}
+                  >
+                    <Folder
+                      label="Folder Container"
+                      colorA={flexoki.purple['600']}
+                      colorB={flexoki.purple['100']}
+                    >
+                      <Dropdown
+                        label="Long Menu"
+                        options={nestedDropdownOptions}
+                        value={nestedDropdownValue}
+                        onChange={(value) => setNestedDropdownValue(value)}
+                        colorA={flexoki.purple['600']}
+                        colorB={flexoki.purple['100']}
+                        borderStyle="a"
+                        fontSize={12}
+                      />
+                    </Folder>
+                  </FloatingPanel>
                 </div>
                 <div className="docs-code-stack">
                   <CodeBlock code={activeRoute.code} />
@@ -1545,6 +1584,41 @@ function App() {
   fontSize={12}
   showMenuIcons
 />`}
+                  />
+                  <CodeBlock
+                    code={`const longOptions = Array.from({ length: 24 }, (_, index) => {
+  const number = String(index + 1).padStart(2, "0")
+  return {
+    value: \`destination-\${number}\`,
+    label: \`Destination \${number} - Macro \${number}\`,
+  }
+})
+
+<FloatingPanel
+  title="Nested Dropdown Demo"
+  colorA={flexoki.purple["600"]}
+  colorB={flexoki.purple["100"]}
+  borderStyle="a"
+  fontSize={12}
+  width={320}
+>
+  <Folder
+    label="Folder Container"
+    colorA={flexoki.purple["600"]}
+    colorB={flexoki.purple["100"]}
+  >
+    <Dropdown
+      label="Long Menu"
+      options={longOptions}
+      value={nestedDropdownValue}
+      onChange={(value) => setNestedDropdownValue(value)}
+      colorA={flexoki.purple["600"]}
+      colorB={flexoki.purple["100"]}
+      borderStyle="a"
+      fontSize={12}
+    />
+  </Folder>
+</FloatingPanel>`}
                   />
                 </div>
               </div>

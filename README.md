@@ -24,7 +24,7 @@ The primary playground lives in `apps/docs/`. The installable package entrypoint
 3) Use the components you need.
 
 ```tsx
-import { FrameLoopProvider, LFOSlider, ColorField } from "ui-bits";
+import { FrameLoopProvider, LFOSlider, ColorField } from "ui-bits/core";
 import "ui-bits/style.css";
 
 export default function App() {
@@ -50,5 +50,19 @@ export default function App() {
   );
 }
 ```
+
+If you need audio instrument features, import those from the audio entry:
+
+```tsx
+import { VirtualKeyboard } from "ui-bits/audio";
+```
+
+Install optional audio peers when you need playback:
+
+```sh
+bun add tone soundfont-player
+```
+
+The root entry (`ui-bits`) remains available and still exports the full surface area for backward compatibility.
 
 If you don’t need animation updates, you can still wrap once and ignore it elsewhere. The stylesheet is required for the internal utility classes.

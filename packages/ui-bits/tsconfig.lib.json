@@ -9,6 +9,8 @@
   },
   "include": [
     "src/library.ts",
+    "src/core.ts",
+    "src/audio.ts",
     "src/components/LFOSlider/**/*",
     "src/components/SelectionGrid/**/*",
     "src/components/Dropdown/**/*",

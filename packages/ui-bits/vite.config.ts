@@ -7,10 +7,14 @@ export default defineConfig({
   plugins: [react()],
   build: {
     lib: {
-      entry: path.resolve(__dirname, "src/library.ts"),
-      name: "LFOSlider",
+      entry: {
+        lfoslider: path.resolve(__dirname, "src/library.ts"),
+        core: path.resolve(__dirname, "src/core.ts"),
+        audio: path.resolve(__dirname, "src/audio.ts"),
+      },
+      name: "UIBits",
       formats: ["es", "cjs"],
-      fileName: (format) => `lfoslider.${format}.js`,
+      fileName: (format, entryName) => `${entryName}.${format}.js`,
     },
     rollupOptions: {
       external: [
@@ -20,6 +24,8 @@ export default defineConfig({
         "react/jsx-dev-runtime",
         "lucide-react",
         "typegpu",
+        "tone",
+        "soundfont-player",
       ],
       output: {
         globals: {

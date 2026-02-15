@@ -7,6 +7,9 @@
   "module": "./packages/ui-bits/dist/lfoslider.es.js",
   "types": "./packages/ui-bits/dist/types/library.d.ts",
   "style": "./packages/ui-bits/dist/ui-bits-internal.css",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "files": [
     "packages/ui-bits/dist"
   ],
@@ -17,20 +20,35 @@
       "require": "./packages/ui-bits/dist/lfoslider.cjs.js"
     },
     "./style.css": "./packages/ui-bits/dist/ui-bits-internal.css",
+    "./core": {
+      "types": "./packages/ui-bits/dist/types/core.d.ts",
+      "import": "./packages/ui-bits/dist/core.es.js",
+      "require": "./packages/ui-bits/dist/core.cjs.js"
+    },
+    "./audio": {
+      "types": "./packages/ui-bits/dist/types/audio.d.ts",
+      "import": "./packages/ui-bits/dist/audio.es.js",
+      "require": "./packages/ui-bits/dist/audio.cjs.js"
+    },
     "./components/LFOSlider": {
       "types": "./packages/ui-bits/dist/types/components/LFOSlider/LFOSlider.d.ts",
-      "import": "./packages/ui-bits/dist/lfoslider.es.js",
-      "require": "./packages/ui-bits/dist/lfoslider.cjs.js"
+      "import": "./packages/ui-bits/dist/core.es.js",
+      "require": "./packages/ui-bits/dist/core.cjs.js"
     },
     "./components/SelectionGrid": {
       "types": "./packages/ui-bits/dist/types/components/SelectionGrid/SelectionGrid.d.ts",
-      "import": "./packages/ui-bits/dist/lfoslider.es.js",
-      "require": "./packages/ui-bits/dist/lfoslider.cjs.js"
+      "import": "./packages/ui-bits/dist/core.es.js",
+      "require": "./packages/ui-bits/dist/core.cjs.js"
     },
     "./components/Dropdown": {
       "types": "./packages/ui-bits/dist/types/components/Dropdown/Dropdown.d.ts",
-      "import": "./packages/ui-bits/dist/lfoslider.es.js",
-      "require": "./packages/ui-bits/dist/lfoslider.cjs.js"
+      "import": "./packages/ui-bits/dist/core.es.js",
+      "require": "./packages/ui-bits/dist/core.cjs.js"
+    },
+    "./components/VirtualKeyboard": {
+      "types": "./packages/ui-bits/dist/types/components/VirtualKeyboard/VirtualKeyboard.d.ts",
+      "import": "./packages/ui-bits/dist/audio.es.js",
+      "require": "./packages/ui-bits/dist/audio.cjs.js"
     },
     "./package.json": "./package.json"
   },
@@ -52,10 +70,16 @@
     "lucide-react": "^0.562.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "soundfont-player": "^0.12.0",
+    "tone": "^15.1.22",
     "typegpu": "^0.9.0"
   },
-  "dependencies": {
-    "soundfont-player": "^0.12.0",
-    "tone": "^15.1.22"
+  "peerDependenciesMeta": {
+    "soundfont-player": {
+      "optional": true
+    },
+    "tone": {
+      "optional": true
+    }
   }
 }

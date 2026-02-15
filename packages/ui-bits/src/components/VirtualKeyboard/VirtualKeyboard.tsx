@@ -1,8 +1,5 @@
 import React from "react";
 import { MousePointer2, CaseUpper, Piano } from "lucide-react";
-import * as Soundfont from "soundfont-player";
-import type { Player as SoundfontPlayer } from "soundfont-player";
-import * as Tone from "tone";
 import { usePanelTheme } from "../../panelGap";
 import { useControlValue, useResolvedControlIdPrefix } from "../../controlStore";
 import IconButton from "../IconButton";
@@ -231,6 +228,64 @@ const KEYBOARD_SHORTCUTS = [
 ];
 
 type SoundfontNote = { stop?: (when?: number) => void };
+type ToneContextLike = { dispose: () => void };
+type ToneSynthLike = {
+  triggerAttack: (note: string) => void;
+  triggerRelease: (note: string) => void;
+  releaseAll: () => void;
+  disconnect: () => void;
+  dispose: () => void;
+  connect: (destination: AudioNode) => void;
+  toDestination: () => void;
+  volume: { value: number };
+  maxPolyphony: number;
+};
+type ToneModuleLike = {
+  start: () => Promise<void>;
+  Context: new (options: { context: AudioContext }) => ToneContextLike;
+  getContext: () => unknown;
+  setContext: (context: unknown) => void;
+  PolySynth: new (voice: unknown, options?: { envelope?: unknown }) => ToneSynthLike;
+  Synth: unknown;
+};
+type SoundfontPlayerLike = {
+  start: (note: string, when?: number) => SoundfontNote | undefined;
+  connect?: (destination: AudioNode) => unknown;
+};
+type SoundfontModuleLike = {
+  instrument: (
+    context: AudioContext,
+    name: string,
+    options?: Record<string, unknown>,
+  ) => Promise<SoundfontPlayerLike>;
+};
+
+let toneModulePromise: Promise<ToneModuleLike> | null = null;
+let soundfontModulePromise: Promise<SoundfontModuleLike> | null = null;
+
+function createMissingAudioDependencyError(dependency: string, error: unknown) {
+  const reason = error instanceof Error ? error.message : String(error);
+  return new Error(
+    `[ui-bits] Missing optional audio dependency "${dependency}". `
+    + `Install "${dependency}" to use VirtualKeyboard audio playback. (${reason})`,
+  );
+}
+
+async function loadToneModule() {
+  if (!toneModulePromise) {
+    toneModulePromise = import("tone")
+      .then((module) => module as unknown as ToneModuleLike);
+  }
+  return toneModulePromise;
+}
+
+async function loadSoundfontModule() {
+  if (!soundfontModulePromise) {
+    soundfontModulePromise = import("soundfont-player")
+      .then((module) => module as unknown as SoundfontModuleLike);
+  }
+  return soundfontModulePromise;
+}
 
 function shouldIgnoreKeyboardEvent(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -388,20 +443,25 @@ export default function VirtualKeyboard({
   const pressedKeysRef = React.useRef<Map<string, string>>(new Map());
   const activeNoteKeysRef = React.useRef<Set<string>>(new Set());
   const soundfontStateRef = React.useRef<{
-    instrument: SoundfontPlayer;
+    instrument: SoundfontPlayerLike;
     context: AudioContext;
     destination: AudioNode;
     ownsContext: boolean;
   } | null>(null);
   const toneStateRef = React.useRef<{
-    synth: Tone.PolySynth<Tone.Synth>;
+    toneModule: ToneModuleLike;
+    synth: ToneSynthLike;
     context: AudioContext;
     destination: AudioNode;
     ownsContext: boolean;
-    toneContext: Tone.Context;
+    toneContext: ToneContextLike;
   } | null>(null);
   const soundfontNotesRef = React.useRef<Map<string, SoundfontNote>>(new Map());
+  const [audioDependencyError, setAudioDependencyError] = React.useState<Error | null>(null);
   const [internalActive, setInternalActive] = React.useState<Record<string, boolean>>({});
+  if (audioDependencyError) {
+    throw audioDependencyError;
+  }
   const resolvedActive = activeNotes ?? internalActive;
   const resolvedNoteCountClamped = Math.max(1, Math.min(88, Math.round(resolvedNoteCount)));
   const derivedKeys = React.useMemo<{
@@ -510,7 +570,7 @@ export default function VirtualKeyboard({
         if (toneState.context.state === "suspended") {
           void toneState.context.resume().catch(() => {});
         }
-        void Tone.start().catch(() => {});
+        void toneState.toneModule.start().catch(() => {});
         toneState.synth.triggerAttack(note);
       } else {
         const soundfontState = soundfontStateRef.current;
@@ -605,53 +665,78 @@ export default function VirtualKeyboard({
       toneStateRef.current = null;
       return undefined;
     }
-    const destination = toneDestination;
-    const destinationContext = destination?.context;
-    const resolvedContext = toneContext
-      ?? (destinationContext instanceof AudioContext ? destinationContext : null)
-      ?? new AudioContext();
-    const context = resolvedContext;
-    const ownsContext = !toneContext && !destination;
-    const toneContextInstance = new Tone.Context({ context });
-    const previousContext = Tone.getContext();
-    Tone.setContext(toneContextInstance);
-    const envelope = {
-      attack: toneAttack ?? 0.01,
-      decay: toneDecay ?? 0.1,
-      sustain: toneSustain ?? 0.3,
-      release: toneRelease ?? 0.8,
-    };
-    const synth = new Tone.PolySynth(Tone.Synth, { envelope });
-    synth.maxPolyphony = tonePolyphony;
-    if (toneVolume !== undefined) {
-      synth.volume.value = toneVolume;
-    }
-    if (destination && destination !== context.destination) {
-      synth.connect(destination);
-    } else {
-      synth.toDestination();
-    }
-    clearAllNotesRef.current();
-    toneStateRef.current = {
-      synth,
-      context,
-      destination: destination ?? context.destination,
-      ownsContext,
-      toneContext: toneContextInstance,
-    };
-    return () => {
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+    void (async () => {
+      let toneModule: ToneModuleLike;
+      try {
+        toneModule = await loadToneModule();
+      } catch (error) {
+        if (!cancelled) {
+          setAudioDependencyError(createMissingAudioDependencyError("tone", error));
+        }
+        return;
+      }
+      if (cancelled) {
+        toneStateRef.current = null;
+        return;
+      }
+      const destination = toneDestination;
+      const destinationContext = destination?.context;
+      const resolvedContext = toneContext
+        ?? (destinationContext instanceof AudioContext ? destinationContext : null)
+        ?? new AudioContext();
+      const context = resolvedContext;
+      const ownsContext = !toneContext && !destination;
+      const toneContextInstance = new toneModule.Context({ context }) as ToneContextLike;
+      const previousContext = toneModule.getContext();
+      toneModule.setContext(toneContextInstance);
+      const envelope = {
+        attack: toneAttack ?? 0.01,
+        decay: toneDecay ?? 0.1,
+        sustain: toneSustain ?? 0.3,
+        release: toneRelease ?? 0.8,
+      };
+      const synth = new toneModule.PolySynth(toneModule.Synth, { envelope }) as ToneSynthLike;
+      synth.maxPolyphony = tonePolyphony;
+      if (toneVolume !== undefined) {
+        synth.volume.value = toneVolume;
+      }
+      if (destination && destination !== context.destination) {
+        synth.connect(destination);
+      } else {
+        synth.toDestination();
+      }
       clearAllNotesRef.current();
-      synth.releaseAll();
-      synth.disconnect();
-      synth.dispose();
-      toneStateRef.current = null;
-      if (Tone.getContext() === toneContextInstance) {
-        Tone.setContext(previousContext);
+      toneStateRef.current = {
+        toneModule,
+        synth,
+        context,
+        destination: destination ?? context.destination,
+        ownsContext,
+        toneContext: toneContextInstance,
+      };
+      cleanup = () => {
+        clearAllNotesRef.current();
+        synth.releaseAll();
+        synth.disconnect();
+        synth.dispose();
+        toneStateRef.current = null;
+        if (toneModule.getContext() === toneContextInstance) {
+          toneModule.setContext(previousContext);
+        }
+        if (ownsContext) {
+          toneContextInstance.dispose();
+          void context.close().catch(() => {});
+        }
+      };
+      if (cancelled) {
+        cleanup();
       }
-      if (ownsContext) {
-        toneContextInstance.dispose();
-        void context.close().catch(() => {});
-      }
+    })();
+    return () => {
+      cancelled = true;
+      cleanup?.();
     };
   }, [
     resolvedTone,
@@ -675,90 +760,112 @@ export default function VirtualKeyboard({
       return undefined;
     }
     let cancelled = false;
-    const destination = soundfontDestination;
-    const destinationContext = destination?.context;
-    const resolvedContext = soundfontContext
-      ?? (destinationContext instanceof AudioContext ? destinationContext : null)
-      ?? new AudioContext();
-    const context = resolvedContext;
-    const ownsContext = !soundfontContext && !destination;
-    const baseUrl = soundfontUrl ? soundfontUrl.replace(/\/$/, "") : null;
-    const options: Record<string, unknown> = {};
-    if (soundfontName) {
-      options.soundfont = soundfontName;
-    }
-    if (soundfontFormat) {
-      options.format = soundfontFormat;
-    }
-    if (soundfontGain !== undefined) {
-      options.gain = soundfontGain;
-    }
-    if (soundfontAttack !== undefined) {
-      options.attack = soundfontAttack;
-    }
-    if (soundfontDecay !== undefined) {
-      options.decay = soundfontDecay;
-    }
-    if (soundfontSustain !== undefined) {
-      options.sustain = soundfontSustain;
-    }
-    if (soundfontRelease !== undefined) {
-      options.release = soundfontRelease;
-    }
-    if (soundfontNotes !== undefined) {
-      options.notes = soundfontNotes;
-    }
-    if (!soundfontMonitor && destination) {
-      options.destination = destination;
-    }
-    if (baseUrl) {
-      options.nameToUrl = (name: string, sf?: string, format?: string) => {
-        const resolvedSoundfont = sf ?? soundfontName ?? "MusyngKite";
-        const resolvedFormat = format === "ogg" ? "ogg" : (soundfontFormat ?? "mp3");
-        return `${baseUrl}/${resolvedSoundfont}/${name}-${resolvedFormat}.js`;
-      };
-    }
-    clearAllNotesRef.current();
-    soundfontNotesRef.current.forEach((entry) => {
-      if (entry?.stop) {
-        entry.stop(context.currentTime);
-      }
-    });
-    soundfontNotesRef.current.clear();
-    soundfontStateRef.current = null;
-    const instrumentName = soundfontInstrument as Parameters<typeof Soundfont.instrument>[1];
-    Soundfont.instrument(context, instrumentName, options)
-      .then((instrument) => {
-        if (cancelled) return;
-        if (destination && (soundfontMonitor || options.destination !== destination)) {
-          if (destination !== context.destination) {
-            instrument.connect(destination);
-          }
+    let cleanup: (() => void) | undefined;
+    void (async () => {
+      let soundfontModule: SoundfontModuleLike;
+      try {
+        soundfontModule = await loadSoundfontModule();
+      } catch (error) {
+        if (!cancelled) {
+          setAudioDependencyError(createMissingAudioDependencyError("soundfont-player", error));
         }
-        soundfontStateRef.current = {
-          instrument,
-          context,
-          destination: destination ?? context.destination,
-          ownsContext,
-        };
-      })
-      .catch(() => {
-        if (cancelled) return;
+        return;
+      }
+      if (cancelled) {
         soundfontStateRef.current = null;
-      });
-    return () => {
-      cancelled = true;
+        return;
+      }
+      const destination = soundfontDestination;
+      const destinationContext = destination?.context;
+      const resolvedContext = soundfontContext
+        ?? (destinationContext instanceof AudioContext ? destinationContext : null)
+        ?? new AudioContext();
+      const context = resolvedContext;
+      const ownsContext = !soundfontContext && !destination;
+      const baseUrl = soundfontUrl ? soundfontUrl.replace(/\/$/, "") : null;
+      const options: Record<string, unknown> = {};
+      if (soundfontName) {
+        options.soundfont = soundfontName;
+      }
+      if (soundfontFormat) {
+        options.format = soundfontFormat;
+      }
+      if (soundfontGain !== undefined) {
+        options.gain = soundfontGain;
+      }
+      if (soundfontAttack !== undefined) {
+        options.attack = soundfontAttack;
+      }
+      if (soundfontDecay !== undefined) {
+        options.decay = soundfontDecay;
+      }
+      if (soundfontSustain !== undefined) {
+        options.sustain = soundfontSustain;
+      }
+      if (soundfontRelease !== undefined) {
+        options.release = soundfontRelease;
+      }
+      if (soundfontNotes !== undefined) {
+        options.notes = soundfontNotes;
+      }
+      if (!soundfontMonitor && destination) {
+        options.destination = destination;
+      }
+      if (baseUrl) {
+        options.nameToUrl = (name: string, sf?: string, format?: string) => {
+          const resolvedSoundfont = sf ?? soundfontName ?? "MusyngKite";
+          const resolvedFormat = format === "ogg" ? "ogg" : (soundfontFormat ?? "mp3");
+          return `${baseUrl}/${resolvedSoundfont}/${name}-${resolvedFormat}.js`;
+        };
+      }
       clearAllNotesRef.current();
       soundfontNotesRef.current.forEach((entry) => {
         if (entry?.stop) {
-          entry.stop();
+          entry.stop(context.currentTime);
         }
       });
       soundfontNotesRef.current.clear();
       soundfontStateRef.current = null;
-      if (ownsContext) {
-        void context.close().catch(() => {});
+      const instrumentName = soundfontInstrument;
+      soundfontModule.instrument(context, instrumentName, options)
+        .then((instrument) => {
+          if (cancelled) return;
+          if (destination && (soundfontMonitor || options.destination !== destination)) {
+            if (destination !== context.destination && typeof instrument.connect === "function") {
+              instrument.connect(destination);
+            }
+          }
+          soundfontStateRef.current = {
+            instrument,
+            context,
+            destination: destination ?? context.destination,
+            ownsContext,
+          };
+        })
+        .catch(() => {
+          if (cancelled) return;
+          soundfontStateRef.current = null;
+        });
+      cleanup = () => {
+        clearAllNotesRef.current();
+        soundfontNotesRef.current.forEach((entry) => {
+          if (entry?.stop) {
+            entry.stop();
+          }
+        });
+        soundfontNotesRef.current.clear();
+        soundfontStateRef.current = null;
+        if (ownsContext) {
+          void context.close().catch(() => {});
+        }
+      };
+      if (cancelled) {
+        cleanup();
       }
+    })();
+    return () => {
+      cancelled = true;
+      cleanup?.();
     };
   }, [
     soundfontInstrument,

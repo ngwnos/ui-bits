@@ -26,3 +26,5 @@ dist-ssr
 *.sw?
 !packages/ui-bits/dist/
 !packages/ui-bits/dist/**
+
+.tmuxp

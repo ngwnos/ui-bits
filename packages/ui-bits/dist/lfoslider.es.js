@@ -12476,12 +12476,6 @@ function Va(n, e) {
     Reflect.has(n, t) && delete n[t];
   }), n;
 }
-/**
- * Tone.js
- * @author Yotam Mann
- * @license http://opensource.org/licenses/MIT MIT License
- * @copyright 2014-2024 Yotam Mann
- */
 class Rr {
   constructor() {
     this.debug = !1, this._wasDisposed = !1;

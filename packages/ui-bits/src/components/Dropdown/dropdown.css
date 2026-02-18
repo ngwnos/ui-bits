@@ -146,7 +146,7 @@
   border-bottom-color: var(--dropdown-border-bottom, var(--dropdown-border));
   border-left-color: var(--dropdown-border-left, var(--dropdown-border));
   border-radius: 0 0 var(--dropdown-radius, 3px) var(--dropdown-radius, 3px);
-  box-shadow: none;
+  box-shadow: var(--dropdown-shadow, none);
   padding: 0;
   display: flex;
   flex-direction: column;

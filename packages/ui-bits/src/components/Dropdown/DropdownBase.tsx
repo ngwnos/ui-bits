@@ -90,6 +90,7 @@ const MENU_MIN_HEIGHT = 40;
 const MENU_VIEWPORT_MARGIN = 6;
 const MENU_BORDER_ALLOWANCE = 2;
 const MENU_OPTION_PADDING_X_REM = 1.25;
+const DROPDOWN_POPUP_SHADOW = "0 8px 20px rgba(0,0,0,0.2)";
 
 type DropdownMenuPlacement = "up" | "down";
 
@@ -335,7 +336,6 @@ export default function DropdownBase({
   });
   const maskedBorderColor = resolvedBorderStyle === "none" ? "transparent" : surfaceColor;
   const mutedColor = colorWithAlpha(textColor, 0.7);
-  const highlightShadow = colorWithAlpha(textColor, 0.25);
   const placeholderColor = colorWithAlpha(textColor, 0.5);
   const focusOverlay = colorWithAlpha(textColor, 0.2, "16,15,15");
 
@@ -356,7 +356,7 @@ export default function DropdownBase({
     "--dropdown-text": textColor,
     "--dropdown-muted": mutedColor,
     "--dropdown-placeholder": placeholderColor,
-    "--dropdown-shadow": highlightShadow,
+    "--dropdown-shadow": DROPDOWN_POPUP_SHADOW,
     "--dropdown-inverse-surface": inverseSurface,
     "--dropdown-inverse-text": inverseText,
     "--dropdown-focus-overlay": focusOverlay,

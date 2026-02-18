@@ -55,6 +55,12 @@ export {
 export { useListScrollMetrics } from "./ListSurface";
 export { default as ListRow, type ListRowProps } from "./ListRow";
 export {
+  default as KeyValueRows,
+  type KeyValueRowsProps,
+  type KeyValueRowsRow,
+  type KeyValueRowsBorderStyle,
+} from "./KeyValueRows";
+export {
   default as RadioList,
   type RadioListProps,
   type RadioListOption,

@@ -87,6 +87,12 @@ export {
 } from "./components/ListSurface";
 export { default as ListRow, type ListRowProps } from "./components/ListRow";
 export {
+  default as KeyValueRows,
+  type KeyValueRowsProps,
+  type KeyValueRowsRow,
+  type KeyValueRowsBorderStyle,
+} from "./components/KeyValueRows";
+export {
   default as RadioList,
   type RadioListProps,
   type RadioListOption,

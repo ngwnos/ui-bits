@@ -11,6 +11,7 @@ import {
   Folder,
   FrameLoopProvider,
   IconButton,
+  KeyValueRows,
   LFOSlider,
   LoadingBar,
   PresetManager,
@@ -115,6 +116,25 @@ const [value, setValue] = useState("balanced");
   onChange={(nextValue) => setValue(nextValue)}
   colorA={flexoki.blue["600"]}
   colorB={flexoki.blue["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>`,
+  },
+  {
+    id: 'key-value-rows',
+    label: 'Key/Value Rows',
+    title: 'Key/Value Rows',
+    code: `const rows = [
+  { key: "status", label: "Status", value: "Available" },
+  { key: "fps", label: "FPS", value: "60" },
+  { key: "adapter", label: "Adapter", value: "Default" },
+  { key: "max-tex-2d", label: "Max Texture 2D", value: "8,192" },
+];
+
+<KeyValueRows
+  rows={rows}
+  colorA={flexoki.green["600"]}
+  colorB={flexoki.green["100"]}
   borderStyle="a"
   fontSize={12}
 />`,
@@ -686,6 +706,20 @@ function App() {
     { value: 'safe', label: 'Safe' },
     { value: 'turbo', label: 'Turbo' },
     { value: 'custom', label: 'Custom' },
+  ]), [])
+  const keyValueRowsData = useMemo(() => ([
+    { key: 'status', label: 'Status', value: 'Available' },
+    { key: 'fps', label: 'FPS', value: '60' },
+    { key: 'adapter', label: 'Adapter', value: 'Default' },
+    { key: 'max-tex-2d', label: 'Max Texture 2D', value: '8,192' },
+    { key: 'max-tex-3d', label: 'Max Texture 3D', value: '2,048' },
+    { key: 'max-buffer', label: 'Max Buffer Size', value: '256 MB' },
+  ]), [])
+  const keyValueRowsStats = useMemo(() => ([
+    { key: 'map-size', label: 'Map Size', value: '05 / 10' },
+    { key: 'cities', label: 'Cities', value: '12 / 24' },
+    { key: 'characters', label: 'Characters', value: '28 / 50' },
+    { key: 'side-quests', label: 'Side Quests', value: '09 / 20' },
   ]), [])
   const dropdownOptions = useMemo(() => ([
     { value: 'sine', label: 'Sine' },
@@ -1621,6 +1655,50 @@ function App() {
                   Use <code>defaultValue</code> for uncontrolled usage, or <code>value</code> with{' '}
                   <code>onChange</code> to bind it to app state. Set <code>columns</code> for denser
                   option layouts.
+                </p>
+              </div>
+            </>
+          ) : activeRouteId === 'key-value-rows' ? (
+            <>
+              <div className="docs-code-section">
+                <div className="docs-radio-stack">
+                  <KeyValueRows
+                    rows={keyValueRowsData}
+                    colorA={flexoki.green['600']}
+                    colorB={flexoki.green['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <KeyValueRows
+                    rows={keyValueRowsStats}
+                    colorA={flexoki.purple['600']}
+                    colorB={flexoki.purple['100']}
+                    borderStyle="b"
+                    fontSize={12}
+                  />
+                </div>
+                <div className="docs-code-stack">
+                  <CodeBlock code={activeRoute.code} />
+                  <CodeBlock
+                    code={`<KeyValueRows
+  rows={rows}
+  colorA={flexoki.purple["600"]}
+  colorB={flexoki.purple["100"]}
+  borderStyle="b"
+  fontSize={12}
+  rowHeight={26}
+/>`}
+                  />
+                </div>
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  KeyValueRows is a single bordered surface for status/detail pairs. Rows are joined
+                  with internal separators, so there is no inter-row gap and only the outer corners are rounded.
+                </p>
+                <p>
+                  Use it when you need <code>label:value</code> data presentation instead of selectable
+                  list items. It inherits panel theme colors and font size by default.
                 </p>
               </div>
             </>

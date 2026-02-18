@@ -1,13 +1,13 @@
 import { jsx as a, jsxs as P, Fragment as gn } from "react/jsx-runtime";
 import o from "react";
 import { MousePointer2 as wn, CaseUpper as Mn, Piano as En } from "lucide-react";
-import { ag as Sn, d as kn, V as Nn, ah as In, I as Ln, X as De } from "./FloatingPanel-DwnPWYI1.js";
-const Et = "C4", An = 13, Pn = 6, Rn = !1, Tn = "tonejs", Dn = 18, Kn = "#f2f0e5", Un = "#1c1b1a", St = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"], On = /* @__PURE__ */ new Set([1, 3, 6, 8, 10]), kt = /* @__PURE__ */ new Set([0, 2, 4, 5, 7, 9, 11]), $n = 21, V = (() => {
+import { ah as Sn, d as kn, X as Nn, ai as In, I as Ln, Y as De } from "./FloatingPanel-C8Z5HD0j.js";
+const Et = "C4", An = 13, Pn = 6, Rn = !1, Tn = "tonejs", Dn = 18, Kn = "#f2f0e5", Un = "#1c1b1a", St = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"], On = /* @__PURE__ */ new Set([1, 3, 6, 8, 10]), kt = /* @__PURE__ */ new Set([0, 2, 4, 5, 7, 9, 11]), $n = 21, H = (() => {
   const s = [];
   for (let i = 0; i <= 127; i += 1)
     kt.has(i % 12) && s.push(i);
   return s;
-})(), B = Math.max(0, V.indexOf($n));
+})(), B = Math.max(0, H.indexOf($n));
 function Fe(s) {
   const i = Math.round(s), l = St[(i % 12 + 12) % 12], b = Math.floor(i / 12) - 1;
   return `${l}${b}`;
@@ -102,10 +102,10 @@ function Mt(s, i) {
     `[ui-bits] Missing optional audio dependency "${s}". Install "${s}" to use VirtualKeyboard audio playback. (${l})`
   );
 }
-async function Vn() {
+async function Hn() {
   return Oe || (Oe = import("tone").then((s) => s)), Oe;
 }
-async function Hn() {
+async function Vn() {
   return $e || ($e = import("soundfont-player").then((s) => s)), $e;
 }
 function zn(s) {
@@ -138,8 +138,8 @@ function Qn({
   onHeightUnitsChange: It,
   showControls: he = !0,
   showHeightControl: Lt = !0,
-  instrumentOptions: Ve = [],
-  soundfontOptions: He = [],
+  instrumentOptions: He = [],
+  soundfontOptions: Ve = [],
   instrument: At,
   defaultInstrument: Pt,
   onInstrumentChange: Rt,
@@ -153,8 +153,8 @@ function Qn({
   colorB: $t,
   whiteKeyColor: Ft,
   blackKeyColor: Bt,
-  whiteKeyActiveColor: Vt,
-  blackKeyActiveColor: Ht,
+  whiteKeyActiveColor: Ht,
+  blackKeyActiveColor: Vt,
   dialIndicatorColor: me,
   soundfont: be,
   tone: ne,
@@ -171,7 +171,7 @@ function Qn({
   fontSize: Yt,
   ariaLabel: Ge = "Virtual keyboard"
 }) {
-  const pe = Sn(jt, Ge), H = o.useCallback((e) => We?.[e] ?? (pe ? `${pe}.${e}` : void 0), [We, pe]), Jt = H("startNote"), Qt = H("noteCount"), Zt = H("heightUnits"), en = H("showLabels"), tn = H("keyboardShortcutsEnabled"), nn = H("instrument"), [oe, Xe] = W(
+  const pe = Sn(jt, Ge), V = o.useCallback((e) => We?.[e] ?? (pe ? `${pe}.${e}` : void 0), [We, pe]), Jt = V("startNote"), Qt = V("noteCount"), Zt = V("heightUnits"), en = V("showLabels"), tn = V("keyboardShortcutsEnabled"), nn = V("instrument"), [oe, Xe] = W(
     l,
     b ?? Et,
     y,
@@ -196,16 +196,16 @@ function Qn({
     Wt,
     qt,
     tn
-  ), Ze = o.useMemo(() => He.map(({ value: e, label: t, ...n }) => ({
+  ), Ze = o.useMemo(() => Ve.map(({ value: e, label: t, ...n }) => ({
     value: e,
     label: t,
     source: "soundfont",
     soundfontConfig: n,
     toneConfig: void 0
-  })), [He]), z = o.useMemo(() => {
+  })), [Ve]), z = o.useMemo(() => {
     const e = /* @__PURE__ */ new Set();
-    return [...Ve, ...Ze].filter((t) => e.has(t.value) ? !1 : (e.add(t.value), !0));
-  }, [Ve, Ze]), [an, cn] = W(
+    return [...He, ...Ze].filter((t) => e.has(t.value) ? !1 : (e.add(t.value), !0));
+  }, [He, Ze]), [an, cn] = W(
     At,
     Pt ?? z[0]?.value ?? "",
     Rt,
@@ -224,10 +224,10 @@ function Qn({
       white: t,
       black: n
     };
-  }, [i, N, oe, s]), ye = ot.white, ln = ot.black, Ce = kn(), rt = ye.length > 0 ? 100 / ye.length : 100, dn = rt * 0.6, K = Yt ?? Ce?.fontSize ?? 12, st = Bn(K), it = Math.max(1, Math.round(rn)), U = o.useMemo(() => wt(oe), [oe]), at = V.indexOf(U), Y = Math.max(0, V.length - 1), fn = Math.max(
+  }, [i, N, oe, s]), ye = ot.white, ln = ot.black, Ce = kn(), rt = ye.length > 0 ? 100 / ye.length : 100, dn = rt * 0.6, K = Yt ?? Ce?.fontSize ?? 12, st = Bn(K), it = Math.max(1, Math.round(rn)), U = o.useMemo(() => wt(oe), [oe]), at = H.indexOf(U), Y = Math.max(0, H.length - 1), fn = Math.max(
     B,
     Math.min(Y, at >= 0 ? at : B)
-  ), O = Ot ?? Ce?.colorA ?? Kn, ie = $t ?? Ce?.colorB ?? Un, ct = Ft ?? ie, xe = Bt ?? O, hn = Vt ?? O, vn = Ht ?? O, J = he && z.length > 0 && !be && !ne, Q = an || z[0]?.value || "", Z = o.useMemo(() => z.find((e) => e.value === Q) ?? null, [Q, z]), _e = J && (Z?.source === "tone" || Z?.toneConfig != null || Q === Tt), ut = Z?.soundfontConfig ?? Kt ?? null, lt = J && !_e && ut ? { ...ut, instrument: Q } : null, p = o.useMemo(() => {
+  ), O = Ot ?? Ce?.colorA ?? Kn, ie = $t ?? Ce?.colorB ?? Un, ct = Ft ?? ie, xe = Bt ?? O, hn = Ht ?? O, vn = Vt ?? O, J = he && z.length > 0 && !be && !ne, Q = an || z[0]?.value || "", Z = o.useMemo(() => z.find((e) => e.value === Q) ?? null, [Q, z]), _e = J && (Z?.source === "tone" || Z?.toneConfig != null || Q === Tt), ut = Z?.soundfontConfig ?? Kt ?? null, lt = J && !_e && ut ? { ...ut, instrument: Q } : null, p = o.useMemo(() => {
     const e = be ?? lt;
     return e ? typeof e == "string" ? { instrument: e } : e : null;
   }, [lt, be]), v = o.useMemo(() => ne || (!J || !_e ? null : Z?.toneConfig ?? ze ?? {}), [Z, J, ne, ze, _e]), mn = Dt ?? /* @__PURE__ */ a(En, {}), ee = p?.instrument, ae = p?.soundfont, ce = p?.format, ge = p?.url, we = p?.monitor ?? !0, Me = p?.gain, Ee = p?.attack, Se = p?.decay, ke = p?.sustain, Ne = p?.release, Ie = p?.notes, ue = p?.context, Le = p?.destination, te = v?.destination, le = v?.context ?? (te?.context instanceof AudioContext ? te.context : null), dt = Math.max(1, Math.round(v?.polyphony ?? 8)), Ae = v?.volume, ft = v?.attack, ht = v?.decay, vt = v?.sustain, mt = v?.release, de = o.useCallback((e, t) => {
@@ -306,7 +306,7 @@ function Qn({
     return (async () => {
       let n;
       try {
-        n = await Vn();
+        n = await Hn();
       } catch (Te) {
         e || tt(Mt("tone", Te));
         return;
@@ -360,7 +360,7 @@ function Qn({
     return (async () => {
       let n;
       try {
-        n = await Hn();
+        n = await Vn();
       } catch (c) {
         e || tt(Mt("soundfont-player", c));
         return;
@@ -426,7 +426,7 @@ function Qn({
   }, [I]), f = { ...Xt };
   f["--ui-bits-color-a"] = O, f["--ui-bits-color-b"] = ie, f["--vk-font-size"] = `${K}px`, f["--vk-header-height"] = `${st}px`, f["--vk-body-height"] = `${st * it}px`, f["--vk-header-bg"] = ie, f["--vk-header-text"] = O, f["--vk-border"] = O, f["--vk-bg"] = xe, f["--vk-white"] = ct, f["--vk-white-text"] = xe, f["--vk-black"] = xe, f["--vk-black-text"] = ct, f["--vk-white-active"] = hn, f["--vk-black-active"] = vn;
   const bn = o.useCallback((e) => {
-    const t = Math.max(B, Math.min(Y, Math.round(e))), n = V[t] ?? V[B] ?? 60;
+    const t = Math.max(B, Math.min(Y, Math.round(e))), n = H[t] ?? H[B] ?? 60;
     Xe(n);
   }, [Y, Xe]), pn = o.useCallback((e) => {
     const t = Math.max(4, Math.min(88, Math.round(e)));
@@ -465,7 +465,7 @@ function Qn({
             indicatorColor: me,
             ariaLabel: "Keyboard start note",
             formatDisplayValue: (e) => {
-              const t = Math.max(B, Math.min(Y, Math.round(e))), n = V[t] ?? V[B] ?? 60;
+              const t = Math.max(B, Math.min(Y, Math.round(e))), n = H[t] ?? H[B] ?? 60;
               return Fe(n);
             }
           }
@@ -660,4 +660,4 @@ function Qn({
 export {
   Qn as V
 };
-//# sourceMappingURL=VirtualKeyboard-BSeo-eIb.js.map
+//# sourceMappingURL=VirtualKeyboard-3sry1nv6.js.map

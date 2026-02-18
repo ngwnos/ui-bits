@@ -1,6 +1,6 @@
 import React from "react";
 import { usePanelTheme } from "../../panelGap";
-import "./webgpu-status.css";
+import KeyValueRows from "../KeyValueRows";
 
 export type WebGpuStatusBorderStyle = "a" | "b" | "none";
 
@@ -81,16 +81,7 @@ const WebGpuStatus = React.forwardRef<HTMLDivElement, WebGpuStatusProps>((props,
   const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
   const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? "a";
   const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
-  const resolvedBorderColor = resolvedBorderStyle === "a"
-    ? resolvedColorA
-    : resolvedBorderStyle === "b"
-      ? resolvedColorB
-      : "transparent";
-  const borderValue = resolvedBorderStyle === "none"
-    ? "1px solid transparent"
-    : `1px solid ${resolvedBorderColor}`;
   const rowHeight = computeRowHeight(resolvedFontSize);
-  const paddingX = Math.round(resolvedFontSize * 0.7);
   const [state, setState] = React.useState<WebGpuStatusState>({ status: "idle" });
   const [fps, setFps] = React.useState<number | null>(null);
 
@@ -202,32 +193,18 @@ const WebGpuStatus = React.forwardRef<HTMLDivElement, WebGpuStatusProps>((props,
   }, [fps, state]);
 
   return (
-    <div
+    <KeyValueRows
       ref={ref}
+      rows={rows}
       className={["ui-bits-webgpu-status", className].filter(Boolean).join(" ")}
-      style={{
-        fontFamily: "inherit",
-        fontSize: resolvedFontSize,
-        lineHeight: 1,
-        color: resolvedColorA,
-        background: resolvedColorB,
-        border: borderValue,
-        borderRadius: 3,
-        boxSizing: "border-box",
-        "--ui-bits-webgpu-row-height": `${rowHeight}px`,
-        "--ui-bits-webgpu-padding-x": `${paddingX}px`,
-        "--ui-bits-webgpu-border-color": resolvedBorderColor,
-        ...(style ?? {}),
-      } as React.CSSProperties}
+      colorA={resolvedColorA}
+      colorB={resolvedColorB}
+      borderStyle={resolvedBorderStyle}
+      fontSize={resolvedFontSize}
+      rowHeight={rowHeight}
+      style={style}
       {...rest}
-    >
-      {rows.map((row) => (
-        <div key={row.label} className="ui-bits-webgpu-status__row">
-          <span className="ui-bits-webgpu-status__label">{row.label}</span>
-          <span className="ui-bits-webgpu-status__value">{row.value}</span>
-        </div>
-      ))}
-    </div>
+    />
   );
 });
 

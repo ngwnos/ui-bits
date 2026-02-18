@@ -1,5 +1,4 @@
 import React from "react";
-import "./webgpu-status.css";
 export type WebGpuStatusBorderStyle = "a" | "b" | "none";
 export interface WebGpuStatusProps extends React.HTMLAttributes<HTMLDivElement> {
     colorA?: string;

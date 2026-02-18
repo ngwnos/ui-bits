@@ -5,6 +5,8 @@ import { type DropdownOption } from "./types";
 
 export interface DropdownProps {
   label: string;
+  labelInline?: boolean;
+  overlayMenu?: boolean;
   options: DropdownOption[];
   value?: string;
   defaultValue?: string;
@@ -20,6 +22,7 @@ export interface DropdownProps {
   borderRadius?: number;
   width?: number | string;
   fontSize?: number;
+  compact?: boolean;
   disabled?: boolean;
   controlId?: string;
   className?: string;
@@ -28,6 +31,8 @@ export interface DropdownProps {
 
 export default function Dropdown({
   label,
+  labelInline,
+  overlayMenu = true,
   options,
   value,
   defaultValue,
@@ -43,6 +48,7 @@ export default function Dropdown({
   borderRadius,
   width,
   fontSize,
+  compact,
   disabled = false,
   controlId,
   className,
@@ -53,6 +59,8 @@ export default function Dropdown({
   return (
     <DropdownBase
       label={label}
+      labelInline={labelInline}
+      overlayMenu={overlayMenu}
       options={options}
       value={value}
       defaultValue={defaultValue}
@@ -68,6 +76,7 @@ export default function Dropdown({
       borderRadius={borderRadius}
       width={width}
       fontSize={fontSize}
+      compact={compact}
       disabled={disabled}
       controlId={resolvedControlId}
       className={className}

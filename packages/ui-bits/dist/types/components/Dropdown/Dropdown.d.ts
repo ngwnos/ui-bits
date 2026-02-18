@@ -2,6 +2,8 @@ import React from "react";
 import { type DropdownOption } from "./types";
 export interface DropdownProps {
     label: string;
+    labelInline?: boolean;
+    overlayMenu?: boolean;
     options: DropdownOption[];
     value?: string;
     defaultValue?: string;
@@ -17,9 +19,10 @@ export interface DropdownProps {
     borderRadius?: number;
     width?: number | string;
     fontSize?: number;
+    compact?: boolean;
     disabled?: boolean;
     controlId?: string;
     className?: string;
     style?: React.CSSProperties;
 }
-export default function Dropdown({ label, options, value, defaultValue, placeholder, onChange, open, defaultOpen, onOpenChange, colorA, colorB, borderStyle, borderMask, borderRadius, width, fontSize, disabled, controlId, className, style, }: DropdownProps): import("react/jsx-runtime").JSX.Element;
+export default function Dropdown({ label, labelInline, overlayMenu, options, value, defaultValue, placeholder, onChange, open, defaultOpen, onOpenChange, colorA, colorB, borderStyle, borderMask, borderRadius, width, fontSize, compact, disabled, controlId, className, style, }: DropdownProps): import("react/jsx-runtime").JSX.Element;

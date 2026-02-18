@@ -7,6 +7,22 @@
   position: relative;
 }
 
+.dropdown-root[data-label-inline="true"] {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropdown-root[data-label-inline="true"] .dropdown-label:not(.dropdown-label--sr) {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.dropdown-root[data-label-inline="true"] .dropdown-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .dropdown-label {
   font-size: var(--dropdown-font-size, 16px);
   letter-spacing: 0.08em;
@@ -41,7 +57,7 @@
   flex-direction: column;
 }
 
-.dropdown-root[data-open="true"] .dropdown-field {
+.dropdown-root[data-open="true"]:not([data-overlay-menu="true"]) .dropdown-field {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
   border-bottom-width: 0;
@@ -75,6 +91,11 @@
   border-color: var(--dropdown-text);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
+}
+
+.dropdown-root[data-overlay-menu="true"] .dropdown-trigger[data-open="true"] {
+  border-bottom-left-radius: var(--dropdown-radius, 3px);
+  border-bottom-right-radius: var(--dropdown-radius, 3px);
 }
 
 .dropdown-value {
@@ -175,11 +196,21 @@
   border-radius: 0 0 var(--dropdown-radius, 3px) var(--dropdown-radius, 3px);
 }
 
+.dropdown-root[data-overlay-menu="true"] .dropdown-menu[data-placement="down"] {
+  border-top-width: 1px;
+  border-radius: var(--dropdown-radius, 3px);
+}
+
 .dropdown-menu[data-placement="up"] {
   transform: translateY(-100%);
   border-top-width: 1px;
   border-bottom-width: 0;
   border-radius: var(--dropdown-radius, 3px) var(--dropdown-radius, 3px) 0 0;
+}
+
+.dropdown-root[data-overlay-menu="true"] .dropdown-menu[data-placement="up"] {
+  border-bottom-width: 1px;
+  border-radius: var(--dropdown-radius, 3px);
 }
 
 .dropdown-root--icon .dropdown-menu[data-placement="down"] {
@@ -209,12 +240,27 @@
   transition: background 100ms ease, color 100ms ease;
   justify-content: center;
   height: var(--dropdown-row-height);
+  flex-shrink: 0;
   box-sizing: border-box;
+}
+
+.dropdown-root[data-compact="true"] .dropdown-option {
+  flex-shrink: 1;
 }
 
 .dropdown-option:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  background: var(--dropdown-surface);
+  color: var(--dropdown-muted);
+}
+
+.dropdown-option:disabled .dropdown-option-label,
+.dropdown-option:disabled .dropdown-option-description {
+  opacity: 0.4;
+}
+
+.dropdown-option:disabled .dropdown-option-icon {
+  color: var(--dropdown-muted);
 }
 
 .dropdown-root[data-show-icons="true"] .dropdown-option {
@@ -240,6 +286,11 @@
 .dropdown-option[aria-selected="true"] {
   background: var(--dropdown-inverse-surface);
   color: var(--dropdown-inverse-text);
+}
+
+.dropdown-option:disabled[aria-selected="true"] {
+  background: var(--dropdown-surface);
+  color: var(--dropdown-muted);
 }
 
 .dropdown-option-label {
@@ -278,6 +329,10 @@
   color: var(--dropdown-inverse-text);
 }
 
+.dropdown-option:disabled[aria-selected="true"] .dropdown-option-icon {
+  color: var(--dropdown-muted);
+}
+
 
 .dropdown-option-text {
   line-height: 1.1;
@@ -293,6 +348,10 @@
 
 .dropdown-option-description--inverse {
   color: var(--dropdown-inverse-text);
+}
+
+.dropdown-option:disabled .dropdown-option-description--inverse {
+  color: var(--dropdown-muted);
 }
 
 .dropdown-option:last-of-type {

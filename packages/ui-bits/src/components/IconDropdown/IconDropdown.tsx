@@ -12,6 +12,8 @@ export interface IconDropdownOption extends DropdownOption {
 export interface IconDropdownProps {
   label?: string;
   showLabel?: boolean;
+  labelInline?: boolean;
+  overlayMenu?: boolean;
   ariaLabel?: string;
   options: IconDropdownOption[];
   value?: string;
@@ -31,6 +33,7 @@ export interface IconDropdownProps {
   borderRadius?: number;
   width?: number | string;
   fontSize?: number;
+  compact?: boolean;
   disabled?: boolean;
   controlId?: string;
   className?: string;
@@ -40,6 +43,8 @@ export interface IconDropdownProps {
 export default function IconDropdown({
   label,
   showLabel = false,
+  labelInline = false,
+  overlayMenu = true,
   ariaLabel,
   options,
   value,
@@ -59,6 +64,7 @@ export default function IconDropdown({
   borderRadius,
   width,
   fontSize,
+  compact,
   disabled = false,
   controlId,
   className,
@@ -113,6 +119,8 @@ export default function IconDropdown({
     <DropdownBase
       label={label}
       showLabel={showLabel}
+      labelInline={labelInline}
+      overlayMenu={overlayMenu}
       ariaLabel={resolvedAriaLabel}
       options={options}
       value={value}
@@ -128,6 +136,7 @@ export default function IconDropdown({
       borderRadius={borderRadius}
       width={width}
       fontSize={fontSize}
+      compact={compact}
       showOptionIcons={showMenuIcons}
       returnFocusOnSelect={!preventFocusOnPointerDown}
       disabled={disabled}

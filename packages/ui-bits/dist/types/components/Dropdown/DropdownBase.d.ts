@@ -20,6 +20,8 @@ export interface DropdownTriggerRenderProps {
 export interface DropdownBaseProps {
     label?: string;
     showLabel?: boolean;
+    labelInline?: boolean;
+    overlayMenu?: boolean;
     ariaLabel?: string;
     options: DropdownOption[];
     value?: string;
@@ -36,6 +38,7 @@ export interface DropdownBaseProps {
     borderRadius?: number;
     width?: number | string;
     fontSize?: number;
+    compact?: boolean;
     showOptionIcons?: boolean;
     returnFocusOnSelect?: boolean;
     disabled?: boolean;
@@ -44,4 +47,4 @@ export interface DropdownBaseProps {
     style?: React.CSSProperties;
     renderTrigger: (props: DropdownTriggerRenderProps) => React.ReactNode;
 }
-export default function DropdownBase({ label, showLabel, ariaLabel, options, value, defaultValue, placeholder, onChange, open, defaultOpen, onOpenChange, colorA, colorB, borderStyle, borderMask, borderRadius, width, fontSize, showOptionIcons, returnFocusOnSelect, disabled, controlId, className, style, renderTrigger, }: DropdownBaseProps): import("react/jsx-runtime").JSX.Element;
+export default function DropdownBase({ label, showLabel, labelInline, overlayMenu, ariaLabel, options, value, defaultValue, placeholder, onChange, open, defaultOpen, onOpenChange, colorA, colorB, borderStyle, borderMask, borderRadius, width, fontSize, compact, showOptionIcons, returnFocusOnSelect, disabled, controlId, className, style, renderTrigger, }: DropdownBaseProps): import("react/jsx-runtime").JSX.Element;

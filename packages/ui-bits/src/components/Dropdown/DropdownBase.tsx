@@ -32,6 +32,8 @@ export interface DropdownTriggerRenderProps {
 export interface DropdownBaseProps {
   label?: string;
   showLabel?: boolean;
+  labelInline?: boolean;
+  overlayMenu?: boolean;
   ariaLabel?: string;
   options: DropdownOption[];
   value?: string;
@@ -48,6 +50,7 @@ export interface DropdownBaseProps {
   borderRadius?: number;
   width?: number | string;
   fontSize?: number;
+  compact?: boolean;
   showOptionIcons?: boolean;
   returnFocusOnSelect?: boolean;
   disabled?: boolean;
@@ -85,6 +88,8 @@ const FALLBACK_COLOR_B = "var(--ui-bits-color-b, #f0f0f0)";
 const MENU_MAX_HEIGHT = 240;
 const MENU_MIN_HEIGHT = 40;
 const MENU_VIEWPORT_MARGIN = 6;
+const MENU_BORDER_ALLOWANCE = 2;
+const MENU_OPTION_PADDING_X_REM = 1.25;
 
 type DropdownMenuPlacement = "up" | "down";
 
@@ -125,6 +130,8 @@ function resolveThemeColors({
 export default function DropdownBase({
   label,
   showLabel = true,
+  labelInline = false,
+  overlayMenu = true,
   ariaLabel,
   options,
   value,
@@ -141,6 +148,7 @@ export default function DropdownBase({
   borderRadius,
   width,
   fontSize,
+  compact = false,
   showOptionIcons = false,
   returnFocusOnSelect = true,
   disabled = false,
@@ -367,6 +375,31 @@ export default function DropdownBase({
   const showPlaceholder = !activeOption;
   const resolvedLabelClass = showLabel ? "dropdown-label" : "dropdown-label dropdown-label--sr";
   const customCssVars = useMemo(() => extractCssVariableStyle(style), [style]);
+  const measuredOptionContentWidth = useMemo(() => {
+    if (typeof document === "undefined" || options.length === 0) return undefined;
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return undefined;
+    const computedFont = getComputedStyle(document.documentElement)
+      .getPropertyValue("--ui-bits-font-family")
+      .trim();
+    const fontFamily = computedFont || '"IBM Plex Mono", monospace';
+    const labelFont = `600 ${appliedFontSize}px ${fontFamily}`;
+    const descriptionFont = `600 ${appliedFontSize * 0.75}px ${fontFamily}`;
+    let maxTextWidth = 0;
+    context.font = labelFont;
+    for (const option of options) {
+      maxTextWidth = Math.max(maxTextWidth, context.measureText(option.label).width);
+      if (option.description) {
+        context.font = descriptionFont;
+        maxTextWidth = Math.max(maxTextWidth, context.measureText(option.description).width);
+        context.font = labelFont;
+      }
+    }
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize || "16");
+    const horizontalPadding = rootFontSize * MENU_OPTION_PADDING_X_REM;
+    return Math.ceil(maxTextWidth + horizontalPadding + MENU_BORDER_ALLOWANCE);
+  }, [appliedFontSize, options]);
   const [menuMetrics, setMenuMetrics] = useState<DropdownMenuMetrics | null>(null);
   const [menuScrollMetrics, setMenuScrollMetrics] = useState(() => ({
     scrollTop: 0,
@@ -385,8 +418,11 @@ export default function DropdownBase({
   const updateMenuMetrics = useCallback(() => {
     if (!fieldRef.current || typeof window === "undefined") return;
     const rect = fieldRef.current.getBoundingClientRect();
-    const availableBelow = Math.max(0, window.innerHeight - rect.bottom - MENU_VIEWPORT_MARGIN);
-    const availableAbove = Math.max(0, rect.top - MENU_VIEWPORT_MARGIN);
+    const rootRect = rootRef.current?.getBoundingClientRect();
+    const downAnchorTop = overlayMenu ? rect.top : rect.bottom;
+    const upAnchorBottom = overlayMenu ? rect.bottom : rect.top;
+    const availableBelow = Math.max(0, window.innerHeight - downAnchorTop - MENU_VIEWPORT_MARGIN);
+    const availableAbove = Math.max(0, upAnchorBottom - MENU_VIEWPORT_MARGIN);
     const placement: DropdownMenuPlacement = (
       availableBelow >= MENU_MIN_HEIGHT || availableBelow >= availableAbove
     )
@@ -394,13 +430,26 @@ export default function DropdownBase({
       : "up";
     const availableSpace = placement === "down" ? availableBelow : availableAbove;
     const maxHeight = Math.max(MENU_MIN_HEIGHT, Math.min(MENU_MAX_HEIGHT, availableSpace));
-    const width = Math.max(
+    const maxViewportWidth = window.innerWidth - MENU_VIEWPORT_MARGIN * 2;
+    const anchorWidth = Math.max(
       0,
-      Math.min(rect.width, window.innerWidth - MENU_VIEWPORT_MARGIN * 2),
+      Math.min(rect.width, maxViewportWidth),
     );
+    const canExpandIntoLabelArea = labelInline && !isIconVariant && Boolean(rootRect);
+    const measuredContentWidth = canExpandIntoLabelArea
+      ? measuredOptionContentWidth ?? anchorWidth
+      : anchorWidth;
+    const width = canExpandIntoLabelArea
+      ? Math.max(anchorWidth, Math.min(measuredContentWidth, maxViewportWidth))
+      : anchorWidth;
+    const preferredLeft = canExpandIntoLabelArea
+      ? Math.max(rootRect!.left, rect.right - width)
+      : rect.left;
     const maxLeft = Math.max(MENU_VIEWPORT_MARGIN, window.innerWidth - width - MENU_VIEWPORT_MARGIN);
-    const left = Math.max(MENU_VIEWPORT_MARGIN, Math.min(rect.left, maxLeft));
-    const top = placement === "down" ? rect.bottom : rect.top;
+    const left = Math.max(MENU_VIEWPORT_MARGIN, Math.min(preferredLeft, maxLeft));
+    const top = placement === "down"
+      ? (overlayMenu ? rect.top : rect.bottom)
+      : (overlayMenu ? rect.bottom : rect.top);
     setMenuMetrics((prev) => {
       if (
         prev
@@ -414,7 +463,7 @@ export default function DropdownBase({
       }
       return { top, left, width, maxHeight, placement };
     });
-  }, []);
+  }, [isIconVariant, labelInline, measuredOptionContentWidth, overlayMenu]);
   const updateMenuScrollMetrics = useCallback(() => {
     const node = menuViewportRef.current;
     if (!node) return;
@@ -455,14 +504,25 @@ export default function DropdownBase({
       return;
     }
     const handleUpdate = () => updateMenuMetrics();
+    const handleWindowScroll = (event: Event) => {
+      const scrollTarget = event.target;
+      if (
+        scrollTarget instanceof Node
+        && menuViewportRef.current
+        && menuViewportRef.current.contains(scrollTarget)
+      ) {
+        return;
+      }
+      updateMenuMetrics();
+    };
     handleUpdate();
     const raf = window.requestAnimationFrame(handleUpdate);
     window.addEventListener("resize", handleUpdate);
-    window.addEventListener("scroll", handleUpdate, true);
+    window.addEventListener("scroll", handleWindowScroll, true);
     return () => {
       window.cancelAnimationFrame(raf);
       window.removeEventListener("resize", handleUpdate);
-      window.removeEventListener("scroll", handleUpdate, true);
+      window.removeEventListener("scroll", handleWindowScroll, true);
     };
   }, [resolvedOpen, updateMenuMetrics]);
 
@@ -523,6 +583,8 @@ export default function DropdownBase({
     ? createPortal(
       <div
         className={isIconVariant ? "dropdown-root dropdown-root--icon" : "dropdown-root"}
+        data-compact={compact ? "true" : "false"}
+        data-overlay-menu={overlayMenu ? "true" : "false"}
         data-show-icons={showOptionIcons ? "true" : "false"}
         style={{
           fontFamily: 'var(--ui-bits-font-family, "IBM Plex Mono", monospace)',
@@ -651,6 +713,9 @@ export default function DropdownBase({
       ref={rootRef}
       className={rootClass}
       data-open={resolvedOpen ? "true" : "false"}
+      data-compact={compact ? "true" : "false"}
+      data-label-inline={labelInline ? "true" : "false"}
+      data-overlay-menu={overlayMenu ? "true" : "false"}
       data-disabled={disabled ? "true" : "false"}
       data-show-icons={showOptionIcons ? "true" : "false"}
       style={{

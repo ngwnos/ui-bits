@@ -6,6 +6,8 @@ export interface IconDropdownOption extends DropdownOption {
 export interface IconDropdownProps {
     label?: string;
     showLabel?: boolean;
+    labelInline?: boolean;
+    overlayMenu?: boolean;
     ariaLabel?: string;
     options: IconDropdownOption[];
     value?: string;
@@ -25,9 +27,10 @@ export interface IconDropdownProps {
     borderRadius?: number;
     width?: number | string;
     fontSize?: number;
+    compact?: boolean;
     disabled?: boolean;
     controlId?: string;
     className?: string;
     style?: React.CSSProperties;
 }
-export default function IconDropdown({ label, showLabel, ariaLabel, options, value, defaultValue, icon, showMenuIcons, iconUsesOptionColors, preventFocusOnPointerDown, onChange, open, defaultOpen, onOpenChange, colorA, colorB, borderStyle, borderMask, borderRadius, width, fontSize, disabled, controlId, className, style, }: IconDropdownProps): import("react/jsx-runtime").JSX.Element;
+export default function IconDropdown({ label, showLabel, labelInline, overlayMenu, ariaLabel, options, value, defaultValue, icon, showMenuIcons, iconUsesOptionColors, preventFocusOnPointerDown, onChange, open, defaultOpen, onOpenChange, colorA, colorB, borderStyle, borderMask, borderRadius, width, fontSize, compact, disabled, controlId, className, style, }: IconDropdownProps): import("react/jsx-runtime").JSX.Element;

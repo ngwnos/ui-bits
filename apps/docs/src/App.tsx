@@ -692,12 +692,21 @@ function App() {
     { value: 'triangle', label: 'Triangle' },
     { value: 'square', label: 'Square', disabled: true },
   ]), [])
+  const dropdownSubtextOptions = useMemo(() => ([
+    { value: 'draft', label: 'Draft', description: 'Fast iteration with lighter passes' },
+    { value: 'balanced', label: 'Balanced', description: 'Default profile for daily use' },
+    { value: 'quality', label: 'Quality', description: 'Highest quality with longer renders' },
+    { value: 'safe', label: 'Safe', description: 'Conservative profile for stability', disabled: true },
+  ]), [])
   const nestedDropdownOptions = useMemo(() => (
     Array.from({ length: 24 }, (_, index) => {
       const number = String(index + 1).padStart(2, '0')
+      const isExtendedLabel = index === 11
       return {
         value: `destination-${number}`,
-        label: `Destination ${number} - Macro ${number}`,
+        label: isExtendedLabel
+          ? `Destination ${number} - Macro ${number} - Ultra-wide modulation routing lane`
+          : `Destination ${number} - Macro ${number}`,
       }
     })
   ), [])
@@ -708,6 +717,7 @@ function App() {
     { value: 'sun', label: 'Sun', icon: <Sun /> },
   ]), [])
   const [waveformValue, setWaveformValue] = useState('sine')
+  const [subtextDropdownValue, setSubtextDropdownValue] = useState('balanced')
   const [radioListValue, setRadioListValue] = useState('balanced')
   const [radioListCompactValue, setRadioListCompactValue] = useState('stereo')
   const [radioListDenseValue, setRadioListDenseValue] = useState('normal')
@@ -1651,6 +1661,17 @@ function App() {
                     borderStyle="a"
                     fontSize={12}
                   />
+                  <Dropdown
+                    label="Render Profile"
+                    options={dropdownSubtextOptions}
+                    value={subtextDropdownValue}
+                    onChange={(value) => setSubtextDropdownValue(value)}
+                    colorA={flexoki.purple['600']}
+                    colorB={flexoki.purple['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                    width={280}
+                  />
                   <IconDropdown
                     label="Weather"
                     options={iconDropdownOptions}
@@ -1682,6 +1703,7 @@ function App() {
                     >
                       <Dropdown
                         label="Long Menu"
+                        labelInline
                         options={nestedDropdownOptions}
                         value={nestedDropdownValue}
                         onChange={(value) => setNestedDropdownValue(value)}
@@ -1695,6 +1717,23 @@ function App() {
                 </div>
                 <div className="docs-code-stack">
                   <CodeBlock code={activeRoute.code} />
+                  <CodeBlock
+                    code={`<Dropdown
+  label="Render Profile"
+  options={[
+    { value: "draft", label: "Draft", description: "Fast iteration with lighter passes" },
+    { value: "balanced", label: "Balanced", description: "Default profile for daily use" },
+    { value: "quality", label: "Quality", description: "Highest quality with longer renders" },
+  ]}
+  value={profile}
+  onChange={(value) => setProfile(value)}
+  colorA={flexoki.purple["600"]}
+  colorB={flexoki.purple["100"]}
+  borderStyle="a"
+  fontSize={12}
+  width={280}
+/>`}
+                  />
                   <CodeBlock
                     code={`<IconDropdown
   label="Weather"
@@ -1716,9 +1755,12 @@ function App() {
                   <CodeBlock
                     code={`const longOptions = Array.from({ length: 24 }, (_, index) => {
   const number = String(index + 1).padStart(2, "0")
+  const isExtendedLabel = index === 11
   return {
     value: \`destination-\${number}\`,
-    label: \`Destination \${number} - Macro \${number}\`,
+    label: isExtendedLabel
+      ? \`Destination \${number} - Macro \${number} - Ultra-wide modulation routing lane\`
+      : \`Destination \${number} - Macro \${number}\`,
   }
 })
 
@@ -1737,6 +1779,7 @@ function App() {
   >
     <Dropdown
       label="Long Menu"
+      labelInline
       options={longOptions}
       value={nestedDropdownValue}
       onChange={(value) => setNestedDropdownValue(value)}

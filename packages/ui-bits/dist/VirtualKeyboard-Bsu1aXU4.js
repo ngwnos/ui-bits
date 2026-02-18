@@ -1,7 +1,7 @@
 import { jsx as a, jsxs as P, Fragment as gn } from "react/jsx-runtime";
 import o from "react";
 import { MousePointer2 as wn, CaseUpper as Mn, Piano as En } from "lucide-react";
-import { ag as Sn, d as kn, V as Nn, ah as In, I as Ln, X as De } from "./FloatingPanel-D0BdMvub.js";
+import { ag as Sn, d as kn, V as Nn, ah as In, I as Ln, X as De } from "./FloatingPanel-D-6EljrX.js";
 const Et = "C4", An = 13, Pn = 6, Rn = !1, Tn = "tonejs", Dn = 18, Kn = "#f2f0e5", Un = "#1c1b1a", St = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"], On = /* @__PURE__ */ new Set([1, 3, 6, 8, 10]), kt = /* @__PURE__ */ new Set([0, 2, 4, 5, 7, 9, 11]), $n = 21, V = (() => {
   const s = [];
   for (let i = 0; i <= 127; i += 1)
@@ -660,4 +660,4 @@ function Qn({
 export {
   Qn as V
 };
-//# sourceMappingURL=VirtualKeyboard-8J3lYlqx.js.map
+//# sourceMappingURL=VirtualKeyboard-Bsu1aXU4.js.map

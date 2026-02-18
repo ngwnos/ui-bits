@@ -1,0 +1,60 @@
+.ui-bits-list-surface {
+  width: 100%;
+}
+
+.ui-bits-list-surface__wrap {
+  position: relative;
+  width: 100%;
+}
+
+.ui-bits-list-surface__list {
+  max-height: var(--ui-bits-list-max-height, 160px);
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(var(--ui-bits-list-columns, 1), minmax(0, 1fr));
+  grid-auto-rows: minmax(var(--ui-bits-list-row-min-height, 24px), auto);
+  gap: var(--ui-bits-list-gap, 2px);
+  align-content: start;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ui-bits-list-surface__list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.ui-bits-list-surface__empty {
+  min-height: var(--ui-bits-list-row-min-height, 24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  grid-column: 1 / -1;
+  opacity: 0.6;
+  font-size: 0.9em;
+  padding: 0 var(--ui-bits-list-row-padding-x, 8px);
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.ui-bits-list-surface__scrollbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.ui-bits-list-surface__wrap:hover .ui-bits-list-surface__scrollbar,
+.ui-bits-list-surface__wrap--scrolling .ui-bits-list-surface__scrollbar {
+  opacity: 1;
+}
+
+.ui-bits-list-surface__scrollbar-thumb {
+  width: 100%;
+  border-radius: 999px;
+  background: var(--ui-bits-list-scrollbar-color, currentColor);
+}

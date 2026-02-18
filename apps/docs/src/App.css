@@ -98,6 +98,14 @@
   align-items: flex-start;
 }
 
+.docs-radio-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 520px;
+}
+
 .docs-code-stack {
   grid-column: 2;
   display: flex;

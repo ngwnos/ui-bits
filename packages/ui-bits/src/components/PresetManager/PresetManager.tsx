@@ -3,6 +3,8 @@ import { useControlStoreState } from "../../controlStore";
 import { usePanelTheme } from "../../panelGap";
 import { createPresetSnapshot, usePresetStore, type PresetSnapshot } from "../../presetStore";
 import IconButton from "../IconButton";
+import ListRow from "../ListRow";
+import ListSurface from "../ListSurface";
 import { ClipboardCopy, Save } from "lucide-react";
 import TextInput from "../TextInput";
 import "./preset-manager.css";
@@ -122,74 +124,6 @@ const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((prop
   const paddingY = Math.round(resolvedFontSize * SLIDER_PAD_Y_EM);
   const paddingX = Math.round(resolvedFontSize * 0.7);
   const resolvedMaxListHeight = resolveSize(maxListHeight) ?? `${rowHeight * 6}px`;
-  const listRef = React.useRef<HTMLDivElement | null>(null);
-  const [scrollMetrics, setScrollMetrics] = React.useState(() => ({
-    scrollTop: 0,
-    scrollHeight: 0,
-    clientHeight: 0,
-  }));
-  const [isScrolling, setIsScrolling] = React.useState(false);
-  const scrollTimeoutRef = React.useRef<number | null>(null);
-
-  const updateScrollMetrics = React.useCallback(() => {
-    const node = listRef.current;
-    if (!node) return;
-    const next = {
-      scrollTop: node.scrollTop,
-      scrollHeight: node.scrollHeight,
-      clientHeight: node.clientHeight,
-    };
-    setScrollMetrics((prev) => {
-      if (
-        prev.scrollTop === next.scrollTop &&
-        prev.scrollHeight === next.scrollHeight &&
-        prev.clientHeight === next.clientHeight
-      ) {
-        return prev;
-      }
-      return next;
-    });
-  }, []);
-
-  const handleListScroll = React.useCallback(() => {
-    updateScrollMetrics();
-    setIsScrolling(true);
-    if (scrollTimeoutRef.current) {
-      window.clearTimeout(scrollTimeoutRef.current);
-    }
-    scrollTimeoutRef.current = window.setTimeout(() => {
-      setIsScrolling(false);
-      scrollTimeoutRef.current = null;
-    }, 650);
-  }, [updateScrollMetrics]);
-
-  React.useLayoutEffect(() => {
-    updateScrollMetrics();
-  }, [updateScrollMetrics, resolvedPresets.length, resolvedMaxListHeight, resolvedFontSize]);
-
-  React.useEffect(() => {
-    const node = listRef.current;
-    if (!node || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => updateScrollMetrics());
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [updateScrollMetrics]);
-  React.useEffect(() => (
-    () => {
-      if (scrollTimeoutRef.current) {
-        window.clearTimeout(scrollTimeoutRef.current);
-      }
-    }
-  ), []);
-
-  const hasOverflow = scrollMetrics.scrollHeight - scrollMetrics.clientHeight > 1;
-  const thumbHeight = hasOverflow
-    ? Math.max(12, Math.round(scrollMetrics.clientHeight * (scrollMetrics.clientHeight / scrollMetrics.scrollHeight)))
-    : 0;
-  const maxThumbTop = Math.max(0, scrollMetrics.clientHeight - thumbHeight);
-  const thumbTop = hasOverflow && scrollMetrics.scrollHeight > scrollMetrics.clientHeight
-    ? Math.round((scrollMetrics.scrollTop / (scrollMetrics.scrollHeight - scrollMetrics.clientHeight)) * maxThumbTop)
-    : 0;
 
   const handleValueChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
     const nextValue = event.target.value;
@@ -264,6 +198,15 @@ const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((prop
         "--pm-padding-y": `${paddingY}px`,
         "--pm-padding-x": `${paddingX}px`,
         "--pm-max-height": resolvedMaxListHeight,
+        "--ui-bits-list-max-height": resolvedMaxListHeight,
+        "--ui-bits-list-row-min-height": `${rowHeight}px`,
+        "--ui-bits-list-gap": "2px",
+        "--ui-bits-list-scrollbar-color": resolvedColorA,
+        "--ui-bits-list-row-height": `${rowHeight}px`,
+        "--ui-bits-list-row-padding-x": `${paddingX}px`,
+        "--ui-bits-list-row-color-a": resolvedColorA,
+        "--ui-bits-list-row-color-b": resolvedColorB,
+        "--ui-bits-list-row-active-border": resolvedColorB,
         fontSize: resolvedFontSize,
       } as React.CSSProperties}
       {...rest}
@@ -311,74 +254,45 @@ const PresetManager = React.forwardRef<HTMLDivElement, PresetManagerProps>((prop
           <ClipboardCopy />
         </IconButton>
       </div>
-      <div
-        className={[
-          "ui-bits-preset-manager__list-wrap",
-          isScrolling ? "ui-bits-preset-manager__list-wrap--scrolling" : "",
-        ].filter(Boolean).join(" ")}
+      <ListSurface
+        className="ui-bits-preset-manager__surface"
+        listClassName="ui-bits-preset-manager__list"
+        columns={2}
+        isEmpty={resolvedPresets.length === 0}
+        emptyState={emptyLabel}
       >
-        <div
-          ref={listRef}
-          className="ui-bits-preset-manager__list"
-          role="list"
-          onScroll={handleListScroll}
-        >
-          {resolvedPresets.length === 0 ? (
-            <div className="ui-bits-preset-manager__empty">{emptyLabel}</div>
-          ) : (
-            resolvedPresets.map((preset) => {
-              const isDisabled = disabled;
-              const isActivePreset = Boolean(
-                currentSnapshot
-                && preset.snapshot
-                && isPresetMatch(currentSnapshot, preset.snapshot),
-              );
-              return (
-                <div
-                  key={preset.id ?? preset.name}
-                  className={[
-                    "ui-bits-preset-manager__item",
-                    isActivePreset ? "ui-bits-preset-manager__item--active" : "",
-                  ].filter(Boolean).join(" ")}
-                  onClick={() => handleSelect(preset)}
-                  onKeyDown={(event) => {
-                    if (isDisabled) return;
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.preventDefault();
-                    handleSelect(preset);
-                  }}
-                  role="listitem"
-                  tabIndex={isDisabled ? -1 : 0}
-                  aria-disabled={isDisabled}
-                  aria-current={isActivePreset ? "true" : undefined}
+        {resolvedPresets.map((preset) => {
+          const isDisabled = disabled;
+          const isActivePreset = Boolean(
+            currentSnapshot
+            && preset.snapshot
+            && isPresetMatch(currentSnapshot, preset.snapshot),
+          );
+          return (
+            <ListRow
+              key={preset.id ?? preset.name}
+              className="ui-bits-preset-manager__item"
+              active={isActivePreset}
+              disabled={isDisabled}
+              onSelect={() => handleSelect(preset)}
+            >
+              <span className="ui-bits-preset-manager__name">{preset.name}</span>
+              {resolvedOnDelete ? (
+                <button
+                  type="button"
+                  className="ui-bits-preset-manager__delete"
+                  onClick={(event) => handleDelete(event, preset)}
+                  disabled={isDisabled || preset.readonly}
+                  aria-label={`Delete preset ${preset.name}`}
+                  title={preset.readonly ? "Built-in preset" : "Delete preset"}
                 >
-                  <span className="ui-bits-preset-manager__name">{preset.name}</span>
-                  {resolvedOnDelete ? (
-                    <button
-                      type="button"
-                      className="ui-bits-preset-manager__delete"
-                      onClick={(event) => handleDelete(event, preset)}
-                      disabled={isDisabled || preset.readonly}
-                      aria-label={`Delete preset ${preset.name}`}
-                      title={preset.readonly ? "Built-in preset" : "Delete preset"}
-                    >
-                    x
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })
-          )}
-        </div>
-        {hasOverflow ? (
-          <div className="ui-bits-preset-manager__scrollbar" aria-hidden="true">
-            <div
-              className="ui-bits-preset-manager__scrollbar-thumb"
-              style={{ height: `${thumbHeight}px`, transform: `translateY(${thumbTop}px)` }}
-            />
-          </div>
-        ) : null}
-      </div>
+                  x
+                </button>
+              ) : null}
+            </ListRow>
+          );
+        })}
+      </ListSurface>
     </div>
   );
 });

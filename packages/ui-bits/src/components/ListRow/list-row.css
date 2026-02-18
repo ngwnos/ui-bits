@@ -1,0 +1,35 @@
+.ui-bits-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--ui-bits-list-row-height, 24px);
+  padding: 0 var(--ui-bits-list-row-padding-x, 8px);
+  border: 1px solid var(--ui-bits-list-row-color-a, currentColor);
+  border-radius: var(--ui-bits-list-row-radius, 3px);
+  background: var(--ui-bits-list-row-color-b, transparent);
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.ui-bits-list-row--active {
+  background: var(--ui-bits-list-row-color-a, currentColor);
+  color: var(--ui-bits-list-row-color-b, transparent);
+  border-color: var(--ui-bits-list-row-active-border, var(--ui-bits-list-row-color-b, transparent));
+}
+
+.ui-bits-list-row--selectable {
+  cursor: pointer;
+}
+
+.ui-bits-list-row--selectable:hover:not([aria-disabled="true"]) {
+  filter: brightness(1.05);
+}
+
+.ui-bits-list-row[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

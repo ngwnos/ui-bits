@@ -1,0 +1,58 @@
+.ui-bits-radio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--ui-bits-font-family, "IBM Plex Mono", monospace);
+  box-sizing: border-box;
+}
+
+.ui-bits-radio-list__label {
+  font-size: 0.8em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.ui-bits-radio-list__group {
+  width: 100%;
+}
+
+.ui-bits-radio-list__item {
+  gap: 8px;
+}
+
+.ui-bits-radio-list__item.ui-bits-list-row--active {
+  background: var(--ui-bits-radio-list-active-bg, currentColor);
+  color: var(--ui-bits-radio-list-active-color, #fff);
+  border-color: var(--ui-bits-radio-list-active-border, currentColor);
+}
+
+.ui-bits-radio-list__icon {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  stroke-width: 1.9;
+}
+
+.ui-bits-radio-list__content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.ui-bits-radio-list__name {
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ui-bits-radio-list__description {
+  font-size: 0.85em;
+  line-height: 1.15;
+  opacity: 0.72;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -15,6 +15,7 @@ import {
   LoadingBar,
   PresetManager,
   PresetStoreProvider,
+  RadioList,
   SliderStoreProvider,
   GradientSelectionGrid,
   SelectionGrid,
@@ -90,6 +91,30 @@ const ROUTES = [
   defaultValue="mid"
   colorA={flexoki.purple["600"]}
   colorB={flexoki.purple["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>`,
+  },
+  {
+    id: 'radio-list',
+    label: 'Radio List',
+    title: 'Radio List',
+    code: `const options = [
+  { value: "draft", label: "Draft", description: "Fast iteration mode" },
+  { value: "balanced", label: "Balanced", description: "Everyday default" },
+  { value: "quality", label: "Quality", description: "Maximum fidelity" },
+];
+
+const [value, setValue] = useState("balanced");
+
+<RadioList
+  label="Render Profile"
+  showLabel
+  options={options}
+  value={value}
+  onChange={(nextValue) => setValue(nextValue)}
+  colorA={flexoki.blue["600"]}
+  colorB={flexoki.blue["100"]}
   borderStyle="a"
   fontSize={12}
 />`,
@@ -643,6 +668,25 @@ function App() {
     { value: 'mid', label: 'Mid' },
     { value: 'high', label: 'High' },
   ]), [])
+  const radioListOptions = useMemo(() => ([
+    { value: 'draft', label: 'Draft', description: 'Fast iteration mode' },
+    { value: 'balanced', label: 'Balanced', description: 'Everyday default' },
+    { value: 'quality', label: 'Quality', description: 'Maximum fidelity' },
+    { value: 'locked', label: 'Locked', description: 'Unavailable in this project', disabled: true },
+  ]), [])
+  const radioListCompactOptions = useMemo(() => ([
+    { value: 'mono', label: 'Mono' },
+    { value: 'stereo', label: 'Stereo' },
+    { value: 'surround', label: 'Surround' },
+  ]), [])
+  const radioListDenseOptions = useMemo(() => ([
+    { value: 'eco', label: 'Eco' },
+    { value: 'fast', label: 'Fast' },
+    { value: 'normal', label: 'Normal' },
+    { value: 'safe', label: 'Safe' },
+    { value: 'turbo', label: 'Turbo' },
+    { value: 'custom', label: 'Custom' },
+  ]), [])
   const dropdownOptions = useMemo(() => ([
     { value: 'sine', label: 'Sine' },
     { value: 'triangle', label: 'Triangle' },
@@ -664,6 +708,9 @@ function App() {
     { value: 'sun', label: 'Sun', icon: <Sun /> },
   ]), [])
   const [waveformValue, setWaveformValue] = useState('sine')
+  const [radioListValue, setRadioListValue] = useState('balanced')
+  const [radioListCompactValue, setRadioListCompactValue] = useState('stereo')
+  const [radioListDenseValue, setRadioListDenseValue] = useState('normal')
   const [iconDropdownValue, setIconDropdownValue] = useState('drizzle')
   const [nestedDropdownValue, setNestedDropdownValue] = useState('destination-01')
   const themeOptions = useMemo(() => ([
@@ -1483,6 +1530,87 @@ function App() {
                   It supports keyboard navigation and keeps the same sizing rhythm as sliders. Use{" "}
                   <code>borderStyle</code>, <code>colorA</code>, and <code>colorB</code> so it blends
                   into stacked control rows.
+                </p>
+              </div>
+            </>
+          ) : activeRouteId === 'radio-list' ? (
+            <>
+              <div className="docs-code-section">
+                <div className="docs-radio-stack">
+                  <RadioList
+                    label="Render Profile"
+                    showLabel
+                    options={radioListOptions}
+                    value={radioListValue}
+                    onChange={(value) => setRadioListValue(value)}
+                    colorA={flexoki.blue['600']}
+                    colorB={flexoki.blue['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <RadioList
+                    label="Render Profile (2 Columns)"
+                    showLabel
+                    options={radioListOptions}
+                    value={radioListValue}
+                    onChange={(value) => setRadioListValue(value)}
+                    columns={2}
+                    colorA={flexoki.blue['600']}
+                    colorB={flexoki.blue['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <RadioList
+                    label="Output Routing"
+                    showLabel
+                    options={radioListCompactOptions}
+                    value={radioListCompactValue}
+                    onChange={(value) => setRadioListCompactValue(value)}
+                    colorA={flexoki.cyan['600']}
+                    colorB={flexoki.cyan['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <RadioList
+                    label="Mode Presets (3 Columns)"
+                    showLabel
+                    options={radioListDenseOptions}
+                    value={radioListDenseValue}
+                    onChange={(value) => setRadioListDenseValue(value)}
+                    columns={3}
+                    colorA={flexoki.purple['600']}
+                    colorB={flexoki.purple['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                </div>
+                <div className="docs-code-stack">
+                  <CodeBlock code={activeRoute.code} />
+                  <CodeBlock
+                    code={`<RadioList
+  label="Render Profile (2 Columns)"
+  showLabel
+  options={options}
+  value={value}
+  onChange={(nextValue) => setValue(nextValue)}
+  columns={2}
+  colorA={flexoki.blue["600"]}
+  colorB={flexoki.blue["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>`}
+                  />
+                </div>
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  RadioList is a single-select list built on ListSurface and ListRow. It uses click
+                  selection by default and supports keyboard navigation with arrow keys, Home, and End.
+                </p>
+                <p>
+                  Use <code>defaultValue</code> for uncontrolled usage, or <code>value</code> with{' '}
+                  <code>onChange</code> to bind it to app state. Set <code>columns</code> for denser
+                  option layouts.
                 </p>
               </div>
             </>

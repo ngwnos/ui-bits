@@ -31,6 +31,7 @@ export { default as Sequencer, type SequencerProps, type SequencerHandle, type S
 export { default as WebGpuStatus, type WebGpuStatusProps, type WebGpuStatusBorderStyle, } from "./components/WebGpuStatus";
 export { default as SegmentBar, type SegmentBarProps, type SegmentBarOption, type SegmentBarBorderStyle, type SegmentBarBorderMask, } from "./components/SegmentBar";
 export { default as PresetManager, type PresetManagerProps, type PresetManagerPreset, } from "./components/PresetManager";
+export { default as NameInputRow, type NameInputRowProps, type NameInputRowBorderStyle, type NameInputRowRandomizeMode, } from "./components/NameInputRow";
 export { default as TextInput, type TextInputProps, type TextInputBorderStyle, } from "./components/TextInput";
 export { default as IconButton, type IconButtonProps, type IconButtonBehavior, type IconButtonBorderStyle, type IconButtonBorderMask, type IconButtonCycleOption, } from "./components/IconButton";
 export { default as Dial, type DialProps, type DialBorderStyle, type DialBorderMask, type DialControlMode, } from "./components/Dial";

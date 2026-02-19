@@ -98,6 +98,12 @@ export {
   type PresetManagerPreset,
 } from "./PresetManager";
 export {
+  default as NameInputRow,
+  type NameInputRowProps,
+  type NameInputRowBorderStyle,
+  type NameInputRowRandomizeMode,
+} from "./NameInputRow";
+export {
   default as VirtualKeyboard,
   type VirtualKeyboardProps,
   type VirtualKeyboardKey,

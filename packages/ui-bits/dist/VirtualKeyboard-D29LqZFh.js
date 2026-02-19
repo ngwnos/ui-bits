@@ -1,7 +1,7 @@
 import { jsx as a, jsxs as P, Fragment as gn } from "react/jsx-runtime";
 import o from "react";
 import { MousePointer2 as wn, CaseUpper as Mn, Piano as En } from "lucide-react";
-import { ai as Sn, d as kn, Y as Nn, aj as In, I as Ln, Z as De } from "./FloatingPanel-B0FCl4m5.js";
+import { aj as Sn, d as kn, Z as Nn, ak as In, I as Ln, _ as De } from "./FloatingPanel-Dmg1oam1.js";
 const Et = "C4", An = 13, Pn = 6, Rn = !1, Tn = "tonejs", Dn = 18, Kn = "#f2f0e5", Un = "#1c1b1a", St = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"], On = /* @__PURE__ */ new Set([1, 3, 6, 8, 10]), kt = /* @__PURE__ */ new Set([0, 2, 4, 5, 7, 9, 11]), $n = 21, H = (() => {
   const s = [];
   for (let i = 0; i <= 127; i += 1)
@@ -167,16 +167,16 @@ function Jn({
   onNoteOn: qe,
   onNoteOff: je,
   className: Gt,
-  style: Yt,
-  fontSize: Xt,
+  style: Xt,
+  fontSize: Yt,
   ariaLabel: Ge = "Virtual keyboard"
 }) {
-  const pe = Sn(jt, Ge), V = o.useCallback((e) => We?.[e] ?? (pe ? `${pe}.${e}` : void 0), [We, pe]), Zt = V("startNote"), Jt = V("noteCount"), Qt = V("heightUnits"), en = V("showLabels"), tn = V("keyboardShortcutsEnabled"), nn = V("instrument"), [oe, Ye] = W(
+  const pe = Sn(jt, Ge), V = o.useCallback((e) => We?.[e] ?? (pe ? `${pe}.${e}` : void 0), [We, pe]), Zt = V("startNote"), Jt = V("noteCount"), Qt = V("heightUnits"), en = V("showLabels"), tn = V("keyboardShortcutsEnabled"), nn = V("instrument"), [oe, Xe] = W(
     l,
     b ?? Et,
     y,
     Zt
-  ), [on, Xe] = W(
+  ), [on, Ye] = W(
     x,
     h ?? An,
     _,
@@ -191,7 +191,7 @@ function Jn({
     E ?? !1,
     R,
     en
-  ), [Y, sn] = W(
+  ), [X, sn] = W(
     zt,
     Wt,
     qt,
@@ -224,9 +224,9 @@ function Jn({
       white: t,
       black: n
     };
-  }, [i, N, oe, s]), ye = ot.white, ln = ot.black, Ce = kn(), rt = ye.length > 0 ? 100 / ye.length : 100, dn = rt * 0.6, K = Xt ?? Ce?.fontSize ?? 12, st = Bn(K), it = Math.max(1, Math.round(rn)), U = o.useMemo(() => wt(oe), [oe]), at = H.indexOf(U), X = Math.max(0, H.length - 1), fn = Math.max(
+  }, [i, N, oe, s]), ye = ot.white, ln = ot.black, Ce = kn(), rt = ye.length > 0 ? 100 / ye.length : 100, dn = rt * 0.6, K = Yt ?? Ce?.fontSize ?? 12, st = Bn(K), it = Math.max(1, Math.round(rn)), U = o.useMemo(() => wt(oe), [oe]), at = H.indexOf(U), Y = Math.max(0, H.length - 1), fn = Math.max(
     B,
-    Math.min(X, at >= 0 ? at : B)
+    Math.min(Y, at >= 0 ? at : B)
   ), O = Ot ?? Ce?.colorA ?? Kn, ie = $t ?? Ce?.colorB ?? Un, ct = Ft ?? ie, xe = Bt ?? O, hn = Ht ?? O, vn = Vt ?? O, Z = he && z.length > 0 && !be && !ne, J = an || z[0]?.value || "", Q = o.useMemo(() => z.find((e) => e.value === J) ?? null, [J, z]), _e = Z && (Q?.source === "tone" || Q?.toneConfig != null || J === Tt), ut = Q?.soundfontConfig ?? Kt ?? null, lt = Z && !_e && ut ? { ...ut, instrument: J } : null, p = o.useMemo(() => {
     const e = be ?? lt;
     return e ? typeof e == "string" ? { instrument: e } : e : null;
@@ -423,15 +423,15 @@ function Jn({
   }, [I]), fe = o.useCallback((e) => {
     const t = S.current;
     t.pointerId === e.pointerId && (t.note && I(t.note), S.current = { pointerId: null, note: null });
-  }, [I]), f = { ...Yt };
+  }, [I]), f = { ...Xt };
   f["--ui-bits-color-a"] = O, f["--ui-bits-color-b"] = ie, f["--vk-font-size"] = `${K}px`, f["--vk-header-height"] = `${st}px`, f["--vk-body-height"] = `${st * it}px`, f["--vk-header-bg"] = ie, f["--vk-header-text"] = O, f["--vk-border"] = O, f["--vk-bg"] = xe, f["--vk-white"] = ct, f["--vk-white-text"] = xe, f["--vk-black"] = xe, f["--vk-black-text"] = ct, f["--vk-white-active"] = hn, f["--vk-black-active"] = vn;
   const bn = o.useCallback((e) => {
-    const t = Math.max(B, Math.min(X, Math.round(e))), n = H[t] ?? H[B] ?? 60;
-    Ye(n);
-  }, [X, Ye]), pn = o.useCallback((e) => {
+    const t = Math.max(B, Math.min(Y, Math.round(e))), n = H[t] ?? H[B] ?? 60;
+    Xe(n);
+  }, [Y, Xe]), pn = o.useCallback((e) => {
     const t = Math.max(4, Math.min(88, Math.round(e)));
-    Xe(t);
-  }, [Xe]), yn = o.useCallback((e) => {
+    Ye(t);
+  }, [Ye]), yn = o.useCallback((e) => {
     const t = Math.max(3, Math.min(12, Math.round(e)));
     Ze(t);
   }, [Ze]), Cn = he ? /* @__PURE__ */ P(gn, { children: [
@@ -456,7 +456,7 @@ function Jn({
           De,
           {
             min: B,
-            max: X,
+            max: Y,
             step: 1,
             value: fn,
             onChange: bn,
@@ -465,7 +465,7 @@ function Jn({
             indicatorColor: me,
             ariaLabel: "Keyboard start note",
             formatDisplayValue: (e) => {
-              const t = Math.max(B, Math.min(X, Math.round(e))), n = H[t] ?? H[B] ?? 60;
+              const t = Math.max(B, Math.min(Y, Math.round(e))), n = H[t] ?? H[B] ?? 60;
               return Fe(n);
             }
           }
@@ -522,14 +522,14 @@ function Jn({
       title: "Keyboard mode"
     }
   ], []), gt = o.useCallback((e) => {
-    if (!Y) return null;
+    if (!X) return null;
     const t = Be(e);
     if (t == null) return null;
     const n = t - U;
     return n < 0 || n >= N || n >= Ue.length ? null : Ue[n];
-  }, [N, Y, U]);
+  }, [N, X, U]);
   return o.useEffect(() => {
-    if (!Y) {
+    if (!X) {
       g.current.forEach((n) => F.current(n)), g.current.clear();
       return;
     }
@@ -546,7 +546,7 @@ function Jn({
     return window.addEventListener("keydown", e, !0), window.addEventListener("keyup", t, !0), () => {
       window.removeEventListener("keydown", e, !0), window.removeEventListener("keyup", t, !0), g.current.forEach((n) => F.current(n)), g.current.clear();
     };
-  }, [Y]), o.useEffect(() => {
+  }, [X]), o.useEffect(() => {
     if (typeof window > "u") return;
     const e = () => {
       Pe.current(), L.current();
@@ -576,7 +576,7 @@ function Jn({
             Nn,
             {
               behavior: "cycle",
-              value: Y ? "keyboard" : "pointer",
+              value: X ? "keyboard" : "pointer",
               options: xn,
               onChange: (e) => sn(e === "keyboard"),
               onPointerDown: (e) => {
@@ -660,4 +660,4 @@ function Jn({
 export {
   Jn as V
 };
-//# sourceMappingURL=VirtualKeyboard-C9Pa6-O2.js.map
+//# sourceMappingURL=VirtualKeyboard-D29LqZFh.js.map

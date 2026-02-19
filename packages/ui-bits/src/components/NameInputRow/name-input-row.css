@@ -1,0 +1,14 @@
+.ui-bits-name-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  color: inherit;
+  font-family: var(--ui-bits-font-family, "IBM Plex Mono", monospace);
+  box-sizing: border-box;
+}
+
+.ui-bits-name-input-row__input {
+  flex: 1;
+  min-width: 0;
+}

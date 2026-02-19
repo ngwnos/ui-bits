@@ -141,6 +141,12 @@ export {
   type PresetManagerPreset,
 } from "./components/PresetManager";
 export {
+  default as NameInputRow,
+  type NameInputRowProps,
+  type NameInputRowBorderStyle,
+  type NameInputRowRandomizeMode,
+} from "./components/NameInputRow";
+export {
   default as TextInput,
   type TextInputProps,
   type TextInputBorderStyle,

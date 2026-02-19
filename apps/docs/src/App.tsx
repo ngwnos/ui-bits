@@ -15,6 +15,7 @@ import {
   KeyValueRows,
   LFOSlider,
   LoadingBar,
+  NameInputRow,
   PresetManager,
   PresetStoreProvider,
   RadioList,
@@ -190,6 +191,30 @@ const [value, setValue] = useState("balanced");
   fontSize={12}
   padding={8}
   verticalGap={6}
+/>`,
+  },
+  {
+    id: 'name-input-row',
+    label: 'Name Input Row',
+    title: 'Name Input Row',
+    code: `const randomWorldNames = [
+  "Ironwake Reach",
+  "Ashen Hollow",
+  "Starfall Basin",
+  "Copper Fen",
+  "Mireglass Coast",
+]
+
+const [createdNames, setCreatedNames] = useState<string[]>([])
+
+<NameInputRow
+  placeholder="New world..."
+  onCreate={(name) => setCreatedNames((prev) => [name, ...prev].slice(0, 6))}
+  onRandomize={() => randomWorldNames[Math.floor(Math.random() * randomWorldNames.length)] ?? ""}
+  colorA={flexoki.orange["600"]}
+  colorB={flexoki.orange["100"]}
+  borderStyle="a"
+  fontSize={12}
 />`,
   },
   {
@@ -951,6 +976,31 @@ function App() {
       ),
     },
   ]), [])
+  const randomWorldNamePool = useMemo(() => ([
+    'Ironwake Reach',
+    'Ashen Hollow',
+    'Starfall Basin',
+    'Copper Fen',
+    'Mireglass Coast',
+    'Thornspire Vale',
+  ]), [])
+  const randomFactionNamePool = useMemo(() => ([
+    'The Ember Cartel',
+    'Order of Glass',
+    'Ravenbound Circle',
+    'Verdant Host',
+    'Guild of the Ninth Bridge',
+  ]), [])
+  const [worldNameInputValue, setWorldNameInputValue] = useState('')
+  const [factionNameInputValue, setFactionNameInputValue] = useState('')
+  const [createdWorldNames, setCreatedWorldNames] = useState<string[]>([])
+  const [createdFactionNames, setCreatedFactionNames] = useState<string[]>([])
+  const getRandomWorldName = useCallback(() => (
+    randomWorldNamePool[Math.floor(Math.random() * randomWorldNamePool.length)] ?? ''
+  ), [randomWorldNamePool])
+  const getRandomFactionName = useCallback(() => (
+    randomFactionNamePool[Math.floor(Math.random() * randomFactionNamePool.length)] ?? ''
+  ), [randomFactionNamePool])
   const themeOptions = useMemo(() => ([
     {
       value: 'dark',
@@ -1950,6 +2000,94 @@ function App() {
                   It supports <code>mode="multiple"</code> (folder stack behavior) and{' '}
                   <code>mode="single"</code> (accordion behavior). The expanded area uses Folder-like
                   spacing controls with <code>padding</code> and <code>verticalGap</code>.
+                </p>
+              </div>
+            </>
+          ) : activeRouteId === 'name-input-row' ? (
+            <>
+              <div className="docs-code-section">
+                <div className="docs-radio-stack">
+                  <NameInputRow
+                    value={worldNameInputValue}
+                    onValueChange={setWorldNameInputValue}
+                    placeholder="New world..."
+                    onCreate={(name) => {
+                      setCreatedWorldNames((prev) => [name, ...prev].slice(0, 6))
+                    }}
+                    onRandomize={getRandomWorldName}
+                    colorA={flexoki.orange['600']}
+                    colorB={flexoki.orange['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <KeyValueRows
+                    rows={createdWorldNames.map((name, index) => ({
+                      key: `world-${index}-${name}`,
+                      label: `World ${String(index + 1).padStart(2, '0')}`,
+                      value: name,
+                    }))}
+                    emptyLabel="No created world names"
+                    colorA={flexoki.orange['600']}
+                    colorB={flexoki.orange['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <NameInputRow
+                    value={factionNameInputValue}
+                    onValueChange={setFactionNameInputValue}
+                    placeholder="Faction..."
+                    onCreate={(name) => {
+                      setCreatedFactionNames((prev) => [name, ...prev].slice(0, 6))
+                    }}
+                    onRandomize={getRandomFactionName}
+                    randomizeMode="append"
+                    appendSeparator=" of "
+                    colorA={flexoki.cyan['600']}
+                    colorB={flexoki.cyan['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <KeyValueRows
+                    rows={createdFactionNames.map((name, index) => ({
+                      key: `faction-${index}-${name}`,
+                      label: `Faction ${String(index + 1).padStart(2, '0')}`,
+                      value: name,
+                    }))}
+                    emptyLabel="No created faction names"
+                    colorA={flexoki.cyan['600']}
+                    colorB={flexoki.cyan['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                </div>
+                <div className="docs-code-stack">
+                  <CodeBlock code={activeRoute.code} />
+                  <CodeBlock
+                    code={`<NameInputRow
+  value={factionName}
+  onValueChange={setFactionName}
+  placeholder="Faction..."
+  onCreate={(name) => saveFaction(name)}
+  onRandomize={() => randomFactionName()}
+  randomizeMode="append"
+  appendSeparator=" of "
+  colorA={flexoki.cyan["600"]}
+  colorB={flexoki.cyan["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>`}
+                  />
+                </div>
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  NameInputRow is a compact create row: text input plus a primary <code>+</code>{" "}
+                  action and optional randomize action with <code>Dice6</code>.
+                </p>
+                <p>
+                  Pass <code>onRandomize</code> as a callback (sync or async) so name generation can
+                  come from your own list, service, or procedural generator without hard-coding data
+                  in the component.
                 </p>
               </div>
             </>

@@ -93,6 +93,13 @@ export {
   type KeyValueRowsBorderStyle,
 } from "./components/KeyValueRows";
 export {
+  default as KeyValueAccordion,
+  type KeyValueAccordionProps,
+  type KeyValueAccordionItem,
+  type KeyValueAccordionBorderStyle,
+  type KeyValueAccordionMode,
+} from "./components/KeyValueAccordion";
+export {
   default as RadioList,
   type RadioListProps,
   type RadioListOption,

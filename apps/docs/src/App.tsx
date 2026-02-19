@@ -11,6 +11,7 @@ import {
   Folder,
   FrameLoopProvider,
   IconButton,
+  KeyValueAccordion,
   KeyValueRows,
   LFOSlider,
   LoadingBar,
@@ -137,6 +138,58 @@ const [value, setValue] = useState("balanced");
   colorB={flexoki.green["100"]}
   borderStyle="a"
   fontSize={12}
+/>`,
+  },
+  {
+    id: 'key-value-accordion',
+    label: 'Key/Value Accordion',
+    title: 'Key/Value Accordion',
+    code: `const items = [
+  {
+    key: "render-profile",
+    label: "Render Profile",
+    value: "Balanced",
+    defaultExpanded: true,
+    children: (
+      <Dropdown
+        label="Profile"
+        labelInline
+        options={[
+          { value: "draft", label: "Draft" },
+          { value: "balanced", label: "Balanced" },
+          { value: "quality", label: "Quality" },
+        ]}
+        value={profile}
+        onChange={(value) => setProfile(value)}
+      />
+    ),
+  },
+  {
+    key: "modulation",
+    label: "Modulation",
+    value: "0.45",
+    children: (
+      <LFOSlider
+        label="Depth"
+        min={0}
+        max={1}
+        step={0.01}
+        defaultValue={0.45}
+        width="100%"
+      />
+    ),
+  },
+];
+
+<KeyValueAccordion
+  items={items}
+  mode="multiple"
+  colorA={flexoki.blue["600"]}
+  colorB={flexoki.blue["100"]}
+  borderStyle="a"
+  fontSize={12}
+  padding={8}
+  verticalGap={6}
 />`,
   },
   {
@@ -721,6 +774,15 @@ function App() {
     { key: 'characters', label: 'Characters', value: '28 / 50' },
     { key: 'side-quests', label: 'Side Quests', value: '09 / 20' },
   ]), [])
+  const accordionProfileOptions = useMemo(() => ([
+    { value: 'draft', label: 'Draft' },
+    { value: 'balanced', label: 'Balanced' },
+    { value: 'quality', label: 'Quality' },
+  ]), [])
+  const accordionLimiterOptions = useMemo(() => ([
+    { value: 'off', label: 'Off' },
+    { value: 'on', label: 'On' },
+  ]), [])
   const dropdownOptions = useMemo(() => ([
     { value: 'sine', label: 'Sine' },
     { value: 'triangle', label: 'Triangle' },
@@ -757,6 +819,138 @@ function App() {
   const [radioListDenseValue, setRadioListDenseValue] = useState('normal')
   const [iconDropdownValue, setIconDropdownValue] = useState('drizzle')
   const [nestedDropdownValue, setNestedDropdownValue] = useState('destination-01')
+  const [accordionProfileValue, setAccordionProfileValue] = useState('balanced')
+  const [accordionRoutingValue, setAccordionRoutingValue] = useState('stereo')
+  const [accordionLimiterValue, setAccordionLimiterValue] = useState('on')
+  const [accordionSingleExpandedKeys, setAccordionSingleExpandedKeys] = useState<string[]>([
+    'single-world',
+  ])
+  const keyValueAccordionItems = useMemo(() => ([
+    {
+      key: 'render-profile',
+      label: 'Render Profile',
+      value: accordionProfileOptions.find((option) => option.value === accordionProfileValue)?.label
+        ?? accordionProfileValue,
+      defaultExpanded: true,
+      children: (
+        <Dropdown
+          label="Profile"
+          labelInline
+          options={accordionProfileOptions}
+          value={accordionProfileValue}
+          onChange={(value) => setAccordionProfileValue(value)}
+          borderStyle="a"
+          fontSize={12}
+        />
+      ),
+    },
+    {
+      key: 'output-routing',
+      label: 'Output Routing',
+      value: radioListCompactOptions.find((option) => option.value === accordionRoutingValue)?.label
+        ?? accordionRoutingValue,
+      children: (
+        <RadioList
+          label="Routing"
+          showLabel
+          options={radioListCompactOptions}
+          value={accordionRoutingValue}
+          onChange={(value) => setAccordionRoutingValue(value)}
+          maxListHeight={120}
+          borderStyle="a"
+          fontSize={12}
+        />
+      ),
+    },
+    {
+      key: 'limiter',
+      label: 'Limiter',
+      value: accordionLimiterValue === 'on' ? 'On' : 'Off',
+      children: (
+        <>
+          <SegmentBar
+            options={accordionLimiterOptions}
+            value={accordionLimiterValue}
+            onChange={(value) => setAccordionLimiterValue(value)}
+            borderStyle="a"
+            fontSize={12}
+          />
+          <LFOSlider
+            label="Ceiling"
+            min={0}
+            max={1}
+            step={0.01}
+            defaultValue={0.93}
+            width="100%"
+            border="a"
+            fontSize={12}
+          />
+        </>
+      ),
+    },
+  ]), [
+    accordionLimiterOptions,
+    accordionLimiterValue,
+    accordionProfileOptions,
+    accordionProfileValue,
+    accordionRoutingValue,
+    radioListCompactOptions,
+  ])
+  const keyValueAccordionSingleItems = useMemo(() => ([
+    {
+      key: 'single-world',
+      label: 'World Scale',
+      value: 'Large',
+      children: (
+        <Dropdown
+          label="Scale"
+          labelInline
+          options={[
+            { value: 'small', label: 'Small' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'large', label: 'Large' },
+          ]}
+          defaultValue="large"
+          borderStyle="a"
+          fontSize={12}
+        />
+      ),
+    },
+    {
+      key: 'single-terrain',
+      label: 'Terrain Detail',
+      value: '0.62',
+      children: (
+        <LFOSlider
+          label="Detail"
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={0.62}
+          width="100%"
+          border="a"
+          fontSize={12}
+        />
+      ),
+    },
+    {
+      key: 'single-fog',
+      label: 'Fog Density',
+      value: 'Low',
+      children: (
+        <SegmentBar
+          options={[
+            { value: 'off', label: 'Off' },
+            { value: 'low', label: 'Low' },
+            { value: 'high', label: 'High' },
+          ]}
+          defaultValue="low"
+          borderStyle="a"
+          fontSize={12}
+        />
+      ),
+    },
+  ]), [])
   const themeOptions = useMemo(() => ([
     {
       value: 'dark',
@@ -1699,6 +1893,63 @@ function App() {
                 <p>
                   Use it when you need <code>label:value</code> data presentation instead of selectable
                   list items. It inherits panel theme colors and font size by default.
+                </p>
+              </div>
+            </>
+          ) : activeRouteId === 'key-value-accordion' ? (
+            <>
+              <div className="docs-code-section">
+                <div className="docs-radio-stack">
+                  <KeyValueAccordion
+                    items={keyValueAccordionItems}
+                    mode="multiple"
+                    colorA={flexoki.blue['600']}
+                    colorB={flexoki.blue['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                    padding={8}
+                    verticalGap={6}
+                  />
+                  <KeyValueAccordion
+                    items={keyValueAccordionSingleItems}
+                    mode="single"
+                    expandedKeys={accordionSingleExpandedKeys}
+                    onExpandedKeysChange={(keys) => setAccordionSingleExpandedKeys(keys)}
+                    colorA={flexoki.cyan['600']}
+                    colorB={flexoki.cyan['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                    padding={8}
+                    verticalGap={6}
+                  />
+                </div>
+                <div className="docs-code-stack">
+                  <CodeBlock code={activeRoute.code} />
+                  <CodeBlock
+                    code={`<KeyValueAccordion
+  items={items}
+  mode="single"
+  expandedKeys={expandedKeys}
+  onExpandedKeysChange={(keys) => setExpandedKeys(keys)}
+  colorA={flexoki.cyan["600"]}
+  colorB={flexoki.cyan["100"]}
+  borderStyle="a"
+  fontSize={12}
+  padding={8}
+  verticalGap={6}
+/>`}
+                  />
+                </div>
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  KeyValueAccordion keeps the joined-row look from KeyValueRows, but each row can
+                  expand into a full control body.
+                </p>
+                <p>
+                  It supports <code>mode="multiple"</code> (folder stack behavior) and{' '}
+                  <code>mode="single"</code> (accordion behavior). The expanded area uses Folder-like
+                  spacing controls with <code>padding</code> and <code>verticalGap</code>.
                 </p>
               </div>
             </>

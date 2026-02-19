@@ -22,6 +22,7 @@ export { default as IconDropdown, type IconDropdownProps, type IconDropdownOptio
 export { default as ListSurface, type ListSurfaceProps, useListScrollMetrics, type UseListScrollMetricsOptions, } from "./components/ListSurface";
 export { default as ListRow, type ListRowProps } from "./components/ListRow";
 export { default as KeyValueRows, type KeyValueRowsProps, type KeyValueRowsRow, type KeyValueRowsBorderStyle, } from "./components/KeyValueRows";
+export { default as KeyValueAccordion, type KeyValueAccordionProps, type KeyValueAccordionItem, type KeyValueAccordionBorderStyle, type KeyValueAccordionMode, } from "./components/KeyValueAccordion";
 export { default as RadioList, type RadioListProps, type RadioListOption, type RadioListBorderStyle, } from "./components/RadioList";
 export { default as ColorPicker, type ColorPickerProps, type ColorPickerBorderStyle, type ColorPickerBorderMask, } from "./components/ColorPicker";
 export { default as ColorField, type ColorFieldProps, type ColorFieldBorderStyle, } from "./components/ColorField";

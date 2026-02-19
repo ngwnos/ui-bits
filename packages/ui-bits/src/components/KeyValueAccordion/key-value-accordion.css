@@ -1,0 +1,92 @@
+.ui-bits-key-value-accordion {
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-bits-key-value-accordion__item {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--ui-bits-key-value-accordion-border-color);
+}
+
+.ui-bits-key-value-accordion__item:first-child {
+  border-top: none;
+}
+
+.ui-bits-key-value-accordion__header {
+  display: grid;
+  grid-template-columns: var(--ui-bits-key-value-accordion-row-height) minmax(0, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: 12px;
+  min-height: var(--ui-bits-key-value-accordion-row-height);
+  padding: 0 var(--ui-bits-key-value-accordion-padding-x);
+  box-sizing: border-box;
+}
+
+.ui-bits-key-value-accordion__header--expandable {
+  cursor: pointer;
+}
+
+.ui-bits-key-value-accordion__header--disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.ui-bits-key-value-accordion__icon {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.ui-bits-key-value-accordion__icon-placeholder {
+  width: var(--ui-bits-key-value-accordion-row-height);
+  height: var(--ui-bits-key-value-accordion-row-height);
+}
+
+.ui-bits-key-value-accordion__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.7;
+}
+
+.ui-bits-key-value-accordion__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.ui-bits-key-value-accordion__body {
+  border-top: 1px solid var(--ui-bits-key-value-accordion-border-color);
+  padding-left: var(--ui-bits-key-value-accordion-body-padding-x);
+  padding-right: var(--ui-bits-key-value-accordion-body-padding-x);
+  padding-top: var(--ui-bits-key-value-accordion-body-padding-y);
+  padding-bottom: var(--ui-bits-key-value-accordion-body-padding-y);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-bits-key-value-accordion-body-gap);
+  background: var(--ui-bits-key-value-accordion-body-background);
+  backdrop-filter: var(--ui-bits-key-value-accordion-body-backdrop-filter);
+  -webkit-backdrop-filter: var(--ui-bits-key-value-accordion-body-backdrop-filter);
+  box-sizing: border-box;
+}
+
+.ui-bits-key-value-accordion__body--collapsed {
+  display: none;
+}
+
+.ui-bits-key-value-accordion__empty {
+  min-height: var(--ui-bits-key-value-accordion-row-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--ui-bits-key-value-accordion-padding-x);
+  opacity: 0.7;
+  box-sizing: border-box;
+}

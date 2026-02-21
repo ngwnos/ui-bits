@@ -139,6 +139,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const [isDragging, setIsDragging] = React.useState(false);
   const [scrollMetrics, setScrollMetrics] = React.useState({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
   const [isScrolling, setIsScrolling] = React.useState(false);
+  const [panelViewportTop, setPanelViewportTop] = React.useState<number | null>(null);
   const [dragPosition, setDragPosition] = React.useState<{ x: number; y: number } | null>(() => (
     defaultPosition ? { x: defaultPosition.x, y: defaultPosition.y } : null
   ));
@@ -364,10 +365,27 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
 
   const resolvedPosition = position ?? dragPosition;
   const isFloating = Boolean(draggable && resolvedPosition);
+  const stylePosition = style?.position;
+  const shouldClampBodyToViewport = Boolean(draggable || stylePosition === "fixed");
   const bottomMargin = 6;
-  const dynamicBodyMaxHeight = isFloating && resolvedPosition
-    ? Math.max(0, window.innerHeight - resolvedPosition.y - headerMinHeight - bottomMargin)
+  const effectivePanelTop = isFloating && resolvedPosition ? resolvedPosition.y : panelViewportTop;
+  const dynamicBodyMaxHeight = shouldClampBodyToViewport && effectivePanelTop !== null && typeof window !== "undefined"
+    ? Math.max(0, window.innerHeight - effectivePanelTop - headerMinHeight - bottomMargin)
     : undefined;
+
+  const updatePanelViewportTop = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (isFloating && resolvedPosition) {
+      setPanelViewportTop(resolvedPosition.y);
+      return;
+    }
+    const panelNode = panelRef.current;
+    if (!panelNode) return;
+    const rect = panelNode.getBoundingClientRect();
+    setPanelViewportTop((prev) => (
+      prev !== null && Math.abs(prev - rect.top) < 0.5 ? prev : rect.top
+    ));
+  }, [isFloating, resolvedPosition]);
 
   const updateScrollMetrics = React.useCallback(() => {
     const node = bodyRef.current;
@@ -402,6 +420,28 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     observer.observe(node);
     return () => observer.disconnect();
   }, [updateScrollMetrics]);
+
+  React.useLayoutEffect(() => {
+    if (!shouldClampBodyToViewport) return;
+    updatePanelViewportTop();
+  }, [shouldClampBodyToViewport, updatePanelViewportTop]);
+
+  React.useEffect(() => {
+    if (!shouldClampBodyToViewport || typeof window === "undefined") return;
+    const handleViewportChange = () => updatePanelViewportTop();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    const panelNode = panelRef.current;
+    const observer = panelNode && typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(handleViewportChange)
+      : null;
+    observer?.observe(panelNode as Element);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      observer?.disconnect();
+    };
+  }, [shouldClampBodyToViewport, updatePanelViewportTop]);
 
   React.useEffect(() => () => {
     if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current);

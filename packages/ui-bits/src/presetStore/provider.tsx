@@ -100,7 +100,7 @@ export function PresetStoreProvider({
     internalStoreRef.current = createControlStore();
   }
   const resolvedStore = controlStore ?? parentStore ?? internalStoreRef.current;
-  const shouldWrapControlStore = !parentStore && !controlStore;
+  const shouldProvideResolvedStore = parentStore !== resolvedStore;
 
   const [internalPresets, setInternalPresets] = React.useState<PresetStorePreset[]>(defaultPresets);
   const isControlled = presets !== undefined;
@@ -235,7 +235,7 @@ export function PresetStoreProvider({
 
   const content = (
     <PresetStoreContext.Provider value={contextValue}>
-      {shouldWrapControlStore ? (
+      {shouldProvideResolvedStore ? (
         children
       ) : (
         <ControlIdProvider autoIds={autoIds} prefix={controlIdPrefix}>
@@ -245,7 +245,7 @@ export function PresetStoreProvider({
     </PresetStoreContext.Provider>
   );
 
-  if (shouldWrapControlStore) {
+  if (shouldProvideResolvedStore) {
     return (
       <ControlStoreProvider
         store={resolvedStore}

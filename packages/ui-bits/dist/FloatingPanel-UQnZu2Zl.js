@@ -9228,7 +9228,7 @@ function G3({
 }) {
   const x = ks(), N = s.useRef(null);
   N.current || (N.current = To());
-  const X = f ?? x ?? N.current, j = !x && !f, [p, K] = s.useState(t), B = n !== void 0, h = B ? n : p, Y = s.useCallback((G) => {
+  const X = f ?? x ?? N.current, j = x !== X, [p, K] = s.useState(t), B = n !== void 0, h = B ? n : p, Y = s.useCallback((G) => {
     if (!B) {
       K((E) => {
         const V = typeof G == "function" ? G(E) : G;
@@ -10495,4 +10495,4 @@ export {
   j3 as y,
   m3 as z
 };
-//# sourceMappingURL=FloatingPanel--WsSLa1P.js.map
+//# sourceMappingURL=FloatingPanel-UQnZu2Zl.js.map

@@ -1,7 +1,7 @@
 import React from "react";
+import tgpu from "typegpu";
 import { usePanelTheme } from "../../panelGap";
 import SegmentBar from "../SegmentBar";
-import ColorFieldWorker from "../ColorField/color-field.worker?worker&inline";
 
 export type ColorFieldPickerMode = "hsv" | "rgb" | "oklch";
 export type ColorFieldPickerBorderStyle = "a" | "b" | "none";
@@ -29,7 +29,422 @@ const SLIDER_PAD_Y_EM = 0.35;
 const SLIDER_BORDER_WIDTH = 1;
 const DEFAULT_PICKER_HEIGHT_UNITS = 6;
 const OKLCH_MAX_CHROMA = 0.4;
-const createColorFieldWorker = () => new ColorFieldWorker();
+
+const LUT_WIDTH = 360;
+const LUT_HEIGHT = 512;
+const LUT_WORKGROUP_SIZE_X = 8;
+const LUT_WORKGROUP_SIZE_Y = 8;
+const UNIFORM_FLOAT_COUNT = 12;
+const UNIFORM_BUFFER_SIZE = UNIFORM_FLOAT_COUNT * Float32Array.BYTES_PER_ELEMENT;
+
+type PointerMetrics = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  planeHeight: number;
+};
+
+type CanvasMetrics = {
+  width: number;
+  height: number;
+  barHeight: number;
+};
+
+type GpuStatus = "loading" | "ready" | "unsupported" | "error";
+
+type TypeGpuRoot = Awaited<ReturnType<typeof tgpu.init>>;
+
+let sharedRoot: TypeGpuRoot | null = null;
+let sharedRootPromise: Promise<TypeGpuRoot | null> | null = null;
+
+interface ColorFieldGpuResources {
+  device: GPUDevice;
+  context: GPUCanvasContext;
+  format: GPUTextureFormat;
+  uniformBuffer: GPUBuffer;
+  lutBuffer: GPUBuffer;
+  computePipeline: GPUComputePipeline;
+  renderPipeline: GPURenderPipeline;
+  computeBindGroup: GPUBindGroup;
+  renderBindGroup: GPUBindGroup;
+  width: number;
+  height: number;
+}
+
+async function getSharedRoot(): Promise<TypeGpuRoot | null> {
+  if (typeof navigator === "undefined" || !navigator.gpu) return null;
+  if (sharedRoot) return sharedRoot;
+  if (!sharedRootPromise) {
+    sharedRootPromise = tgpu.init().then((root) => {
+      sharedRoot = root;
+      return root;
+    }).catch((error) => {
+      console.error("ColorFieldPicker: TypeGPU init failed", error);
+      sharedRootPromise = null;
+      return null;
+    });
+  }
+  return sharedRootPromise;
+}
+
+function createColorFieldComputeShader() {
+  return `
+const LUT_WIDTH : u32 = ${LUT_WIDTH}u;
+const LUT_HEIGHT : u32 = ${LUT_HEIGHT}u;
+const OKLCH_MAX_CHROMA : f32 = ${OKLCH_MAX_CHROMA};
+
+@group(0) @binding(0) var<storage, read_write> lut : array<f32>;
+
+fn oklchToLinearRgb(l: f32, c: f32, h: f32) -> vec3<f32> {
+  let hRad = h * 3.14159265359 / 180.0;
+  let a = c * cos(hRad);
+  let b = c * sin(hRad);
+  let l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+  let m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+  let s_ = l - 0.0894841775 * a - 1.291485548 * b;
+  let l3 = l_ * l_ * l_;
+  let m3 = m_ * m_ * m_;
+  let s3 = s_ * s_ * s_;
+  return vec3<f32>(
+    4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3,
+    -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3,
+    -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3,
+  );
+}
+
+fn isInGamut(l: f32, c: f32, h: f32) -> bool {
+  let rgb = oklchToLinearRgb(l, c, h);
+  let epsilon = 0.0001;
+  return rgb.x >= -epsilon && rgb.x <= (1.0 + epsilon)
+    && rgb.y >= -epsilon && rgb.y <= (1.0 + epsilon)
+    && rgb.z >= -epsilon && rgb.z <= (1.0 + epsilon);
+}
+
+fn findMaxChroma(l: f32, h: f32, targetC: f32) -> f32 {
+  if (isInGamut(l, targetC, h)) {
+    return targetC;
+  }
+  var lo = 0.0;
+  var hi = targetC;
+  for (var i = 0u; i < 12u; i = i + 1u) {
+    let mid = (lo + hi) * 0.5;
+    if (isInGamut(l, mid, h)) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
+}
+
+fn lutIndex(lIndex: u32, hIndex: u32) -> u32 {
+  return lIndex * LUT_WIDTH + hIndex;
+}
+
+@compute @workgroup_size(${LUT_WORKGROUP_SIZE_X}, ${LUT_WORKGROUP_SIZE_Y}, 1)
+fn cs_main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let hIndex = gid.x;
+  let lIndex = gid.y;
+  if (hIndex >= LUT_WIDTH || lIndex >= LUT_HEIGHT) {
+    return;
+  }
+  let l = f32(lIndex) / f32(LUT_HEIGHT - 1u);
+  let h = f32(hIndex) / f32(LUT_WIDTH) * 360.0;
+  lut[lutIndex(lIndex, hIndex)] = findMaxChroma(l, h, OKLCH_MAX_CHROMA);
+}
+`;
+}
+
+function createColorFieldRenderShader() {
+  return `
+const LUT_WIDTH : u32 = ${LUT_WIDTH}u;
+const LUT_HEIGHT : u32 = ${LUT_HEIGHT}u;
+const OKLCH_MAX_CHROMA : f32 = ${OKLCH_MAX_CHROMA};
+const EPSILON : f32 = 0.0001;
+
+struct Uniforms {
+  viewport : vec4<f32>,
+  state0 : vec4<f32>,
+  state1 : vec4<f32>,
+};
+
+struct VertexOutput {
+  @builtin(position) position : vec4<f32>,
+  @location(0) uv : vec2<f32>,
+};
+
+@group(0) @binding(0) var<uniform> uniforms : Uniforms;
+@group(0) @binding(1) var<storage, read> lut : array<f32>;
+
+@vertex
+fn vs_main(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
+  var positions = array<vec2<f32>, 6>(
+    vec2<f32>(-1.0, 1.0),
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>(1.0, 1.0),
+    vec2<f32>(1.0, 1.0),
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>(1.0, -1.0)
+  );
+  var uvs = array<vec2<f32>, 6>(
+    vec2<f32>(0.0, 0.0),
+    vec2<f32>(0.0, 1.0),
+    vec2<f32>(1.0, 0.0),
+    vec2<f32>(1.0, 0.0),
+    vec2<f32>(0.0, 1.0),
+    vec2<f32>(1.0, 1.0)
+  );
+  var out : VertexOutput;
+  out.position = vec4<f32>(positions[vertexIndex], 0.0, 1.0);
+  out.uv = uvs[vertexIndex];
+  return out;
+}
+
+fn clamp01(value: f32) -> f32 {
+  return clamp(value, 0.0, 1.0);
+}
+
+fn hsvToRgb(h: f32, s: f32, v: f32) -> vec3<f32> {
+  let normalizedHue = h - 360.0 * floor(h / 360.0);
+  let c = v * s;
+  let hp = normalizedHue / 60.0;
+  let x = c * (1.0 - abs((hp - 2.0 * floor(hp * 0.5)) - 1.0));
+  var rgb = vec3<f32>(0.0, 0.0, 0.0);
+  if (hp >= 0.0 && hp < 1.0) {
+    rgb = vec3<f32>(c, x, 0.0);
+  } else if (hp >= 1.0 && hp < 2.0) {
+    rgb = vec3<f32>(x, c, 0.0);
+  } else if (hp >= 2.0 && hp < 3.0) {
+    rgb = vec3<f32>(0.0, c, x);
+  } else if (hp >= 3.0 && hp < 4.0) {
+    rgb = vec3<f32>(0.0, x, c);
+  } else if (hp >= 4.0 && hp < 5.0) {
+    rgb = vec3<f32>(x, 0.0, c);
+  } else {
+    rgb = vec3<f32>(c, 0.0, x);
+  }
+  let m = v - c;
+  return rgb + vec3<f32>(m, m, m);
+}
+
+fn linearToSrgb(value: f32) -> f32 {
+  let clamped = clamp(value, 0.0, 1.0);
+  if (clamped <= 0.0031308) {
+    return clamped * 12.92;
+  }
+  return 1.055 * pow(clamped, 1.0 / 2.4) - 0.055;
+}
+
+fn oklchToLinearRgb(l: f32, c: f32, h: f32) -> vec3<f32> {
+  let hRad = h * 3.14159265359 / 180.0;
+  let a = c * cos(hRad);
+  let b = c * sin(hRad);
+  let l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+  let m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+  let s_ = l - 0.0894841775 * a - 1.291485548 * b;
+  let l3 = l_ * l_ * l_;
+  let m3 = m_ * m_ * m_;
+  let s3 = s_ * s_ * s_;
+  return vec3<f32>(
+    4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3,
+    -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3,
+    -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3,
+  );
+}
+
+fn oklchToRgb(l: f32, c: f32, h: f32) -> vec3<f32> {
+  let linear = oklchToLinearRgb(l, c, h);
+  return vec3<f32>(
+    linearToSrgb(linear.x),
+    linearToSrgb(linear.y),
+    linearToSrgb(linear.z),
+  );
+}
+
+fn lutIndex(lIndex: u32, hIndex: u32) -> u32 {
+  return lIndex * LUT_WIDTH + hIndex;
+}
+
+fn sampleMaxChroma(l: f32, h: f32) -> f32 {
+  let lScaled = clamp01(l) * f32(LUT_HEIGHT - 1u);
+  let hWrapped = h - 360.0 * floor(h / 360.0);
+  let hScaled = hWrapped / 360.0 * f32(LUT_WIDTH);
+
+  let l0 = u32(floor(lScaled));
+  let l1 = min(LUT_HEIGHT - 1u, l0 + 1u);
+  let h0 = u32(floor(hScaled)) % LUT_WIDTH;
+  let h1 = (h0 + 1u) % LUT_WIDTH;
+
+  let tl = fract(lScaled);
+  let th = fract(hScaled);
+
+  let c00 = lut[lutIndex(l0, h0)];
+  let c10 = lut[lutIndex(l0, h1)];
+  let c01 = lut[lutIndex(l1, h0)];
+  let c11 = lut[lutIndex(l1, h1)];
+
+  let c0 = mix(c00, c10, th);
+  let c1 = mix(c01, c11, th);
+  return mix(c0, c1, tl);
+}
+
+@fragment
+fn fs_main(in : VertexOutput) -> @location(0) vec4<f32> {
+  let width = max(1.0, uniforms.viewport.x);
+  let height = max(1.0, uniforms.viewport.y);
+  let barHeight = clamp(uniforms.viewport.z, 1.0, height);
+  let mode = uniforms.viewport.w;
+
+  let planeHeight = max(1.0, height - barHeight);
+  let maxX = max(1.0, width - 1.0);
+  let maxY = max(1.0, planeHeight - 1.0);
+
+  let xPx = clamp(in.uv.x * width, 0.0, width - 1.0);
+  let yPx = clamp(in.uv.y * height, 0.0, height - 1.0);
+  let xRatio = xPx / maxX;
+  let isBar = yPx >= planeHeight;
+
+  var color = vec3<f32>(0.0, 0.0, 0.0);
+
+  if (mode < 0.5) {
+    if (isBar) {
+      color = hsvToRgb(xRatio * 360.0, clamp01(uniforms.state1.y), clamp01(uniforms.state1.z));
+    } else {
+      let v = 1.0 - clamp01(yPx / maxY);
+      color = hsvToRgb(uniforms.state1.w, xRatio, v);
+    }
+  } else if (mode < 1.5) {
+    if (isBar) {
+      color = vec3<f32>(
+        clamp(uniforms.state0.z, 0.0, 255.0) / 255.0,
+        clamp(uniforms.state0.w, 0.0, 255.0) / 255.0,
+        xRatio,
+      );
+    } else {
+      color = vec3<f32>(
+        xRatio,
+        1.0 - clamp01(yPx / maxY),
+        clamp(uniforms.state1.x, 0.0, 255.0) / 255.0,
+      );
+    }
+  } else {
+    if (isBar) {
+      let nextL = xRatio;
+      let maxC = sampleMaxChroma(nextL, uniforms.state1.w);
+      let mappedC = min(clamp(uniforms.state0.y, 0.0, OKLCH_MAX_CHROMA), maxC);
+      color = oklchToRgb(nextL, mappedC, uniforms.state1.w);
+    } else {
+      let h = xRatio * 360.0;
+      let row = floor(yPx);
+      let rowC = clamp01(1.0 - row / maxY) * OKLCH_MAX_CHROMA;
+      let rowCBelow = clamp01(1.0 - (row + 1.0) / maxY) * OKLCH_MAX_CHROMA;
+      let maxC = sampleMaxChroma(clamp01(uniforms.state0.x), h);
+      if (rowC <= maxC + EPSILON) {
+        color = oklchToRgb(clamp01(uniforms.state0.x), rowC, h);
+      } else if (rowCBelow <= maxC + EPSILON) {
+        color = vec3<f32>(0.0, 0.0, 0.0);
+      } else {
+        color = oklchToRgb(clamp01(uniforms.state0.x), min(rowC, maxC), h);
+      }
+    }
+  }
+
+  return vec4<f32>(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
+}
+`;
+}
+
+function disposeGpuResources(resources: ColorFieldGpuResources | null) {
+  if (!resources) return;
+  resources.uniformBuffer.destroy();
+  resources.lutBuffer.destroy();
+  resources.width = 0;
+  resources.height = 0;
+}
+
+function buildGpuResources(device: GPUDevice, canvas: HTMLCanvasElement): ColorFieldGpuResources | null {
+  if (typeof navigator === "undefined" || !navigator.gpu) return null;
+  const context = canvas.getContext("webgpu");
+  if (!context) return null;
+
+  const format = navigator.gpu.getPreferredCanvasFormat();
+  context.configure({
+    device,
+    format,
+    alphaMode: "opaque",
+  });
+
+  const uniformBuffer = device.createBuffer({
+    size: UNIFORM_BUFFER_SIZE,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  const lutBuffer = device.createBuffer({
+    size: LUT_WIDTH * LUT_HEIGHT * Float32Array.BYTES_PER_ELEMENT,
+    usage: GPUBufferUsage.STORAGE,
+  });
+
+  const computeModule = device.createShaderModule({ code: createColorFieldComputeShader() });
+  const renderModule = device.createShaderModule({ code: createColorFieldRenderShader() });
+
+  const computePipeline = device.createComputePipeline({
+    layout: "auto",
+    compute: { module: computeModule, entryPoint: "cs_main" },
+  });
+
+  const renderPipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: { module: renderModule, entryPoint: "vs_main" },
+    fragment: {
+      module: renderModule,
+      entryPoint: "fs_main",
+      targets: [{ format }],
+    },
+    primitive: { topology: "triangle-list" },
+  });
+
+  const computeBindGroup = device.createBindGroup({
+    layout: computePipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: lutBuffer } },
+    ],
+  });
+
+  const renderBindGroup = device.createBindGroup({
+    layout: renderPipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } },
+      { binding: 1, resource: { buffer: lutBuffer } },
+    ],
+  });
+
+  const computeEncoder = device.createCommandEncoder();
+  const computePass = computeEncoder.beginComputePass();
+  computePass.setPipeline(computePipeline);
+  computePass.setBindGroup(0, computeBindGroup);
+  computePass.dispatchWorkgroups(
+    Math.ceil(LUT_WIDTH / LUT_WORKGROUP_SIZE_X),
+    Math.ceil(LUT_HEIGHT / LUT_WORKGROUP_SIZE_Y),
+    1,
+  );
+  computePass.end();
+  device.queue.submit([computeEncoder.finish()]);
+
+  return {
+    device,
+    context,
+    format,
+    uniformBuffer,
+    lutBuffer,
+    computePipeline,
+    renderPipeline,
+    computeBindGroup,
+    renderBindGroup,
+    width: 0,
+    height: 0,
+  };
+}
 
 function resolveSize(value?: number | string): string | undefined {
   if (value == null) return undefined;
@@ -277,6 +692,7 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
     style,
     ...rest
   } = props;
+
   const panelTheme = usePanelTheme();
   const resolvedColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
   const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
@@ -315,54 +731,113 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
       : "transparent";
   const borderRadius = Math.max(2, Math.round(resolvedFontSize * 0.25));
 
+  const supportsWebGPU = typeof navigator !== "undefined" && Boolean(navigator.gpu);
+  const [gpuStatus, setGpuStatus] = React.useState<GpuStatus>(() => (supportsWebGPU ? "loading" : "unsupported"));
+  const isGpuReady = gpuStatus === "ready";
+
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const [canvasNode, setCanvasNode] = React.useState<HTMLCanvasElement | null>(null);
-  const workerPoolRef = React.useRef<Worker[]>([]);
-  const paintTokenRef = React.useRef(0);
-  const canvasSizeRef = React.useRef({ width: 0, height: 0 });
-  const lastCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const planeMarkerRef = React.useRef<HTMLDivElement | null>(null);
+  const barMarkerRef = React.useRef<HTMLDivElement | null>(null);
+  const resourcesRef = React.useRef<ColorFieldGpuResources | null>(null);
+  const uniformArrayRef = React.useRef<Float32Array>(new Float32Array(UNIFORM_FLOAT_COUNT));
+
+  const renderRafRef = React.useRef<number | null>(null);
+  const renderNowRef = React.useRef<(() => void) | null>(null);
+
   const draggingRef = React.useRef(false);
   const activeRegionRef = React.useRef<"plane" | "hue" | null>(null);
-  const [canvasMetrics, setCanvasMetrics] = React.useState({ width: 0, height: 0, barHeight: 0 });
+  const pointerMetricsRef = React.useRef<PointerMetrics | null>(null);
+  const lastPointerSampleRef = React.useRef<{
+    x: number;
+    y: number;
+    region: "plane" | "hue";
+    mode: ColorFieldPickerMode;
+  } | null>(null);
 
-  const [hsvState, setHsvState] = React.useState(() => {
-    const rgb = hexToRgb(resolvedValue) ?? { r: 255, g: 255, b: 255 };
-    return rgbToHsv(rgb.r, rgb.g, rgb.b);
-  });
-  const hsvRef = React.useRef(hsvState);
-  const [rgbState, setRgbState] = React.useState(() => (
-    hexToRgb(resolvedValue) ?? { r: 255, g: 255, b: 255 }
-  ));
-  const rgbRef = React.useRef(rgbState);
-  const [oklchState, setOklchState] = React.useState(() => {
-    const rgb = hexToRgb(resolvedValue) ?? { r: 255, g: 255, b: 255 };
-    return rgbToOklch(rgb.r, rgb.g, rgb.b);
-  });
-  const oklchRef = React.useRef(oklchState);
+  const [canvasMetrics, setCanvasMetrics] = React.useState<CanvasMetrics>({ width: 0, height: 0, barHeight: 0 });
+  const canvasMetricsRef = React.useRef<CanvasMetrics>(canvasMetrics);
+  const modeRef = React.useRef<ColorFieldPickerMode>(resolvedMode);
+  const seedRgbRef = React.useRef(hexToRgb(resolvedValue) ?? { r: 255, g: 255, b: 255 });
+  const rgbRef = React.useRef(seedRgbRef.current);
+  const hsvRef = React.useRef(rgbToHsv(seedRgbRef.current.r, seedRgbRef.current.g, seedRgbRef.current.b));
+  const oklchRef = React.useRef(rgbToOklch(seedRgbRef.current.r, seedRgbRef.current.g, seedRgbRef.current.b));
+
+  const scheduleRender = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (renderRafRef.current !== null) return;
+    renderRafRef.current = window.requestAnimationFrame(() => {
+      renderRafRef.current = null;
+      renderNowRef.current?.();
+    });
+  }, []);
 
   React.useEffect(() => {
-    hsvRef.current = hsvState;
-  }, [hsvState]);
+    setGpuStatus((prev) => {
+      if (!supportsWebGPU) return "unsupported";
+      return prev === "unsupported" ? "loading" : prev;
+    });
+  }, [supportsWebGPU]);
+
   React.useEffect(() => {
-    rgbRef.current = rgbState;
-  }, [rgbState]);
+    canvasMetricsRef.current = canvasMetrics;
+  }, [canvasMetrics]);
+
+  const updateMarkersNow = React.useCallback(() => {
+    const planeMarker = planeMarkerRef.current;
+    const barMarker = barMarkerRef.current;
+    if (!planeMarker || !barMarker) return;
+    const metrics = canvasMetricsRef.current;
+    if (metrics.width <= 0 || metrics.height <= 0) {
+      planeMarker.style.opacity = "0";
+      barMarker.style.opacity = "0";
+      return;
+    }
+
+    const planeMode = modeRef.current;
+    const planeHeight = Math.max(1, metrics.height - metrics.barHeight);
+    const planeX = planeMode === "oklch"
+      ? clamp01(oklchRef.current.h / 360) * metrics.width
+      : planeMode === "rgb"
+        ? clamp01(rgbRef.current.r / 255) * metrics.width
+        : clamp01(hsvRef.current.s) * metrics.width;
+    const planeY = planeMode === "oklch"
+      ? clamp01(1 - oklchRef.current.c / OKLCH_MAX_CHROMA) * planeHeight
+      : planeMode === "rgb"
+        ? clamp01(1 - rgbRef.current.g / 255) * planeHeight
+        : clamp01(1 - hsvRef.current.v) * planeHeight;
+    const barValue = planeMode === "oklch"
+      ? oklchRef.current.l
+      : planeMode === "rgb"
+        ? rgbRef.current.b / 255
+        : hsvRef.current.h / 360;
+    const barX = clamp01(barValue) * metrics.width;
+
+    planeMarker.style.left = `${planeX}px`;
+    planeMarker.style.top = `${planeY}px`;
+    planeMarker.style.opacity = "1";
+
+    barMarker.style.left = `${barX}px`;
+    barMarker.style.top = `${Math.max(1, metrics.height - metrics.barHeight) + metrics.barHeight / 2}px`;
+    barMarker.style.opacity = "1";
+  }, []);
+
   React.useEffect(() => {
-    oklchRef.current = oklchState;
-  }, [oklchState]);
+    modeRef.current = resolvedMode;
+    scheduleRender();
+  }, [resolvedMode, scheduleRender]);
 
   React.useEffect(() => {
     if (draggingRef.current) return;
     const rgb = hexToRgb(resolvedValue);
     if (!rgb) return;
-    const next = rgbToHsv(rgb.r, rgb.g, rgb.b);
-    hsvRef.current = next;
-    setHsvState(next);
+    const nextHsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    hsvRef.current = nextHsv;
     rgbRef.current = rgb;
-    setRgbState(rgb);
     const nextOklch = rgbToOklchWithHue(rgb.r, rgb.g, rgb.b, oklchRef.current.h);
     oklchRef.current = nextOklch;
-    setOklchState(nextOklch);
-  }, [resolvedValue]);
+    scheduleRender();
+  }, [resolvedValue, scheduleRender]);
 
   const prevColorModeRef = React.useRef(resolvedMode);
   React.useEffect(() => {
@@ -373,53 +848,160 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
     if (resolvedMode === "oklch") {
       const nextOklch = rgbToOklchWithHue(rgb.r, rgb.g, rgb.b, oklchRef.current.h);
       oklchRef.current = nextOklch;
-      setOklchState(nextOklch);
     } else if (resolvedMode === "rgb") {
       rgbRef.current = rgb;
-      setRgbState(rgb);
     } else {
       const nextHsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
       hsvRef.current = nextHsv;
-      setHsvState(nextHsv);
     }
-  }, [resolvedMode, resolvedValue]);
+    scheduleRender();
+  }, [resolvedMode, resolvedValue, scheduleRender]);
+
+  const renderCanvas = React.useCallback(() => {
+    updateMarkersNow();
+    if (typeof window === "undefined") return;
+    const resources = resourcesRef.current;
+    const canvas = canvasRef.current;
+    if (!resources || !canvas) return;
+
+    const metrics = canvasMetricsRef.current;
+    if (metrics.width <= 0 || metrics.height <= 0) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const widthPx = Math.max(1, Math.round(metrics.width * dpr));
+    const heightPx = Math.max(1, Math.round(metrics.height * dpr));
+    const barHeightPx = Math.max(1, Math.round(metrics.barHeight * dpr));
+
+    if (canvas.width !== widthPx || canvas.height !== heightPx) {
+      canvas.width = widthPx;
+      canvas.height = heightPx;
+    }
+
+    if (resources.width !== widthPx || resources.height !== heightPx) {
+      resources.context.configure({
+        device: resources.device,
+        format: resources.format,
+        alphaMode: "opaque",
+      });
+      resources.width = widthPx;
+      resources.height = heightPx;
+    }
+
+    const modeValue = modeRef.current === "hsv"
+      ? 0
+      : modeRef.current === "rgb"
+        ? 1
+        : 2;
+
+    const hue = modeRef.current === "oklch"
+      ? oklchRef.current.h
+      : modeRef.current === "hsv"
+        ? hsvRef.current.h
+        : 0;
+
+    const uniforms = uniformArrayRef.current;
+    uniforms[0] = widthPx;
+    uniforms[1] = heightPx;
+    uniforms[2] = barHeightPx;
+    uniforms[3] = modeValue;
+
+    uniforms[4] = oklchRef.current.l;
+    uniforms[5] = oklchRef.current.c;
+    uniforms[6] = rgbRef.current.r;
+    uniforms[7] = rgbRef.current.g;
+
+    uniforms[8] = rgbRef.current.b;
+    uniforms[9] = hsvRef.current.s;
+    uniforms[10] = hsvRef.current.v;
+    uniforms[11] = hue;
+
+    resources.device.queue.writeBuffer(
+      resources.uniformBuffer,
+      0,
+      uniforms.buffer,
+      uniforms.byteOffset,
+      uniforms.byteLength,
+    );
+
+    const encoder = resources.device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [{
+        view: resources.context.getCurrentTexture().createView(),
+        loadOp: "clear",
+        storeOp: "store",
+        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+      }],
+    });
+    pass.setPipeline(resources.renderPipeline);
+    pass.setBindGroup(0, resources.renderBindGroup);
+    pass.draw(6, 1, 0, 0);
+    pass.end();
+
+    resources.device.queue.submit([encoder.finish()]);
+  }, [updateMarkersNow]);
 
   React.useEffect(() => {
-    const canvas = canvasNode ?? canvasRef.current;
-    if (!canvas) return;
-    if (lastCanvasRef.current !== canvas) {
-      canvasSizeRef.current = { width: 0, height: 0 };
-      lastCanvasRef.current = canvas;
-    }
-  }, [canvasNode]);
+    renderNowRef.current = renderCanvas;
+    return () => {
+      if (renderNowRef.current === renderCanvas) {
+        renderNowRef.current = null;
+      }
+    };
+  }, [renderCanvas]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
-    const ensureWorkers = (count: number) => {
-      const pool = workerPoolRef.current;
-      if (pool.length === count) return pool;
-      if (pool.length > count) {
-        const extras = pool.splice(count);
-        extras.forEach((worker) => worker.terminate());
-      } else {
-        for (let i = pool.length; i < count; i += 1) {
-          pool.push(createColorFieldWorker());
-        }
-      }
-      return pool;
-    };
-
+    if (!supportsWebGPU) {
+      setGpuStatus("unsupported");
+      return;
+    }
     const canvas = canvasNode ?? canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
 
-    const paint = () => {
+    let cancelled = false;
+    let createdResources: ColorFieldGpuResources | null = null;
+    setGpuStatus((prev) => (prev === "ready" ? prev : "loading"));
+
+    const boot = async () => {
+      const root = await getSharedRoot();
+      if (cancelled) return;
+      if (!root) {
+        setGpuStatus("error");
+        return;
+      }
+      const resources = buildGpuResources(root.device, canvas);
+      if (cancelled) {
+        disposeGpuResources(resources);
+        return;
+      }
+      if (!resources) {
+        setGpuStatus("error");
+        return;
+      }
+      createdResources = resources;
+      resourcesRef.current = resources;
+      setGpuStatus("ready");
+      scheduleRender();
+    };
+
+    void boot();
+
+    return () => {
+      cancelled = true;
+      if (resourcesRef.current && resourcesRef.current === createdResources) {
+        disposeGpuResources(resourcesRef.current);
+        resourcesRef.current = null;
+      }
+    };
+  }, [canvasNode, scheduleRender, supportsWebGPU]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const canvas = canvasNode ?? canvasRef.current;
+    if (!canvas) return;
+
+    const updateMetrics = () => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      const widthPx = Math.max(1, Math.round(rect.width * dpr));
-      const heightPx = Math.max(1, Math.round(rect.height * dpr));
-      const barHeightPx = Math.max(1, Math.round(sliderUnitHeight(resolvedFontSize) * dpr));
       const nextMetrics = {
         width: rect.width,
         height: rect.height,
@@ -432,75 +1014,37 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
           ? prev
           : nextMetrics
       ));
-      if (canvasSizeRef.current.width !== widthPx || canvasSizeRef.current.height !== heightPx) {
-        canvas.width = widthPx;
-        canvas.height = heightPx;
-        canvasSizeRef.current = { width: widthPx, height: heightPx };
-      }
-      paintTokenRef.current += 1;
-      const token = paintTokenRef.current;
-      const planeMode = resolvedMode;
-      const hue = planeMode === "oklch"
-        ? oklchRef.current.h
-        : planeMode === "hsv"
-          ? hsvRef.current.h
-          : 0;
-      const stripeHeight = Math.max(1, Math.round(sliderUnitHeight(resolvedFontSize) * dpr));
-      const stripeCount = Math.max(1, Math.ceil(heightPx / stripeHeight));
-      const workers = ensureWorkers(stripeCount);
-      workers.forEach((worker, index) => {
-        const yStart = index * stripeHeight;
-        const yEnd = Math.min(heightPx, yStart + stripeHeight);
-        worker.onmessage = (event) => {
-          if (event.data?.token !== token) return;
-          const pixels = new Uint8ClampedArray(event.data.pixels);
-          const sliceHeight = event.data.height as number;
-          const imageData = new ImageData(pixels, widthPx, sliceHeight);
-          ctx.putImageData(imageData, 0, yStart);
-        };
-        worker.postMessage({
-          width: widthPx,
-          height: heightPx,
-          barHeight: barHeightPx,
-          yStart,
-          yEnd,
-          hue,
-          mode: planeMode,
-          planeL: oklchRef.current.l,
-          planeC: oklchRef.current.c,
-          planeR: rgbRef.current.r,
-          planeG: rgbRef.current.g,
-          planeB: rgbRef.current.b,
-          planeS: hsvRef.current.s,
-          planeHsvV: hsvRef.current.v,
-          token,
-        });
-      });
+      pointerMetricsRef.current = null;
+      scheduleRender();
     };
 
-    const handleResize = () => paint();
-    paint();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [
-    canvasNode,
-    resolvedFontSize,
-    hsvState.h,
-    hsvState.s,
-    hsvState.v,
-    oklchState.h,
-    oklchState.l,
-    oklchState.c,
-    rgbState.r,
-    rgbState.g,
-    rgbState.b,
-    resolvedMode,
-  ]);
+    updateMetrics();
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(updateMetrics);
+      resizeObserver.observe(canvas);
+    }
+
+    window.addEventListener("resize", updateMetrics);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateMetrics);
+    };
+  }, [canvasNode, resolvedFontSize, scheduleRender]);
+
+  React.useEffect(() => {
+    scheduleRender();
+  }, [canvasMetrics, scheduleRender]);
 
   React.useEffect(() => (
     () => {
-      workerPoolRef.current.forEach((worker) => worker.terminate());
-      workerPoolRef.current = [];
+      if (typeof window !== "undefined" && renderRafRef.current !== null) {
+        window.cancelAnimationFrame(renderRafRef.current);
+      }
+      renderRafRef.current = null;
+      disposeGpuResources(resourcesRef.current);
+      resourcesRef.current = null;
     }
   ), []);
 
@@ -509,102 +1053,148 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
     setCanvasNode(node);
   }, []);
 
-  const updateFromPointer = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!canvasRef.current) return;
+  const capturePointerMetrics = React.useCallback((): PointerMetrics | null => {
+    if (!canvasRef.current) return null;
     const rect = canvasRef.current.getBoundingClientRect();
-    const barHeight = canvasMetrics.barHeight || sliderUnitHeight(resolvedFontSize);
+    const barHeight = canvasMetricsRef.current.barHeight || sliderUnitHeight(resolvedFontSize);
     const planeHeight = Math.max(1, rect.height - barHeight);
-    const x = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
-    const y = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-    const planeMode = resolvedMode;
+    const metrics = {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      planeHeight,
+    };
+    pointerMetricsRef.current = metrics;
+    return metrics;
+  }, [resolvedFontSize]);
+
+  const updateFromPointer = React.useCallback((clientX: number, clientY: number) => {
+    const metrics = pointerMetricsRef.current ?? capturePointerMetrics();
+    if (!metrics) return;
+    const x = Math.min(Math.max(clientX - metrics.left, 0), metrics.width);
+    const y = Math.min(Math.max(clientY - metrics.top, 0), metrics.height);
+    const planeMode = modeRef.current;
     const region = activeRegionRef.current
-      ?? (y >= planeHeight ? "hue" : "plane");
+      ?? (y >= metrics.planeHeight ? "hue" : "plane");
+
+    const roundedX = Math.round(x);
+    const roundedY = Math.round(y);
+    const prevSample = lastPointerSampleRef.current;
+    if (
+      prevSample
+      && prevSample.x === roundedX
+      && prevSample.y === roundedY
+      && prevSample.region === region
+      && prevSample.mode === planeMode
+    ) {
+      return;
+    }
+
+    lastPointerSampleRef.current = {
+      x: roundedX,
+      y: roundedY,
+      region,
+      mode: planeMode,
+    };
+
     if (region === "plane") {
       if (planeMode === "oklch") {
-        const ratioX = clamp01(rect.width > 0 ? x / rect.width : 0);
-        const ratioY = clamp01(planeHeight > 0 ? y / planeHeight : 0);
+        const ratioX = clamp01(metrics.width > 0 ? x / metrics.width : 0);
+        const ratioY = clamp01(metrics.planeHeight > 0 ? y / metrics.planeHeight : 0);
         const next = {
           ...oklchRef.current,
           h: ratioX * 360,
           c: (1 - ratioY) * OKLCH_MAX_CHROMA,
         };
         oklchRef.current = next;
-        setOklchState(next);
         commitValue(oklchToHex(next.l, next.c, next.h));
       } else if (planeMode === "rgb") {
-        const ratioX = clamp01(rect.width > 0 ? x / rect.width : 0);
-        const ratioY = clamp01(planeHeight > 0 ? y / planeHeight : 0);
+        const ratioX = clamp01(metrics.width > 0 ? x / metrics.width : 0);
+        const ratioY = clamp01(metrics.planeHeight > 0 ? y / metrics.planeHeight : 0);
         const next = {
           ...rgbRef.current,
           r: ratioX * 255,
           g: (1 - ratioY) * 255,
         };
         rgbRef.current = next;
-        setRgbState(next);
         commitValue(rgbToHex(next.r, next.g, next.b));
       } else {
-        const ratioX = clamp01(rect.width > 0 ? x / rect.width : 0);
-        const ratioY = clamp01(planeHeight > 0 ? y / planeHeight : 0);
+        const ratioX = clamp01(metrics.width > 0 ? x / metrics.width : 0);
+        const ratioY = clamp01(metrics.planeHeight > 0 ? y / metrics.planeHeight : 0);
         const next = {
           ...hsvRef.current,
           s: ratioX,
           v: 1 - ratioY,
         };
         hsvRef.current = next;
-        setHsvState(next);
         commitValue(hsvToHex(next.h, next.s, next.v));
       }
     } else if (planeMode === "oklch") {
       const next = {
         ...oklchRef.current,
-        l: clamp01(rect.width > 0 ? x / rect.width : 0),
+        l: clamp01(metrics.width > 0 ? x / metrics.width : 0),
       };
       oklchRef.current = next;
-      setOklchState(next);
       commitValue(oklchToHex(next.l, next.c, next.h));
     } else if (planeMode === "rgb") {
       const next = {
         ...rgbRef.current,
-        b: clamp01(rect.width > 0 ? x / rect.width : 0) * 255,
+        b: clamp01(metrics.width > 0 ? x / metrics.width : 0) * 255,
       };
       rgbRef.current = next;
-      setRgbState(next);
       commitValue(rgbToHex(next.r, next.g, next.b));
     } else {
       const next = {
         ...hsvRef.current,
-        h: clamp01(rect.width > 0 ? x / rect.width : 0) * 360,
+        h: clamp01(metrics.width > 0 ? x / metrics.width : 0) * 360,
       };
       hsvRef.current = next;
-      setHsvState(next);
       commitValue(hsvToHex(next.h, next.s, next.v));
     }
-  }, [canvasMetrics.barHeight, commitValue, resolvedFontSize, resolvedMode]);
+
+    scheduleRender();
+  }, [capturePointerMetrics, commitValue, scheduleRender]);
 
   const handlePointerDown: React.PointerEventHandler<HTMLDivElement> = (event) => {
+    if (!isGpuReady) return;
     if (event.button !== 0) return;
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const barHeight = canvasMetrics.barHeight || sliderUnitHeight(resolvedFontSize);
-    const planeHeight = Math.max(1, rect.height - barHeight);
-    const y = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
-    activeRegionRef.current = y >= planeHeight ? "hue" : "plane";
+    const metrics = capturePointerMetrics();
+    if (!metrics) return;
+    lastPointerSampleRef.current = null;
+    const y = Math.min(Math.max(event.clientY - metrics.top, 0), metrics.height);
+    activeRegionRef.current = y >= metrics.planeHeight ? "hue" : "plane";
     draggingRef.current = true;
     (event.currentTarget as HTMLDivElement).setPointerCapture(event.pointerId);
-    updateFromPointer(event);
+    updateFromPointer(event.clientX, event.clientY);
   };
 
   const handlePointerMove: React.PointerEventHandler<HTMLDivElement> = (event) => {
+    if (!isGpuReady) return;
     if (!draggingRef.current) return;
-    updateFromPointer(event);
+    updateFromPointer(event.clientX, event.clientY);
   };
 
   const handlePointerUp: React.PointerEventHandler<HTMLDivElement> = (event) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
     activeRegionRef.current = null;
-    (event.currentTarget as HTMLDivElement).releasePointerCapture(event.pointerId);
+    pointerMetricsRef.current = null;
+    lastPointerSampleRef.current = null;
+    try {
+      (event.currentTarget as HTMLDivElement).releasePointerCapture(event.pointerId);
+    } catch {
+      // ignore
+    }
   };
+
+  const overlayMessage = gpuStatus === "unsupported"
+    ? "WebGPU is required for this color picker."
+    : gpuStatus === "error"
+      ? "WebGPU initialization failed."
+      : gpuStatus === "loading"
+        ? "Initializing WebGPU..."
+        : null;
 
   return (
     <div
@@ -649,6 +1239,7 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
           position: "relative",
           overflow: "hidden",
           touchAction: "none",
+          cursor: isGpuReady ? "crosshair" : "default",
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -661,61 +1252,64 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
             display: "block",
             width: "100%",
             height: "100%",
+            opacity: isGpuReady ? 1 : 0.5,
           }}
         />
-        {canvasMetrics.width > 0 && canvasMetrics.height > 0 ? (
-          (() => {
-            const planeMode = resolvedMode;
-            const planeHeight = Math.max(1, canvasMetrics.height - canvasMetrics.barHeight);
-            const planeX = planeMode === "oklch"
-              ? clamp01(oklchState.h / 360) * canvasMetrics.width
-              : planeMode === "rgb"
-                ? clamp01(rgbState.r / 255) * canvasMetrics.width
-                : clamp01(hsvState.s) * canvasMetrics.width;
-            const planeY = planeMode === "oklch"
-              ? clamp01(1 - oklchState.c / OKLCH_MAX_CHROMA) * planeHeight
-              : planeMode === "rgb"
-                ? clamp01(1 - rgbState.g / 255) * planeHeight
-                : clamp01(1 - hsvState.v) * planeHeight;
-            const barValue = planeMode === "oklch"
-              ? oklchState.l
-              : planeMode === "rgb"
-                ? rgbState.b / 255
-                : hsvState.h / 360;
-            const barX = clamp01(barValue) * canvasMetrics.width;
-            return (
-              <>
-                <div
-                  style={{
-                    position: "absolute",
-                    left: `${planeX}px`,
-                    top: `${planeY}px`,
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,0.85)",
-                    boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
-                    transform: "translate(-50%, -50%)",
-                    pointerEvents: "none",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    left: `${barX}px`,
-                    top: `${Math.max(1, canvasMetrics.height - canvasMetrics.barHeight) + canvasMetrics.barHeight / 2}px`,
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,0.85)",
-                    boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
-                    transform: "translate(-50%, -50%)",
-                    pointerEvents: "none",
-                  }}
-                />
-              </>
-            );
-          })()
+        <div
+          ref={planeMarkerRef}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            border: "2px solid rgba(255,255,255,0.85)",
+            boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+            opacity: 0,
+            display: isGpuReady ? "block" : "none",
+          }}
+        />
+        <div
+          ref={barMarkerRef}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            border: "2px solid rgba(255,255,255,0.85)",
+            boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+            opacity: 0,
+            display: isGpuReady ? "block" : "none",
+          }}
+        />
+        {overlayMessage ? (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 8px",
+              textAlign: "center",
+              pointerEvents: "none",
+              color: resolvedColorB,
+              background: "rgba(0,0,0,0.35)",
+              fontSize: Math.max(10, Math.round(resolvedFontSize * 0.9)),
+              lineHeight: 1.2,
+            }}
+          >
+            {overlayMessage}
+          </div>
         ) : null}
       </div>
     </div>

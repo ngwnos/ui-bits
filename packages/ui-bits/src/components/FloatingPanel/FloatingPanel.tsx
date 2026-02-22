@@ -37,6 +37,7 @@ export interface FloatingPanelProps extends Omit<React.HTMLAttributes<HTMLDivEle
   position?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
   defaultPosition?: { x: number; y: number };
+  constrainBodyToViewport?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
   width?: number | string;
   padding?: number | string;
@@ -116,6 +117,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     position,
     onPositionChange,
     defaultPosition,
+    constrainBodyToViewport = true,
     onCollapseChange,
     width,
     padding,
@@ -365,8 +367,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
 
   const resolvedPosition = position ?? dragPosition;
   const isFloating = Boolean(draggable && resolvedPosition);
-  const stylePosition = style?.position;
-  const shouldClampBodyToViewport = Boolean(draggable || stylePosition === "fixed");
+  const shouldClampBodyToViewport = constrainBodyToViewport;
   const bottomMargin = 6;
   const effectivePanelTop = isFloating && resolvedPosition ? resolvedPosition.y : panelViewportTop;
   const dynamicBodyMaxHeight = shouldClampBodyToViewport && effectivePanelTop !== null && typeof window !== "undefined"

@@ -35,6 +35,7 @@ export interface FloatingPanelProps extends Omit<React.HTMLAttributes<HTMLDivEle
         x: number;
         y: number;
     };
+    constrainBodyToViewport?: boolean;
     onCollapseChange?: (collapsed: boolean) => void;
     width?: number | string;
     padding?: number | string;

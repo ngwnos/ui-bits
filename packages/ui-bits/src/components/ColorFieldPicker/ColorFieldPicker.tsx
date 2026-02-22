@@ -709,12 +709,27 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
   const [internalMode, setInternalMode] = React.useState<ColorFieldPickerMode>(defaultMode);
   const resolvedMode = isModeControlled ? mode : internalMode;
 
-  const commitValue = React.useCallback((nextValue: string) => {
+  const localCommittedValuesRef = React.useRef<Set<string>>(new Set());
+  const rememberLocalCommittedValue = React.useCallback((nextValue: string) => {
+    const values = localCommittedValuesRef.current;
+    values.add(nextValue);
+    if (values.size > 256) {
+      const oldest = values.values().next().value as string | undefined;
+      if (oldest !== undefined) {
+        values.delete(oldest);
+      }
+    }
+  }, []);
+
+  const commitValue = React.useCallback((nextValue: string, options?: { localInteraction?: boolean }) => {
+    if (options?.localInteraction) {
+      rememberLocalCommittedValue(nextValue);
+    }
     if (!isControlled) {
       setInternalValue(nextValue);
     }
     onChange?.(nextValue);
-  }, [isControlled, onChange]);
+  }, [isControlled, onChange, rememberLocalCommittedValue]);
 
   const commitMode = React.useCallback((nextMode: ColorFieldPickerMode) => {
     if (!isModeControlled) {
@@ -829,6 +844,14 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
 
   React.useEffect(() => {
     if (draggingRef.current) return;
+    const localValues = localCommittedValuesRef.current;
+    if (localValues.size > 0 && localValues.has(resolvedValue)) {
+      scheduleRender();
+      return;
+    }
+    if (localValues.size > 0) {
+      localValues.clear();
+    }
     const rgb = hexToRgb(resolvedValue);
     if (!rgb) return;
     const nextHsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
@@ -1108,7 +1131,7 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
           c: (1 - ratioY) * OKLCH_MAX_CHROMA,
         };
         oklchRef.current = next;
-        commitValue(oklchToHex(next.l, next.c, next.h));
+        commitValue(oklchToHex(next.l, next.c, next.h), { localInteraction: true });
       } else if (planeMode === "rgb") {
         const ratioX = clamp01(metrics.width > 0 ? x / metrics.width : 0);
         const ratioY = clamp01(metrics.planeHeight > 0 ? y / metrics.planeHeight : 0);
@@ -1118,7 +1141,7 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
           g: (1 - ratioY) * 255,
         };
         rgbRef.current = next;
-        commitValue(rgbToHex(next.r, next.g, next.b));
+        commitValue(rgbToHex(next.r, next.g, next.b), { localInteraction: true });
       } else {
         const ratioX = clamp01(metrics.width > 0 ? x / metrics.width : 0);
         const ratioY = clamp01(metrics.planeHeight > 0 ? y / metrics.planeHeight : 0);
@@ -1128,7 +1151,7 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
           v: 1 - ratioY,
         };
         hsvRef.current = next;
-        commitValue(hsvToHex(next.h, next.s, next.v));
+        commitValue(hsvToHex(next.h, next.s, next.v), { localInteraction: true });
       }
     } else if (planeMode === "oklch") {
       const next = {
@@ -1136,21 +1159,21 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
         l: clamp01(metrics.width > 0 ? x / metrics.width : 0),
       };
       oklchRef.current = next;
-      commitValue(oklchToHex(next.l, next.c, next.h));
+      commitValue(oklchToHex(next.l, next.c, next.h), { localInteraction: true });
     } else if (planeMode === "rgb") {
       const next = {
         ...rgbRef.current,
         b: clamp01(metrics.width > 0 ? x / metrics.width : 0) * 255,
       };
       rgbRef.current = next;
-      commitValue(rgbToHex(next.r, next.g, next.b));
+      commitValue(rgbToHex(next.r, next.g, next.b), { localInteraction: true });
     } else {
       const next = {
         ...hsvRef.current,
         h: clamp01(metrics.width > 0 ? x / metrics.width : 0) * 360,
       };
       hsvRef.current = next;
-      commitValue(hsvToHex(next.h, next.s, next.v));
+      commitValue(hsvToHex(next.h, next.s, next.v), { localInteraction: true });
     }
 
     scheduleRender();
@@ -1161,6 +1184,7 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
     if (event.button !== 0) return;
     const metrics = capturePointerMetrics();
     if (!metrics) return;
+    localCommittedValuesRef.current.clear();
     lastPointerSampleRef.current = null;
     const y = Math.min(Math.max(event.clientY - metrics.top, 0), metrics.height);
     activeRegionRef.current = y >= metrics.planeHeight ? "hue" : "plane";
@@ -1175,8 +1199,13 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
     updateFromPointer(event.clientX, event.clientY);
   };
 
-  const handlePointerUp: React.PointerEventHandler<HTMLDivElement> = (event) => {
+  const finishPointerInteraction = (event: React.PointerEvent<HTMLDivElement>, commitFinalSample: boolean) => {
     if (!draggingRef.current) return;
+    if (commitFinalSample && isGpuReady) {
+      // Capture the final pointer position so release while moving doesn't
+      // leave the picker state on the previous move sample.
+      updateFromPointer(event.clientX, event.clientY);
+    }
     draggingRef.current = false;
     activeRegionRef.current = null;
     pointerMetricsRef.current = null;
@@ -1186,6 +1215,14 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
     } catch {
       // ignore
     }
+  };
+
+  const handlePointerUp: React.PointerEventHandler<HTMLDivElement> = (event) => {
+    finishPointerInteraction(event, true);
+  };
+
+  const handlePointerCancel: React.PointerEventHandler<HTMLDivElement> = (event) => {
+    finishPointerInteraction(event, false);
   };
 
   const overlayMessage = gpuStatus === "unsupported"
@@ -1244,7 +1281,7 @@ const ColorFieldPicker = React.forwardRef<HTMLDivElement, ColorFieldPickerProps>
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       >
         <canvas
           ref={handleCanvasRef}

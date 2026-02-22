@@ -115,7 +115,14 @@ export {
   default as ColorField,
   type ColorFieldProps,
   type ColorFieldBorderStyle,
+  type ColorFieldPickerDisplay,
 } from "./components/ColorField";
+export {
+  default as ColorFieldPicker,
+  type ColorFieldPickerProps,
+  type ColorFieldPickerMode,
+  type ColorFieldPickerBorderStyle,
+} from "./components/ColorFieldPicker";
 export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./components/LoadingBar";
 export {
   default as Sequencer,

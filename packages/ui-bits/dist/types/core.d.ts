@@ -25,7 +25,8 @@ export { default as KeyValueRows, type KeyValueRowsProps, type KeyValueRowsRow, 
 export { default as KeyValueAccordion, type KeyValueAccordionProps, type KeyValueAccordionItem, type KeyValueAccordionBorderStyle, type KeyValueAccordionMode, } from "./components/KeyValueAccordion";
 export { default as RadioList, type RadioListProps, type RadioListOption, type RadioListBorderStyle, } from "./components/RadioList";
 export { default as ColorPicker, type ColorPickerProps, type ColorPickerBorderStyle, type ColorPickerBorderMask, } from "./components/ColorPicker";
-export { default as ColorField, type ColorFieldProps, type ColorFieldBorderStyle, } from "./components/ColorField";
+export { default as ColorField, type ColorFieldProps, type ColorFieldBorderStyle, type ColorFieldPickerDisplay, } from "./components/ColorField";
+export { default as ColorFieldPicker, type ColorFieldPickerProps, type ColorFieldPickerMode, type ColorFieldPickerBorderStyle, } from "./components/ColorFieldPicker";
 export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./components/LoadingBar";
 export { default as Sequencer, type SequencerProps, type SequencerHandle, type SequencerEvent, } from "./components/Sequencer";
 export { default as WebGpuStatus, type WebGpuStatusProps, type WebGpuStatusBorderStyle, } from "./components/WebGpuStatus";

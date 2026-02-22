@@ -285,6 +285,34 @@ const folders = [
 />`,
   },
   {
+    id: 'color-field',
+    label: 'Color Field',
+    title: 'Color Field',
+    code: `const [accentColor, setAccentColor] = useState("#d14d41")
+
+<ColorField
+  label="Accent"
+  value={accentColor}
+  onChange={(next) => setAccentColor(next)}
+  defaultAlpha={220}
+  colorA={flexoki.red["600"]}
+  colorB={flexoki.red["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>
+
+<ColorField
+  label="Accent (Popup)"
+  value={accentColor}
+  onChange={(next) => setAccentColor(next)}
+  pickerDisplay="popup"
+  colorA={flexoki.red["600"]}
+  colorB={flexoki.red["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>`,
+  },
+  {
     id: 'floating-panel',
     label: 'Floating Panel',
     title: 'Floating Panel',
@@ -844,6 +872,7 @@ function App() {
   const [radioListDenseValue, setRadioListDenseValue] = useState('normal')
   const [iconDropdownValue, setIconDropdownValue] = useState('drizzle')
   const [nestedDropdownValue, setNestedDropdownValue] = useState('destination-01')
+  const [colorFieldValue, setColorFieldValue] = useState('#d14d41')
   const [accordionProfileValue, setAccordionProfileValue] = useState('balanced')
   const [accordionRoutingValue, setAccordionRoutingValue] = useState('stereo')
   const [accordionLimiterValue, setAccordionLimiterValue] = useState('on')
@@ -2270,6 +2299,52 @@ function App() {
                   IconDropdown reuses the same menu and keyboard behavior, but uses an icon trigger.
                   Give it a short label for accessibility and set a wider width so the menu text has
                   breathing room.
+                </p>
+              </div>
+            </>
+          ) : activeRouteId === 'color-field' ? (
+            <>
+              <div className="docs-code-section">
+                <div
+                  style={{
+                    width: '100%',
+                    maxWidth: 360,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                  }}
+                >
+                  <ColorField
+                    label="Accent"
+                    value={colorFieldValue}
+                    onChange={(next) => setColorFieldValue(next)}
+                    defaultAlpha={220}
+                    colorA={flexoki.red['600']}
+                    colorB={flexoki.red['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                  <ColorField
+                    label="Accent (Popup)"
+                    value={colorFieldValue}
+                    onChange={(next) => setColorFieldValue(next)}
+                    pickerDisplay="popup"
+                    colorA={flexoki.red['600']}
+                    colorB={flexoki.red['100']}
+                    borderStyle="a"
+                    fontSize={12}
+                  />
+                </div>
+                <CodeBlock code={activeRoute.code} />
+              </div>
+              <div className="docs-text-block">
+                <p>
+                  ColorField combines a swatch trigger, editable hex value, and alpha slider in one
+                  control row.
+                </p>
+                <p>
+                  Default mode keeps the picker inline below the sliders. Set{" "}
+                  <code>pickerDisplay="popup"</code> to open it from the swatch instead.
                 </p>
               </div>
             </>

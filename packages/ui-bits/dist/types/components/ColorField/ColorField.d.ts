@@ -1,6 +1,7 @@
 import React from "react";
 import "./color-field.css";
 export type ColorFieldBorderStyle = "a" | "b" | "none";
+export type ColorFieldPickerDisplay = "inline" | "popup";
 export interface ColorFieldProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "color" | "onChange"> {
     label?: string;
     value?: string;
@@ -13,6 +14,7 @@ export interface ColorFieldProps extends Omit<React.HTMLAttributes<HTMLDivElemen
     colorA?: string;
     colorB?: string;
     borderStyle?: ColorFieldBorderStyle;
+    pickerDisplay?: ColorFieldPickerDisplay;
     fontSize?: number;
     pickerHeightUnits?: number;
     width?: number | string;

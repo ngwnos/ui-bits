@@ -1,7 +1,7 @@
 import { jsx as a, jsxs as P, Fragment as gn } from "react/jsx-runtime";
 import o from "react";
 import { MousePointer2 as wn, CaseUpper as Mn, Piano as En } from "lucide-react";
-import { aj as Sn, d as kn, Z as Nn, ak as In, I as Ln, _ as De } from "./FloatingPanel-B0p3sNXD.js";
+import { ak as Sn, d as kn, _ as Nn, al as In, I as Ln, $ as De } from "./FloatingPanel-BUrwphVp.js";
 const Et = "C4", An = 13, Pn = 6, Rn = !1, Tn = "tonejs", Dn = 18, Kn = "#f2f0e5", Un = "#1c1b1a", St = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"], On = /* @__PURE__ */ new Set([1, 3, 6, 8, 10]), kt = /* @__PURE__ */ new Set([0, 2, 4, 5, 7, 9, 11]), $n = 21, H = (() => {
   const s = [];
   for (let i = 0; i <= 127; i += 1)
@@ -121,7 +121,7 @@ function W(s, i, l, b) {
     !h || y !== void 0 || x(i);
   }, [i, x, h, y]), [R, q];
 }
-function Jn({
+function Qn({
   whiteKeys: s,
   blackKeys: i,
   startNote: l,
@@ -171,22 +171,22 @@ function Jn({
   fontSize: Yt,
   ariaLabel: Ge = "Virtual keyboard"
 }) {
-  const pe = Sn(jt, Ge), V = o.useCallback((e) => We?.[e] ?? (pe ? `${pe}.${e}` : void 0), [We, pe]), Zt = V("startNote"), Jt = V("noteCount"), Qt = V("heightUnits"), en = V("showLabels"), tn = V("keyboardShortcutsEnabled"), nn = V("instrument"), [oe, Xe] = W(
+  const pe = Sn(jt, Ge), V = o.useCallback((e) => We?.[e] ?? (pe ? `${pe}.${e}` : void 0), [We, pe]), Jt = V("startNote"), Qt = V("noteCount"), Zt = V("heightUnits"), en = V("showLabels"), tn = V("keyboardShortcutsEnabled"), nn = V("instrument"), [oe, Xe] = W(
     l,
     b ?? Et,
     y,
-    Zt
+    Jt
   ), [on, Ye] = W(
     x,
     h ?? An,
     _,
-    Jt
-  ), [rn, Ze] = W(
+    Qt
+  ), [rn, Je] = W(
     q,
     j ?? Pn,
     It,
-    Qt
-  ), [Je] = W(
+    Zt
+  ), [Qe] = W(
     M,
     E ?? !1,
     R,
@@ -196,7 +196,7 @@ function Jn({
     Wt,
     qt,
     tn
-  ), Qe = o.useMemo(() => Ve.map(({ value: e, label: t, ...n }) => ({
+  ), Ze = o.useMemo(() => Ve.map(({ value: e, label: t, ...n }) => ({
     value: e,
     label: t,
     source: "soundfont",
@@ -204,8 +204,8 @@ function Jn({
     toneConfig: void 0
   })), [Ve]), z = o.useMemo(() => {
     const e = /* @__PURE__ */ new Set();
-    return [...He, ...Qe].filter((t) => e.has(t.value) ? !1 : (e.add(t.value), !0));
-  }, [He, Qe]), [an, cn] = W(
+    return [...He, ...Ze].filter((t) => e.has(t.value) ? !1 : (e.add(t.value), !0));
+  }, [He, Ze]), [an, cn] = W(
     At,
     Pt ?? z[0]?.value ?? "",
     Rt,
@@ -227,10 +227,10 @@ function Jn({
   }, [i, N, oe, s]), ye = ot.white, ln = ot.black, Ce = kn(), rt = ye.length > 0 ? 100 / ye.length : 100, dn = rt * 0.6, K = Yt ?? Ce?.fontSize ?? 12, st = Bn(K), it = Math.max(1, Math.round(rn)), U = o.useMemo(() => wt(oe), [oe]), at = H.indexOf(U), Y = Math.max(0, H.length - 1), fn = Math.max(
     B,
     Math.min(Y, at >= 0 ? at : B)
-  ), O = Ot ?? Ce?.colorA ?? Kn, ie = $t ?? Ce?.colorB ?? Un, ct = Ft ?? ie, xe = Bt ?? O, hn = Ht ?? O, vn = Vt ?? O, Z = he && z.length > 0 && !be && !ne, J = an || z[0]?.value || "", Q = o.useMemo(() => z.find((e) => e.value === J) ?? null, [J, z]), _e = Z && (Q?.source === "tone" || Q?.toneConfig != null || J === Tt), ut = Q?.soundfontConfig ?? Kt ?? null, lt = Z && !_e && ut ? { ...ut, instrument: J } : null, p = o.useMemo(() => {
+  ), O = Ot ?? Ce?.colorA ?? Kn, ie = $t ?? Ce?.colorB ?? Un, ct = Ft ?? ie, xe = Bt ?? O, hn = Ht ?? O, vn = Vt ?? O, J = he && z.length > 0 && !be && !ne, Q = an || z[0]?.value || "", Z = o.useMemo(() => z.find((e) => e.value === Q) ?? null, [Q, z]), _e = J && (Z?.source === "tone" || Z?.toneConfig != null || Q === Tt), ut = Z?.soundfontConfig ?? Kt ?? null, lt = J && !_e && ut ? { ...ut, instrument: Q } : null, p = o.useMemo(() => {
     const e = be ?? lt;
     return e ? typeof e == "string" ? { instrument: e } : e : null;
-  }, [lt, be]), v = o.useMemo(() => ne || (!Z || !_e ? null : Q?.toneConfig ?? ze ?? {}), [Q, Z, ne, ze, _e]), mn = Dt ?? /* @__PURE__ */ a(En, {}), ee = p?.instrument, ae = p?.soundfont, ce = p?.format, ge = p?.url, we = p?.monitor ?? !0, Me = p?.gain, Ee = p?.attack, Se = p?.decay, ke = p?.sustain, Ne = p?.release, Ie = p?.notes, ue = p?.context, Le = p?.destination, te = v?.destination, le = v?.context ?? (te?.context instanceof AudioContext ? te.context : null), dt = Math.max(1, Math.round(v?.polyphony ?? 8)), Ae = v?.volume, ft = v?.attack, ht = v?.decay, vt = v?.sustain, mt = v?.release, de = o.useCallback((e, t) => {
+  }, [lt, be]), v = o.useMemo(() => ne || (!J || !_e ? null : Z?.toneConfig ?? ze ?? {}), [Z, J, ne, ze, _e]), mn = Dt ?? /* @__PURE__ */ a(En, {}), ee = p?.instrument, ae = p?.soundfont, ce = p?.format, ge = p?.url, we = p?.monitor ?? !0, Me = p?.gain, Ee = p?.attack, Se = p?.decay, ke = p?.sustain, Ne = p?.release, Ie = p?.notes, ue = p?.context, Le = p?.destination, te = v?.destination, le = v?.context ?? (te?.context instanceof AudioContext ? te.context : null), dt = Math.max(1, Math.round(v?.polyphony ?? 8)), Ae = v?.volume, ft = v?.attack, ht = v?.decay, vt = v?.sustain, mt = v?.release, de = o.useCallback((e, t) => {
     G || nt((n) => {
       if (t)
         return n[e] ? n : { ...n, [e]: !0 };
@@ -433,15 +433,15 @@ function Jn({
     Ye(t);
   }, [Ye]), yn = o.useCallback((e) => {
     const t = Math.max(3, Math.min(12, Math.round(e)));
-    Ze(t);
-  }, [Ze]), Cn = he ? /* @__PURE__ */ P(gn, { children: [
+    Je(t);
+  }, [Je]), Cn = he ? /* @__PURE__ */ P(gn, { children: [
     he ? /* @__PURE__ */ P("div", { className: "ui-bits-virtual-keyboard__controls", children: [
-      Z ? /* @__PURE__ */ a(
+      J ? /* @__PURE__ */ a(
         Ln,
         {
           label: "Soundfont",
           options: z,
-          value: J,
+          value: Q,
           onChange: (e) => cn(e),
           borderStyle: "b",
           fontSize: K,
@@ -611,7 +611,7 @@ function Jn({
               },
               children: (() => {
                 const t = gt(e.note);
-                return t ? /* @__PURE__ */ a("span", { className: "ui-bits-virtual-keyboard__label", children: t }) : Je ? /* @__PURE__ */ a("span", { className: "ui-bits-virtual-keyboard__label", children: e.note }) : null;
+                return t ? /* @__PURE__ */ a("span", { className: "ui-bits-virtual-keyboard__label", children: t }) : Qe ? /* @__PURE__ */ a("span", { className: "ui-bits-virtual-keyboard__label", children: e.note }) : null;
               })()
             },
             e.note
@@ -642,7 +642,7 @@ function Jn({
                 },
                 children: (() => {
                   const r = gt(e.note);
-                  return r ? /* @__PURE__ */ a("span", { className: "ui-bits-virtual-keyboard__label", children: r }) : Je ? /* @__PURE__ */ a("span", { className: "ui-bits-virtual-keyboard__label", children: e.note }) : null;
+                  return r ? /* @__PURE__ */ a("span", { className: "ui-bits-virtual-keyboard__label", children: r }) : Qe ? /* @__PURE__ */ a("span", { className: "ui-bits-virtual-keyboard__label", children: e.note }) : null;
                 })()
               },
               e.note
@@ -658,6 +658,6 @@ function Jn({
   );
 }
 export {
-  Jn as V
+  Qn as V
 };
-//# sourceMappingURL=VirtualKeyboard-DA0-W_HW.js.map
+//# sourceMappingURL=VirtualKeyboard-CvGY0kxu.js.map

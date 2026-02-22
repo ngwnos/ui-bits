@@ -83,7 +83,14 @@ export {
   default as ColorField,
   type ColorFieldProps,
   type ColorFieldBorderStyle,
+  type ColorFieldPickerDisplay,
 } from "./ColorField";
+export {
+  default as ColorFieldPicker,
+  type ColorFieldPickerProps,
+  type ColorFieldPickerMode,
+  type ColorFieldPickerBorderStyle,
+} from "./ColorFieldPicker";
 export { default as LoadingBar, type LoadingBarProps, type LoadingBarStyle } from "./LoadingBar";
 export {
   default as SegmentBar,

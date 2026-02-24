@@ -86,6 +86,7 @@ const ROUTES = [
     label: 'Segment Bar',
     title: 'Segment Bar',
     code: `<SegmentBar
+  label="Band"
   options={[
     { value: "low", label: "Low" },
     { value: "mid", label: "Mid" },
@@ -1827,6 +1828,7 @@ function App() {
             <>
               <div className="docs-code-section">
                 <SegmentBar
+                  label="Band"
                   options={segmentOptions}
                   defaultValue="mid"
                   colorA={flexoki.purple['600']}

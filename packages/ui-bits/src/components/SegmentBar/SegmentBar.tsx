@@ -74,7 +74,7 @@ function resolveInitialValue(
 
 export default function SegmentBar({
   label,
-  showLabel = false,
+  showLabel = true,
   ariaLabel,
   options,
   value,
@@ -150,7 +150,7 @@ export default function SegmentBar({
     maxWidth: resolvedWidth,
     display: "flex",
     flexDirection: "column",
-    gap: showLabel && label ? "0.25rem" : 0,
+    gap: showLabel && label ? "4px" : 0,
     fontSize: resolvedFontSize,
     fontFamily: 'var(--ui-bits-font-family, "IBM Plex Mono", monospace)',
     fontWeight: 600,
@@ -159,6 +159,7 @@ export default function SegmentBar({
   const hasOptions = options.length > 0;
   const inactiveTextColor = resolvedColorA;
   const activeTextColor = resolvedColorB;
+  const mutedLabelColor = colorWithAlpha(inactiveTextColor, 0.7, "0,0,0");
 
   const draggingRef = useRef(false);
 
@@ -242,10 +243,10 @@ export default function SegmentBar({
       {showLabel && label ? (
         <div
           style={{
-            fontSize: "0.8em",
+            fontSize: "1em",
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: resolvedColorA,
+            color: mutedLabelColor,
           }}
         >
           {label}

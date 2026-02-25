@@ -7,7 +7,16 @@ export type SliderBorder = 'a' | 'b' | 'none';
 export type LFOSliderMode = 'auto' | 'manual' | 'lfo' | 'external';
 export type SliderVariant = 'full' | 'basic';
 export type SliderBarStyle = 'continuous' | 'discrete' | 'step-aligned';
+/**
+ * Numeric slider with optional LFO/external modulation controls.
+ *
+ * State modes:
+ * - Controlled: provide `value` and update it in `onUserChange`.
+ * - Store-bound: provide `controlId` without controlled `value`.
+ * - Uncontrolled: provide `defaultValue`.
+ */
 export interface LFOSliderProps {
+    /** Visible label and auto-id seed when `controlId` is omitted. */
     label: string;
     ariaLabel?: string;
     showLabel?: boolean;
@@ -17,7 +26,9 @@ export interface LFOSliderProps {
     variant?: SliderVariant;
     barStyle?: SliderBarStyle;
     barSegmentCount?: number;
+    /** Initial value for uncontrolled usage. */
     defaultValue?: number;
+    /** Controlled value. */
     value?: number;
     width?: number | string;
     drawerLines?: [number, number];
@@ -42,7 +53,9 @@ export interface LFOSliderProps {
     mirrorToStore?: MirrorFn;
     mirrorEveryMs?: number;
     epsilon?: number;
+    /** Called for direct user edits (typing, dragging, wheel). */
     onUserChange?: (v: number) => void;
+    /** Called every frame while animated output changes. */
     onAnimatedUpdate?: (v: number) => void;
     onDrawerOpenChange?: (open: boolean) => void;
     onDrawerLinesChange?: (lines: [number, number]) => void;
@@ -75,7 +88,9 @@ export interface LFOSliderProps {
     onAudioSamplePositionChange?: (value: number) => void;
     borderMask?: Partial<Record<'top' | 'right' | 'bottom' | 'left', boolean>>;
     suspended?: boolean;
+    /** Control-store id for the base slider value, used when `value` is uncontrolled. */
     controlId?: string;
+    /** Prefix for derived LFO control ids (`.enabled`, `.waveform`, `.frequency`, ...). */
     lfoControlIdPrefix?: string;
 }
 declare function LFOSlider(props: LFOSliderProps): import("react/jsx-runtime").JSX.Element;

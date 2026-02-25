@@ -8,9 +8,12 @@ import React, {
 import { clamp } from "../../lfo";
 import { useControlValue, useResolvedControlId } from "../../controlStore";
 import { usePanelTheme } from "../../panelGap";
+import { warnOnceDev } from "../../utils/warnOnceDev";
 
 export interface SegmentBarOption {
+  /** Programmatic value emitted on selection. */
   value: string;
+  /** Visible text for the segment. */
   label: string;
 }
 
@@ -18,12 +21,18 @@ export type SegmentBarBorderStyle = "a" | "b" | "none";
 export type SegmentBarBorderMask = Partial<Record<"top" | "right" | "bottom" | "left", boolean>>;
 
 export interface SegmentBarProps {
+  /** Optional label rendered above the bar. */
   label?: string;
+  /** Controls whether the label row is visible when `label` is present. */
   showLabel?: boolean;
   ariaLabel?: string;
+  /** Segment definitions shown left-to-right. */
   options: SegmentBarOption[];
+  /** Controlled selected value. */
   value?: string;
+  /** Initial value for uncontrolled usage. */
   defaultValue?: string;
+  /** Fired when a segment is selected. */
   onChange?: (value: string, option: SegmentBarOption, index: number) => void;
   colorA?: string;
   colorB?: string;
@@ -32,6 +41,7 @@ export interface SegmentBarProps {
   width?: number | string;
   fontSize?: number;
   disabled?: boolean;
+  /** Control-store id, used when `value` is not controlled. */
   controlId?: string;
   className?: string;
   style?: React.CSSProperties;
@@ -98,6 +108,7 @@ export default function SegmentBar({
   const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
   const accessibleLabel = ariaLabel ?? label;
   const resolvedControlId = useResolvedControlId(controlId, accessibleLabel);
+  const warningScope = resolvedControlId ?? (accessibleLabel || "unlabeled");
   const [storeValue, setStoreValue] = useControlValue<string>(resolvedControlId);
   const shouldUseStore = resolvedControlId !== undefined && value === undefined;
   const resolvedValueProp = shouldUseStore ? storeValue : value;
@@ -114,6 +125,13 @@ export default function SegmentBar({
     resolveInitialValue(options, defaultValue, resolvedValueProp)
   ));
   const isControlled = resolvedValueProp !== undefined;
+  useEffect(() => {
+    if (resolvedControlId === undefined || value === undefined) return;
+    warnOnceDev(
+      `SegmentBar.control-id-controlled-value.${warningScope}`,
+      "[ui-bits] SegmentBar received both `controlId` and controlled `value`. The control store binding is ignored while `value` is controlled.",
+    );
+  }, [resolvedControlId, value, warningScope]);
   const currentValue = isControlled ? resolvedValueProp! : internalValue;
   const selectedIndex = useMemo(() => (
     options.findIndex((option) => option.value === currentValue)

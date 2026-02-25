@@ -2,6 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { useControlValue, useResolvedControlId } from "../../controlStore";
 import { usePanelTheme } from "../../panelGap";
+import { warnOnceDev } from "../../utils/warnOnceDev";
 import ColorFieldPicker from "../ColorFieldPicker";
 import ColorPicker from "../ColorPicker";
 import LFOSlider from "../LFOSlider";
@@ -10,23 +11,41 @@ import "./color-field.css";
 export type ColorFieldBorderStyle = "a" | "b" | "none";
 export type ColorFieldPickerDisplay = "inline" | "popup";
 
+/**
+ * Color input with hex and alpha sliders plus an optional 2D picker.
+ *
+ * State modes:
+ * - Controlled: provide `value`/`alpha` and corresponding callbacks.
+ * - Store-bound: provide `controlId`/`alphaControlId` without controlled values.
+ * - Uncontrolled: provide `defaultValue`/`defaultAlpha`.
+ */
 export interface ColorFieldProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "color" | "onChange"> {
+  /** Visible label above the hex slider. */
   label?: string;
+  /** Controlled hex value (`#rgb` or `#rrggbb`). */
   value?: string;
+  /** Initial value for uncontrolled usage. */
   defaultValue?: string;
+  /** Called when color changes. */
   onChange?: (value: string) => void;
+  /** Controlled alpha channel (`0..255`). */
   alpha?: number;
+  /** Initial alpha for uncontrolled usage. */
   defaultAlpha?: number;
+  /** Called when alpha changes. */
   onAlphaChange?: (alpha: number) => void;
+  /** Control-store id for alpha, used only when `alpha` is not controlled. */
   alphaControlId?: string;
   colorA?: string;
   colorB?: string;
   borderStyle?: ColorFieldBorderStyle;
+  /** `inline` keeps picker always visible; `popup` toggles from swatch click. */
   pickerDisplay?: ColorFieldPickerDisplay;
   fontSize?: number;
   pickerHeightUnits?: number;
   width?: number | string;
   ariaLabel?: string;
+  /** Control-store id for color, used only when `value` is not controlled. */
   controlId?: string;
 }
 
@@ -130,6 +149,7 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   const labelText = label.trim();
   const resolvedAriaLabel = ariaLabel ?? labelText;
   const resolvedControlId = useResolvedControlId(controlId, resolvedAriaLabel);
+  const warningScope = resolvedControlId ?? (labelText || "unlabeled");
   const [storeValue, setStoreValue] = useControlValue<string>(resolvedControlId);
   const shouldUseStore = resolvedControlId !== undefined && value === undefined;
   const resolvedValueProp = shouldUseStore ? storeValue : value;
@@ -142,6 +162,7 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   const shouldUseAlphaStore = resolvedAlphaControlId !== undefined && alpha === undefined;
   const resolvedAlphaProp = shouldUseAlphaStore ? storeAlpha : alpha;
   const isAlphaControlled = resolvedAlphaProp !== undefined;
+  const normalizedDefaultValue = normalizeHex(defaultValue);
   const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
   const resolvedColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
   const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
@@ -149,14 +170,49 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   const usesPopupPicker = pickerDisplay === "popup";
   const resolvedWidth = resolveSize(width);
   const resolvedPickerUnits = Math.max(1, Math.round(pickerHeightUnits ?? DEFAULT_PICKER_HEIGHT_UNITS));
-  const fallbackValue = normalizeHex(defaultValue) ?? DEFAULT_COLOR;
+  const fallbackValue = normalizedDefaultValue ?? DEFAULT_COLOR;
   const [internalValue, setInternalValue] = React.useState(fallbackValue);
-  const resolvedValue = isControlled ? (normalizeHex(resolvedValueProp ?? "") ?? fallbackValue) : internalValue;
+  const normalizedResolvedValue = resolvedValueProp === undefined
+    ? undefined
+    : normalizeHex(resolvedValueProp);
+  const resolvedValue = isControlled ? (normalizedResolvedValue ?? fallbackValue) : internalValue;
   const resolvedHexValue = clampHexValue(hexToInt(resolvedValue) ?? 0);
   const [internalAlpha, setInternalAlpha] = React.useState(() => clampAlpha(defaultAlpha));
   const resolvedAlpha = clampAlpha(
     isAlphaControlled ? (resolvedAlphaProp ?? defaultAlpha) : internalAlpha,
   );
+
+  React.useEffect(() => {
+    if (resolvedControlId === undefined || value === undefined) return;
+    warnOnceDev(
+      `ColorField.control-id-controlled-value.${warningScope}`,
+      "[ui-bits] ColorField received both `controlId` and controlled `value`. The control store binding is ignored while `value` is controlled.",
+    );
+  }, [resolvedControlId, value, warningScope]);
+
+  React.useEffect(() => {
+    if (resolvedAlphaControlId === undefined || alpha === undefined) return;
+    warnOnceDev(
+      `ColorField.alpha-control-id-controlled-value.${warningScope}`,
+      "[ui-bits] ColorField received both `alphaControlId` and controlled `alpha`. The alpha control store binding is ignored while `alpha` is controlled.",
+    );
+  }, [alpha, resolvedAlphaControlId, warningScope]);
+
+  React.useEffect(() => {
+    if (normalizedDefaultValue !== null) return;
+    warnOnceDev(
+      `ColorField.invalid-default.${warningScope}`,
+      `[ui-bits] ColorField expected \`defaultValue\` to be a hex color (#rgb or #rrggbb). Received "${defaultValue}". Falling back to ${DEFAULT_COLOR}.`,
+    );
+  }, [defaultValue, normalizedDefaultValue, warningScope]);
+
+  React.useEffect(() => {
+    if (resolvedValueProp === undefined || normalizedResolvedValue !== null) return;
+    warnOnceDev(
+      `ColorField.invalid-controlled-value.${warningScope}`,
+      `[ui-bits] ColorField expected \`value\` to be a hex color (#rgb or #rrggbb). Received "${resolvedValueProp}". Falling back to ${fallbackValue}.`,
+    );
+  }, [fallbackValue, normalizedResolvedValue, resolvedValueProp, warningScope]);
 
   React.useEffect(() => {
     if (!shouldUseStore || storeValue !== undefined) return;
@@ -189,9 +245,15 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
   }, [isAlphaControlled, onAlphaChange, setStoreAlpha, shouldUseAlphaStore]);
 
   const handlePickerChange = React.useCallback((nextValue: string) => {
-    const normalized = normalizeHex(nextValue) ?? fallbackValue;
-    commitValue(normalized);
-  }, [commitValue, fallbackValue]);
+    const normalized = normalizeHex(nextValue);
+    if (normalized === null) {
+      warnOnceDev(
+        `ColorField.invalid-picker-output.${warningScope}`,
+        `[ui-bits] ColorFieldPicker returned a non-hex value "${nextValue}". Falling back to ${fallbackValue}.`,
+      );
+    }
+    commitValue(normalized ?? fallbackValue);
+  }, [commitValue, fallbackValue, warningScope]);
 
   const gap = Math.round(resolvedFontSize * 0.5);
   const alphaWidth = Math.round(resolvedFontSize * 7);

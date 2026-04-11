@@ -1,0 +1,15 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ui-bits",
+  "compatibility_date": "2026-04-11",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "ui-bits.vibe-coded.com",
+      "custom_domain": true
+    }
+  ]
+}

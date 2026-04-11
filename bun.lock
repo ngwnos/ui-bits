@@ -4,16 +4,18 @@
   "workspaces": {
     "": {
       "name": "ui-bits",
-      "dependencies": {
-        "soundfont-player": "^0.12.0",
-        "tone": "^15.1.22",
-      },
       "peerDependencies": {
         "lucide-react": "^0.562.0",
-        "react": "^19.1.1",
-        "react-dom": "^19.1.1",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0",
+        "soundfont-player": "^0.12.0",
+        "tone": "^15.1.22",
         "typegpu": "^0.9.0",
       },
+      "optionalPeers": [
+        "soundfont-player",
+        "tone",
+      ],
     },
     "apps/demo": {
       "name": "ui-bits-demo",
@@ -74,10 +76,6 @@
     "packages/ui-bits": {
       "name": "ui-bits-internal",
       "version": "0.0.0",
-      "dependencies": {
-        "soundfont-player": "^0.12.0",
-        "tone": "^15.1.22",
-      },
       "devDependencies": {
         "@eslint/js": "^9.36.0",
         "@types/node": "^24.6.0",
@@ -92,6 +90,8 @@
         "lucide-react": "^0.562.0",
         "react": "^19.1.1",
         "react-dom": "^19.1.1",
+        "soundfont-player": "^0.12.0",
+        "tone": "^15.1.22",
         "typegpu": "^0.9.0",
         "typescript": "~5.9.3",
         "typescript-eslint": "^8.45.0",
@@ -101,8 +101,14 @@
         "lucide-react": "^0.562.0",
         "react": "^19.1.1",
         "react-dom": "^19.1.1",
+        "soundfont-player": "^0.12.0",
+        "tone": "^15.1.22",
         "typegpu": "^0.9.0",
       },
+      "optionalPeers": [
+        "soundfont-player",
+        "tone",
+      ],
     },
   },
   "packages": {

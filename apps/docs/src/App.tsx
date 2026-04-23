@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   BasicButton,
   AudioAnalysisProvider,
@@ -59,6 +59,157 @@ const SIDEBAR_COLORS = [
 const AUDIO_BIN_COUNT = 128
 
 const fallbackCombo = { colorA: flexoki.orange['600'], colorB: flexoki.orange['150'] }
+
+const DOCS_INTROS: Record<string, ReactNode> = {
+  slider: (
+    <>
+      <p>
+        A value slider with optional LFO modulation. Use <code>defaultValue</code> for local state,{" "}
+        <code>value</code>/<code>onUserChange</code> for parent-owned state, or{" "}
+        <code>controlId</code> with a shared slider store.
+      </p>
+      <p>
+        <code>showLfoControls</code> exposes waveform, range, and rate controls.{" "}
+        <code>onAnimatedUpdate</code> reports the animated value while the LFO runs.
+      </p>
+    </>
+  ),
+  'icon-button': (
+    <>
+      <p>
+        Use IconButton for icon-only actions. Choose <code>momentary</code> for clicks,{" "}
+        <code>toggle</code> for a persistent boolean, or <code>cycle</code> when the button steps
+        through options.
+      </p>
+      <p>
+        Controlled props are available for each behavior. <code>borderStyle</code> and{" "}
+        <code>borderMask</code> handle joins with adjacent controls.
+      </p>
+    </>
+  ),
+  'loading-bar': (
+    <>
+      <p>
+        LoadingBar is a read-only progress indicator for values from <code>0</code> to{" "}
+        <code>1</code>. It shares color, border, and fill props with the slider family but does not
+        handle input.
+      </p>
+    </>
+  ),
+  'audio-controls': (
+    <>
+      <p>
+        AudioControls handles playback and FFT analysis for buffer, stream, or{" "}
+        <code>AudioNode</code> sources. Share analysis through <code>AudioAnalysisProvider</code> or
+        an explicit store.
+      </p>
+      <p>
+        Audio-driven sliders read that analysis data, and VirtualKeyboard output can feed the same
+        audio graph.
+      </p>
+    </>
+  ),
+  'segment-bar': (
+    <>
+      <p>
+        SegmentBar is a compact single-select control for short option sets. Use{" "}
+        <code>defaultValue</code> for local state or <code>value</code>/<code>onChange</code> for
+        controlled state.
+      </p>
+    </>
+  ),
+  'radio-list': (
+    <>
+      <p>
+        RadioList renders one selected value from an option list. Descriptions and disabled options
+        are supported.
+      </p>
+      <p>
+        Use <code>columns</code> only when the options are short enough to scan across rows.
+      </p>
+    </>
+  ),
+  'key-value-rows': (
+    <>
+      <p>
+        KeyValueRows renders read-only metadata in one bordered surface. Use it for status and
+        system values, not editable state.
+      </p>
+    </>
+  ),
+  'key-value-accordion': (
+    <>
+      <p>
+        KeyValueAccordion renders label/value rows that expand to show controls or custom content.
+      </p>
+      <p>
+        <code>mode="multiple"</code> allows several open rows. <code>mode="single"</code> keeps one
+        row open, and <code>expandedKeys</code>/<code>onExpandedKeysChange</code> control expansion.
+      </p>
+    </>
+  ),
+  'name-input-row': (
+    <>
+      <p>
+        NameInputRow combines text entry, create, and optional randomize actions.{" "}
+        <code>onCreate</code> receives the current text.
+      </p>
+      <p>
+        <code>onRandomize</code> can return a string directly or asynchronously.{" "}
+        <code>randomizeMode="append"</code> appends it to the current value.
+      </p>
+    </>
+  ),
+  'selection-grid': (
+    <>
+      <p>
+        SelectionGrid renders selectable tiles from host data. Provide <code>getKey</code>,{" "}
+        <code>getLabel</code>, and <code>getPreview</code> so the component stays data-agnostic.
+      </p>
+      <p>
+        GradientSelectionGrid is the gradient-specific variant. Terrain assets come from the host
+        app; the package does not bundle terrain images.
+      </p>
+    </>
+  ),
+  dropdown: (
+    <>
+      <p>
+        Dropdown renders a labelled menu from an explicit option list. Use local default state or
+        controlled <code>value</code>/<code>onChange</code>.
+      </p>
+      <p>
+        IconDropdown uses the same option contract with an icon trigger and optional menu icons.
+      </p>
+    </>
+  ),
+  'color-field': (
+    <>
+      <p>
+        ColorField binds a hex color and optional alpha value in one row. The picker is inline by
+        default; use <code>pickerDisplay="popup"</code> when the row should stay compact.
+      </p>
+    </>
+  ),
+  'floating-panel': (
+    <>
+      <p>
+        FloatingPanel gives stacked controls a header and body. Use it when controls need to float
+        above the app surface or collapse into a docked panel.
+      </p>
+      <p>
+        <code>collapsible</code>, <code>draggable</code>, <code>showDockButton</code>, opacity, and
+        padding props control the panel shell; children remain ordinary controls.
+      </p>
+    </>
+  ),
+}
+
+const DocsIntro = ({ routeId }: { routeId: string }) => {
+  const content = DOCS_INTROS[routeId]
+  if (!content) return null
+  return <div className="docs-text-block docs-text-block--intro">{content}</div>
+}
 
 const buildRandomCombos = (
   source: typeof sliderColorCombos,
@@ -630,6 +781,7 @@ function App() {
         </aside>
         <main className="docs-main">
           <h1 className="docs-title">{activeRoute.title}</h1>
+          <DocsIntro routeId={activeRouteId} />
           {activeRouteId === 'slider' ? (
             <>
               <div className="docs-code-section">
@@ -925,18 +1077,6 @@ function App() {
                   <CodeBlock code={`fontSize={16}\n`} />
                 </div>
               </div>
-              <div className="docs-text-block">
-                <p>
-                  LFOSlider supports uncontrolled, controlled, and store-bound use. Use{" "}
-                  <code>defaultValue</code> for local state, <code>value</code> with{" "}
-                  <code>onUserChange</code> for parent state, or <code>controlId</code> for the shared
-                  slider store.
-                </p>
-                <p>
-                  <code>showLfoControls</code> adds waveform and range controls.{" "}
-                  <code>onAnimatedUpdate</code> reports frame-time values when the LFO is running.
-                </p>
-              </div>
             </>
           ) : activeRouteId === 'icon-button' ? (
             <>
@@ -1033,60 +1173,39 @@ function App() {
                   )
                 })}
               </div>
-              <div className="docs-text-block">
-                <p>
-                  IconButton supports momentary, toggle, and cycle modes. Cycle mode reads{" "}
-                  <code>options</code> and emits the selected option value through{" "}
-                  <code>onChange</code>.
-                </p>
-                <p>
-                  Use <code>defaultPressed</code> or <code>defaultToggled</code> for local state, or{" "}
-                  <code>pressed</code>/<code>toggled</code> with callbacks for controlled state.{" "}
-                  <code>borderStyle</code> and <code>borderMask</code> control how the button joins
-                  adjacent controls.
-                </p>
-              </div>
             </>
           ) : activeRouteId === 'loading-bar' ? (
             <>
               <div className="docs-code-section">
-                <LoadingBar
-                  value={loadingBarValue}
-                  width="100%"
-                  colorA={flexoki.green['600']}
-                  colorB={flexoki.green['100']}
-                  border="a"
-                  fontSize={12}
-                  barStyle="discrete"
-                  barSegmentCount={24}
-                />
-                <LFOSlider
-                  label="Value"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  defaultValue={loadingBarValue}
-                  value={loadingBarValue}
-                  width="100%"
-                  colorA={flexoki.green['600']}
-                  colorB={flexoki.green['100']}
-                  border="a"
-                  fontSize={12}
-                  onUserChange={setLoadingBarValue}
-                  onAnimatedUpdate={setLoadingBarValue}
-                  formatDisplayValue={(value) => value.toFixed(2)}
-                />
+                <div className="docs-example-stack">
+                  <LoadingBar
+                    value={loadingBarValue}
+                    width="100%"
+                    colorA={flexoki.green['600']}
+                    colorB={flexoki.green['100']}
+                    border="a"
+                    fontSize={12}
+                    barStyle="discrete"
+                    barSegmentCount={24}
+                  />
+                  <LFOSlider
+                    label="Value"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    defaultValue={loadingBarValue}
+                    value={loadingBarValue}
+                    width="100%"
+                    colorA={flexoki.green['600']}
+                    colorB={flexoki.green['100']}
+                    border="a"
+                    fontSize={12}
+                    onUserChange={setLoadingBarValue}
+                    onAnimatedUpdate={setLoadingBarValue}
+                    formatDisplayValue={(value) => value.toFixed(2)}
+                  />
+                </div>
                 <CodeBlock code={routeSnippet(activeRoute)} />
-              </div>
-              <div className="docs-text-block">
-                <p>
-                  LoadingBar renders a <code>value</code> between <code>0</code> and <code>1</code>.
-                  It does not handle input.
-                </p>
-                <p>
-                  Use <code>barStyle</code> and <code>barSegmentCount</code> for the fill style. Set{" "}
-                  <code>colorA</code>/<code>colorB</code> to match surrounding controls.
-                </p>
               </div>
             </>
           ) : activeRouteId === 'audio-controls' ? (
@@ -1151,23 +1270,6 @@ function App() {
                 </div>
                 <CodeBlock code={routeSnippet(activeRoute, 'liveInput')} />
               </div>
-              <div className="docs-text-block">
-                <p>
-                  AudioControls creates or uses an analysis store for a buffer, media stream, or{" "}
-                  <code>AudioNode</code> source. Wrap related controls in{" "}
-                  <code>AudioAnalysisProvider</code> or pass <code>audioAnalysisStore</code> directly
-                  to share FFT data.
-                </p>
-                <p>
-                  Sliders with <code>defaultWaveform="audio"</code> read that analysis data. Use
-                  controlled props such as <code>playing</code>, <code>binCount</code>, and{" "}
-                  <code>binInterpolation</code> only when the host owns those values.
-                </p>
-                <p>
-                  VirtualKeyboard can use Tone.js or SoundFont options. Pass a destination node when
-                  keyboard output should feed the same AudioControls analysis path.
-                </p>
-              </div>
             </>
           ) : activeRouteId === 'segment-bar' ? (
             <>
@@ -1182,17 +1284,6 @@ function App() {
                   fontSize={12}
                 />
                 <CodeBlock code={routeSnippet(activeRoute)} />
-              </div>
-              <div className="docs-text-block">
-                <p>
-                  SegmentBar renders one selected option from a fixed option list. Use{" "}
-                  <code>defaultValue</code> for local state or <code>value</code>/<code>onChange</code>{" "}
-                  for controlled state.
-                </p>
-                <p>
-                  It supports keyboard navigation and the same color and border props as the other
-                  controls.
-                </p>
               </div>
             </>
           ) : activeRouteId === 'radio-list' ? (
@@ -1251,16 +1342,6 @@ function App() {
                   <CodeBlock code={routeSnippet(activeRoute, 'columns')} />
                 </div>
               </div>
-              <div className="docs-text-block">
-                <p>
-                  RadioList renders one selected value from an option list. Descriptions and disabled
-                  options are supported.
-                </p>
-                <p>
-                  Use <code>defaultValue</code> for local state or <code>value</code>/<code>onChange</code>{" "}
-                  for controlled state. Set <code>columns</code> when the list needs a denser layout.
-                </p>
-              </div>
             </>
           ) : activeRouteId === 'key-value-rows' ? (
             <>
@@ -1285,14 +1366,6 @@ function App() {
                   <CodeBlock code={routeSnippet(activeRoute)} />
                   <CodeBlock code={routeSnippet(activeRoute, 'bordered')} />
                 </div>
-              </div>
-              <div className="docs-text-block">
-                <p>
-                  KeyValueRows renders read-only label/value rows in one bordered surface.
-                </p>
-                <p>
-                  Use it for status or metadata. It is not selectable and has no state model.
-                </p>
               </div>
             </>
           ) : activeRouteId === 'key-value-accordion' ? (
@@ -1326,17 +1399,6 @@ function App() {
                   <CodeBlock code={routeSnippet(activeRoute)} />
                   <CodeBlock code={routeSnippet(activeRoute, 'single')} />
                 </div>
-              </div>
-              <div className="docs-text-block">
-                <p>
-                  KeyValueAccordion renders label/value rows that can expand to show controls or
-                  custom content.
-                </p>
-                <p>
-                  <code>mode="multiple"</code> allows several open rows. <code>mode="single"</code>{" "}
-                  keeps one row open. Use <code>expandedKeys</code>/<code>onExpandedKeysChange</code>{" "}
-                  to control expansion.
-                </p>
               </div>
             </>
           ) : activeRouteId === 'name-input-row' ? (
@@ -1401,16 +1463,6 @@ function App() {
                   <CodeBlock code={routeSnippet(activeRoute, 'append')} />
                 </div>
               </div>
-              <div className="docs-text-block">
-                <p>
-                  NameInputRow combines a text input, create action, and optional randomize action.
-                </p>
-                <p>
-                  <code>onCreate</code> receives the current text. <code>onRandomize</code> may return
-                  a string directly or asynchronously; <code>randomizeMode="append"</code> appends it
-                  to the current value.
-                </p>
-              </div>
             </>
           ) : activeRouteId === 'selection-grid' ? (
             <>
@@ -1421,17 +1473,6 @@ function App() {
                   </div>
                 </SliderStoreProvider>
                 <CodeBlock code={routeSnippet(activeRoute)} />
-              </div>
-              <div className="docs-text-block">
-                <p>
-                  SelectionGrid renders selectable square items. Provide <code>getKey</code>,{" "}
-                  <code>getLabel</code>, and <code>getPreview</code> so it can stay data-agnostic.
-                </p>
-                <p>
-                  GradientSelectionGrid is the gradient-specific variant. Pass{" "}
-                  <code>terrainAssets</code> from the host app when terrain previews are needed; the
-                  package does not bundle terrain images.
-                </p>
               </div>
             </>
           ) : activeRouteId === 'dropdown' ? (
@@ -1509,30 +1550,11 @@ function App() {
                   <CodeBlock code={routeSnippet(activeRoute, 'nested')} />
                 </div>
               </div>
-              <div className="docs-text-block">
-                <p>
-                  Dropdown renders a labelled menu from an explicit option list. Use{" "}
-                  <code>defaultValue</code> for local state or <code>value</code>/<code>onChange</code>{" "}
-                  for controlled state.
-                </p>
-                <p>
-                  IconDropdown uses the same option contract with an icon trigger. Use{" "}
-                  <code>showMenuIcons</code> when option icons should appear inside the menu.
-                </p>
-              </div>
             </>
           ) : activeRouteId === 'color-field' ? (
             <>
               <div className="docs-code-section">
-                <div
-                  style={{
-                    width: '100%',
-                    maxWidth: 360,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 10,
-                  }}
-                >
+                <div className="docs-example-stack docs-example-stack--narrow">
                   <ColorField
                     label="Accent"
                     value={colorFieldValue}
@@ -1555,15 +1577,6 @@ function App() {
                   />
                 </div>
                 <CodeBlock code={routeSnippet(activeRoute)} />
-              </div>
-              <div className="docs-text-block">
-                <p>
-                  ColorField binds a hex color and optional alpha value in one row.
-                </p>
-                <p>
-                  The picker is inline by default. Set <code>pickerDisplay="popup"</code> to open it
-                  from the swatch.
-                </p>
               </div>
             </>
           ) : activeRouteId === 'floating-panel' ? (
@@ -1671,17 +1684,6 @@ function App() {
                   </FloatingPanel>
                 </PresetStoreProvider>
                 <CodeBlock code={routeSnippet(activeRoute)} />
-              </div>
-              <div className="docs-text-block">
-                <p>
-                  FloatingPanel renders a header and body for stacked controls. <code>title</code>{" "}
-                  creates the default header; <code>header</code> replaces it with custom content.
-                </p>
-                <p>
-                  <code>collapsible</code> controls body visibility. <code>draggable</code> and{" "}
-                  <code>showDockButton</code> add panel movement and docking. <code>padding</code>{" "}
-                  and <code>verticalGap</code> control body spacing.
-                </p>
               </div>
             </>
           ) : (

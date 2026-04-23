@@ -595,53 +595,41 @@ function App() {
       <AudioAnalysisProvider>
         <AudioBinsDriver onFrame={updateAudioBins} />
         <div className="docs-layout">
-          <aside className="docs-sidebar">
-            <div className="docs-brand">
-              <DocsBrandCanvas {...brandCanvasProps} />
-            </div>
-            <Folder
-              className="docs-folder"
-              label="Components"
-              colorA={flexoki.base['100']}
-              colorB={flexoki.base['800']}
-              borderStyle="none"
-              transparent
-              fontSize={16}
-              padding={6}
-              verticalGap={6}
-            >
-              {ROUTES.map((route, index) => {
-                const palette = SIDEBAR_COLORS[index % SIDEBAR_COLORS.length]
-                const isActive = route.id === activeRouteId
-                return (
-                  <BasicButton
-                    key={route.id}
-                    className="docs-button"
-                    colorA={isActive ? flexoki.base['950'] : palette.colorA}
-                    colorB={isActive ? palette.colorA : 'transparent'}
-                    borderStyle={isActive ? 'a' : 'none'}
-                    fontSize={13}
-                    padding="8px 10px"
-                    aria-current={isActive ? 'page' : undefined}
-                    data-active={isActive ? 'true' : undefined}
-                    onClick={() => handleNavClick(route.id)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                    }}
-                  >
-                    {route.label}
-                  </BasicButton>
-                )
-              })}
-            </Folder>
-          </aside>
-          <main className="docs-main">
-            <div className="docs-main-inner">
-              <header className="docs-page-header">
-                <div className="docs-page-kicker">ui-bits docs</div>
-                <h1 className="docs-title">{activeRoute.title}</h1>
-              </header>
+        <aside className="docs-sidebar">
+          <div className="docs-brand">
+            <DocsBrandCanvas {...brandCanvasProps} />
+          </div>
+          <Folder
+            className="docs-folder"
+            label="Components"
+            colorA={flexoki.base['100']}
+            colorB={flexoki.base['800']}
+            borderStyle="none"
+            transparent
+            fontSize={16}
+            padding={6}
+            verticalGap={6}
+          >
+            {ROUTES.map((route, index) => {
+              const palette = SIDEBAR_COLORS[index % SIDEBAR_COLORS.length]
+              return (
+                <BasicButton
+                  key={route.id}
+                  className="docs-button"
+                  colorA={palette.colorA}
+                  colorB={palette.colorB}
+                  borderStyle="none"
+                  fontSize={16}
+                  onClick={() => handleNavClick(route.id)}
+                >
+                  {route.label}
+                </BasicButton>
+              )
+            })}
+          </Folder>
+        </aside>
+        <main className="docs-main">
+          <h1 className="docs-title">{activeRoute.title}</h1>
           {activeRouteId === 'slider' ? (
             <>
               <div className="docs-code-section">
@@ -1537,7 +1525,13 @@ function App() {
             <>
               <div className="docs-code-section">
                 <div
-                  className="docs-control-stack docs-control-stack--narrow"
+                  style={{
+                    width: '100%',
+                    maxWidth: 360,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                  }}
                 >
                   <ColorField
                     label="Accent"
@@ -1693,11 +1687,10 @@ function App() {
           ) : (
             <CodeBlock code={routeSnippet(activeRoute)} />
           )}
-          </div>
         </main>
         <FloatingPanel
           className="docs-panel"
-          title="Brand"
+          title="Shader"
           collapsible
           showDockButton
           dockOnMount

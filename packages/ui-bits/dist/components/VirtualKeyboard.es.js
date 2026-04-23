@@ -1,4 +1,4 @@
-import { b as E, a as _, D as U, V as s } from "../VirtualKeyboard-DS0x4yC8.js";
+import { b as E, a as _, D as U, V as s } from "../VirtualKeyboard-C3lGocCp.js";
 export {
   E as DEFAULT_HEIGHT_UNITS,
   _ as DEFAULT_NOTE_COUNT,

@@ -271,6 +271,17 @@ function createMissingAudioDependencyError(dependency: string, error: unknown) {
   );
 }
 
+function resolveSoundfontConfig(
+  sharedConfig: VirtualKeyboardSoundfontConfig | null | undefined,
+  optionConfig: VirtualKeyboardSoundfontConfig | null | undefined,
+) {
+  if (!sharedConfig && !optionConfig) return null;
+  return {
+    ...(sharedConfig ?? {}),
+    ...(optionConfig ?? {}),
+  };
+}
+
 async function loadToneModule() {
   if (!toneModulePromise) {
     toneModulePromise = import("tone")
@@ -509,7 +520,9 @@ export default function VirtualKeyboard({
     || selectedInstrument?.toneConfig != null
     || effectiveInstrument === toneInstrumentValue
   );
-  const resolvedSoundfontConfig = selectedInstrument?.soundfontConfig ?? soundfontConfig ?? null;
+  const resolvedSoundfontConfig = React.useMemo(() => (
+    resolveSoundfontConfig(soundfontConfig, selectedInstrument?.soundfontConfig)
+  ), [selectedInstrument, soundfontConfig]);
   const baseSoundfont = React.useMemo(() => (
     showInstrumentControl && !usesTone && resolvedSoundfontConfig
       ? { ...resolvedSoundfontConfig, instrument: effectiveInstrument }

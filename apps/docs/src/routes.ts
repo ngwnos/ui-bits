@@ -175,15 +175,16 @@ defaultLfoRange={[20, 80]}`,
     label: 'Radio List',
     title: 'Radio List',
     code: `const options = [
-  { value: "draft", label: "Draft", description: "Draft output" },
-  { value: "balanced", label: "Balanced", description: "Balanced output" },
-  { value: "quality", label: "Quality", description: "Quality output" },
+  { value: "manual", label: "Manual", description: "User controlled" },
+  { value: "auto", label: "Auto", description: "Host controlled" },
+  { value: "follow", label: "Follow", description: "Linked control" },
+  { value: "locked", label: "Locked", description: "Disabled", disabled: true },
 ];
 
-const [value, setValue] = useState("balanced");
+const [value, setValue] = useState("auto");
 
 <RadioList
-  label="Render Profile"
+  label="Control Mode"
   showLabel
   options={options}
   value={value}
@@ -195,7 +196,7 @@ const [value, setValue] = useState("balanced");
 />`,
     snippets: {
       columns: `<RadioList
-  label="Render Profile (2 Columns)"
+  label="Control Mode (2 Columns)"
   showLabel
   options={options}
   value={value}
@@ -243,18 +244,18 @@ const [value, setValue] = useState("balanced");
     title: 'Key/Value Accordion',
     code: `const items = [
   {
-    key: "render-profile",
-    label: "Render Profile",
-    value: "Balanced",
+    key: "preset",
+    label: "Preset",
+    value: "Bright",
     defaultExpanded: true,
     children: (
       <Dropdown
         label="Profile"
         labelInline
         options={[
-          { value: "draft", label: "Draft" },
-          { value: "balanced", label: "Balanced" },
-          { value: "quality", label: "Quality" },
+          { value: "clean", label: "Clean" },
+          { value: "bright", label: "Bright" },
+          { value: "wide", label: "Wide" },
         ]}
         value={profile}
         onChange={(value) => setProfile(value)}
@@ -307,20 +308,20 @@ const [value, setValue] = useState("balanced");
     id: 'name-input-row',
     label: 'Name Input Row',
     title: 'Name Input Row',
-    code: `const randomWorldNames = [
-  "Ironwake Reach",
-  "Ashen Hollow",
-  "Starfall Basin",
-  "Copper Fen",
-  "Mireglass Coast",
+    code: `const randomPresetNames = [
+  "Clean Lead",
+  "Soft Pad",
+  "Short Delay",
+  "Wide Chorus",
+  "Low Drone",
 ]
 
 const [createdNames, setCreatedNames] = useState<string[]>([])
 
 <NameInputRow
-  placeholder="New world..."
+  placeholder="Preset name..."
   onCreate={(name) => setCreatedNames((prev) => [name, ...prev].slice(0, 6))}
-  onRandomize={() => randomWorldNames[Math.floor(Math.random() * randomWorldNames.length)] ?? ""}
+  onRandomize={() => randomPresetNames[Math.floor(Math.random() * randomPresetNames.length)] ?? ""}
   colorA={flexoki.orange["600"]}
   colorB={flexoki.orange["100"]}
   borderStyle="a"
@@ -328,13 +329,13 @@ const [createdNames, setCreatedNames] = useState<string[]>([])
 />`,
     snippets: {
       append: `<NameInputRow
-  value={factionName}
-  onValueChange={setFactionName}
-  placeholder="Faction..."
-  onCreate={(name) => saveFaction(name)}
-  onRandomize={() => randomFactionName()}
+  value={tagName}
+  onValueChange={setTagName}
+  placeholder="Tag..."
+  onCreate={(name) => saveTag(name)}
+  onRandomize={() => randomTag()}
   randomizeMode="append"
-  appendSeparator=" of "
+  appendSeparator=" / "
   colorA={flexoki.cyan["600"]}
   colorB={flexoki.cyan["100"]}
   borderStyle="a"
@@ -411,14 +412,14 @@ const folders = [
 />`,
     snippets: {
       subtext: `<Dropdown
-  label="Render Profile"
+  label="Buffer Mode"
   options={[
-    { value: "draft", label: "Draft", description: "Draft output" },
-    { value: "balanced", label: "Balanced", description: "Balanced output" },
-    { value: "quality", label: "Quality", description: "Quality output" },
+    { value: "low-latency", label: "Low Latency", description: "Small buffer" },
+    { value: "balanced", label: "Balanced", description: "Default buffer" },
+    { value: "large-buffer", label: "Large Buffer", description: "Larger buffer" },
   ]}
-  value={profile}
-  onChange={(value) => setProfile(value)}
+  value={bufferMode}
+  onChange={(value) => setBufferMode(value)}
   colorA={flexoki.purple["600"]}
   colorB={flexoki.purple["100"]}
   borderStyle="a"
@@ -426,14 +427,14 @@ const folders = [
   width={280}
 />`,
       icon: `<IconDropdown
-  label="Weather"
+  label="Status"
   options={[
-    { value: "drizzle", label: "Drizzle", icon: <CloudDrizzle /> },
-    { value: "lightning", label: "Lightning", icon: <CloudLightning /> },
-    { value: "snow", label: "Snow", icon: <CloudSnow /> },
-    { value: "sun", label: "Sun", icon: <Sun /> },
+    { value: "idle", label: "Idle", icon: <Square /> },
+    { value: "active", label: "Active", icon: <SquareCheckBig /> },
+    { value: "muted", label: "Muted", icon: <PowerOff /> },
+    { value: "armed", label: "Armed", icon: <Power /> },
   ]}
-  value="drizzle"
+  value="idle"
   onChange={(value) => setIconDropdownValue(value)}
   colorA={flexoki.cyan["600"]}
   colorB={flexoki.cyan["100"]}
@@ -445,10 +446,10 @@ const folders = [
   const number = String(index + 1).padStart(2, "0")
   const isExtendedLabel = index === 11
   return {
-    value: \`destination-\${number}\`,
+    value: \`output-\${number}\`,
     label: isExtendedLabel
-      ? \`Destination \${number} - Macro \${number} - Ultra-wide modulation routing lane\`
-      : \`Destination \${number} - Macro \${number}\`,
+      ? \`Output \${number} - Auxiliary return with a long label\`
+      : \`Output \${number} - Bus \${number}\`,
   }
 })
 
@@ -461,12 +462,12 @@ const folders = [
   width={320}
 >
   <Folder
-    label="Folder Container"
+    label="Routing"
     colorA={flexoki.purple["600"]}
     colorB={flexoki.purple["100"]}
   >
     <Dropdown
-      label="Long Menu"
+      label="Output"
       labelInline
       options={longOptions}
       value={nestedDropdownValue}

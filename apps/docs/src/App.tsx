@@ -32,9 +32,6 @@ import {
   sliderColorCombos,
 } from 'ui-bits'
 import {
-  CloudDrizzle,
-  CloudLightning,
-  CloudSnow,
   MoonStar,
   Paintbrush,
   Power,
@@ -109,7 +106,7 @@ function App() {
   const [loadingBarValue, setLoadingBarValue] = useState(0.6)
   const [iconToggled, setIconToggled] = useState(false)
   const [powerToggled, setPowerToggled] = useState(false)
-  const [weatherMode, setWeatherMode] = useState('drizzle')
+  const [statusMode, setStatusMode] = useState('idle')
   const [themeMode, setThemeMode] = useState('dark')
   const audioBinsRef = useRef<number[]>(Array.from({ length: AUDIO_BIN_COUNT }, () => 0))
   const [iconSizeColors, setIconSizeColors] = useState(() => (
@@ -190,34 +187,34 @@ function App() {
   )
   const brandBackground = 'rgb(16, 15, 15)'
   const brandTextColor = flexoki.base['50']
-  const weatherOptions = useMemo(() => ([
+  const statusOptions = useMemo(() => ([
     {
-      value: 'drizzle',
-      icon: <CloudDrizzle />,
+      value: 'idle',
+      icon: <Square />,
       colorA: flexoki.blue['600'],
       colorB: flexoki.blue['150'],
-      ariaLabel: 'Drizzle',
+      ariaLabel: 'Idle',
     },
     {
-      value: 'lightning',
-      icon: <CloudLightning />,
-      colorA: flexoki.yellow['600'],
-      colorB: flexoki.yellow['150'],
-      ariaLabel: 'Lightning',
+      value: 'active',
+      icon: <SquareCheckBig />,
+      colorA: flexoki.green['600'],
+      colorB: flexoki.green['150'],
+      ariaLabel: 'Active',
     },
     {
-      value: 'snow',
-      icon: <CloudSnow />,
-      colorA: flexoki.base['800'],
-      colorB: flexoki.base['150'],
-      ariaLabel: 'Snow',
+      value: 'muted',
+      icon: <PowerOff />,
+      colorA: flexoki.red['600'],
+      colorB: flexoki.red['150'],
+      ariaLabel: 'Muted',
     },
     {
-      value: 'sun',
-      icon: <Sun />,
+      value: 'armed',
+      icon: <Power />,
       colorA: flexoki.orange['600'],
       colorB: flexoki.orange['150'],
-      ariaLabel: 'Sun',
+      ariaLabel: 'Armed',
     },
   ]), [])
   const segmentOptions = useMemo(() => ([
@@ -226,9 +223,9 @@ function App() {
     { value: 'high', label: 'High' },
   ]), [])
   const radioListOptions = useMemo(() => ([
-    { value: 'draft', label: 'Draft', description: 'Draft output' },
-    { value: 'balanced', label: 'Balanced', description: 'Balanced output' },
-    { value: 'quality', label: 'Quality', description: 'Quality output' },
+    { value: 'manual', label: 'Manual', description: 'User controlled' },
+    { value: 'auto', label: 'Auto', description: 'Host controlled' },
+    { value: 'follow', label: 'Follow', description: 'Linked control' },
     { value: 'locked', label: 'Locked', description: 'Disabled', disabled: true },
   ]), [])
   const radioListCompactOptions = useMemo(() => ([
@@ -237,12 +234,12 @@ function App() {
     { value: 'surround', label: 'Surround' },
   ]), [])
   const radioListDenseOptions = useMemo(() => ([
-    { value: 'eco', label: 'Eco' },
-    { value: 'fast', label: 'Fast' },
-    { value: 'normal', label: 'Normal' },
-    { value: 'safe', label: 'Safe' },
-    { value: 'turbo', label: 'Turbo' },
-    { value: 'custom', label: 'Custom' },
+    { value: 'main', label: 'Main' },
+    { value: 'cue', label: 'Cue' },
+    { value: 'aux-1', label: 'Aux 1' },
+    { value: 'aux-2', label: 'Aux 2' },
+    { value: 'print', label: 'Print' },
+    { value: 'mute', label: 'Mute' },
   ]), [])
   const keyValueRowsData = useMemo(() => ([
     { key: 'status', label: 'Status', value: 'Available' },
@@ -253,15 +250,15 @@ function App() {
     { key: 'max-buffer', label: 'Max Buffer Size', value: '256 MB' },
   ]), [])
   const keyValueRowsStats = useMemo(() => ([
-    { key: 'map-size', label: 'Map Size', value: '05 / 10' },
-    { key: 'cities', label: 'Cities', value: '12 / 24' },
-    { key: 'characters', label: 'Characters', value: '28 / 50' },
-    { key: 'side-quests', label: 'Side Quests', value: '09 / 20' },
+    { key: 'inputs', label: 'Inputs', value: '02 / 08' },
+    { key: 'outputs', label: 'Outputs', value: '04 / 08' },
+    { key: 'sample-rate', label: 'Sample Rate', value: '48 kHz' },
+    { key: 'buffer', label: 'Buffer', value: '128' },
   ]), [])
   const accordionProfileOptions = useMemo(() => ([
-    { value: 'draft', label: 'Draft' },
-    { value: 'balanced', label: 'Balanced' },
-    { value: 'quality', label: 'Quality' },
+    { value: 'clean', label: 'Clean' },
+    { value: 'bright', label: 'Bright' },
+    { value: 'wide', label: 'Wide' },
   ]), [])
   const accordionLimiterOptions = useMemo(() => ([
     { value: 'off', label: 'Off' },
@@ -273,47 +270,47 @@ function App() {
     { value: 'square', label: 'Square', disabled: true },
   ]), [])
   const dropdownSubtextOptions = useMemo(() => ([
-    { value: 'draft', label: 'Draft', description: 'Draft output' },
-    { value: 'balanced', label: 'Balanced', description: 'Balanced output' },
-    { value: 'quality', label: 'Quality', description: 'Quality output' },
-    { value: 'safe', label: 'Safe', description: 'Disabled', disabled: true },
+    { value: 'low-latency', label: 'Low Latency', description: 'Small buffer' },
+    { value: 'balanced', label: 'Balanced', description: 'Default buffer' },
+    { value: 'large-buffer', label: 'Large Buffer', description: 'Larger buffer' },
+    { value: 'locked', label: 'Locked', description: 'Disabled', disabled: true },
   ]), [])
   const nestedDropdownOptions = useMemo(() => (
     Array.from({ length: 24 }, (_, index) => {
       const number = String(index + 1).padStart(2, '0')
       const isExtendedLabel = index === 11
       return {
-        value: `destination-${number}`,
+        value: `output-${number}`,
         label: isExtendedLabel
-          ? `Destination ${number} - Macro ${number} - Ultra-wide modulation routing lane`
-          : `Destination ${number} - Macro ${number}`,
+          ? `Output ${number} - Auxiliary return with a long label`
+          : `Output ${number} - Bus ${number}`,
       }
     })
   ), [])
   const iconDropdownOptions = useMemo(() => ([
-    { value: 'drizzle', label: 'Drizzle', icon: <CloudDrizzle /> },
-    { value: 'lightning', label: 'Lightning', icon: <CloudLightning /> },
-    { value: 'snow', label: 'Snow', icon: <CloudSnow /> },
-    { value: 'sun', label: 'Sun', icon: <Sun /> },
+    { value: 'idle', label: 'Idle', icon: <Square /> },
+    { value: 'active', label: 'Active', icon: <SquareCheckBig /> },
+    { value: 'muted', label: 'Muted', icon: <PowerOff /> },
+    { value: 'armed', label: 'Armed', icon: <Power /> },
   ]), [])
   const [waveformValue, setWaveformValue] = useState('sine')
   const [subtextDropdownValue, setSubtextDropdownValue] = useState('balanced')
-  const [radioListValue, setRadioListValue] = useState('balanced')
+  const [radioListValue, setRadioListValue] = useState('auto')
   const [radioListCompactValue, setRadioListCompactValue] = useState('stereo')
-  const [radioListDenseValue, setRadioListDenseValue] = useState('normal')
-  const [iconDropdownValue, setIconDropdownValue] = useState('drizzle')
-  const [nestedDropdownValue, setNestedDropdownValue] = useState('destination-01')
+  const [radioListDenseValue, setRadioListDenseValue] = useState('main')
+  const [iconDropdownValue, setIconDropdownValue] = useState('idle')
+  const [nestedDropdownValue, setNestedDropdownValue] = useState('output-01')
   const [colorFieldValue, setColorFieldValue] = useState('#d14d41')
-  const [accordionProfileValue, setAccordionProfileValue] = useState('balanced')
+  const [accordionProfileValue, setAccordionProfileValue] = useState('bright')
   const [accordionRoutingValue, setAccordionRoutingValue] = useState('stereo')
   const [accordionLimiterValue, setAccordionLimiterValue] = useState('on')
   const [accordionSingleExpandedKeys, setAccordionSingleExpandedKeys] = useState<string[]>([
-    'single-world',
+    'single-gain',
   ])
   const keyValueAccordionItems = useMemo(() => ([
     {
-      key: 'render-profile',
-      label: 'Render Profile',
+      key: 'preset',
+      label: 'Preset',
       value: accordionProfileOptions.find((option) => option.value === accordionProfileValue)?.label
         ?? accordionProfileValue,
       defaultExpanded: true,
@@ -383,31 +380,29 @@ function App() {
   ])
   const keyValueAccordionSingleItems = useMemo(() => ([
     {
-      key: 'single-world',
-      label: 'World Scale',
-      value: 'Large',
+      key: 'single-gain',
+      label: 'Input Gain',
+      value: '0.72',
       children: (
-        <Dropdown
-          label="Scale"
-          labelInline
-          options={[
-            { value: 'small', label: 'Small' },
-            { value: 'medium', label: 'Medium' },
-            { value: 'large', label: 'Large' },
-          ]}
-          defaultValue="large"
-          borderStyle="a"
+        <LFOSlider
+          label="Gain"
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={0.72}
+          width="100%"
+          border="a"
           fontSize={12}
         />
       ),
     },
     {
-      key: 'single-terrain',
-      label: 'Terrain Detail',
+      key: 'single-filter',
+      label: 'Filter Cutoff',
       value: '0.62',
       children: (
         <LFOSlider
-          label="Detail"
+          label="Cutoff"
           min={0}
           max={1}
           step={0.01}
@@ -419,48 +414,48 @@ function App() {
       ),
     },
     {
-      key: 'single-fog',
-      label: 'Fog Density',
-      value: 'Low',
+      key: 'single-output',
+      label: 'Output Mode',
+      value: 'Main',
       children: (
         <SegmentBar
           options={[
-            { value: 'off', label: 'Off' },
-            { value: 'low', label: 'Low' },
-            { value: 'high', label: 'High' },
+            { value: 'main', label: 'Main' },
+            { value: 'cue', label: 'Cue' },
+            { value: 'mute', label: 'Mute' },
           ]}
-          defaultValue="low"
+          defaultValue="main"
           borderStyle="a"
           fontSize={12}
         />
       ),
     },
   ]), [])
-  const randomWorldNamePool = useMemo(() => ([
-    'Ironwake Reach',
-    'Ashen Hollow',
-    'Starfall Basin',
-    'Copper Fen',
-    'Mireglass Coast',
-    'Thornspire Vale',
+  const randomPresetNamePool = useMemo(() => ([
+    'Clean Lead',
+    'Soft Pad',
+    'Short Delay',
+    'Wide Chorus',
+    'Low Drone',
+    'Bright Pluck',
   ]), [])
-  const randomFactionNamePool = useMemo(() => ([
-    'The Ember Cartel',
-    'Order of Glass',
-    'Ravenbound Circle',
-    'Verdant Host',
-    'Guild of the Ninth Bridge',
+  const randomTagPool = useMemo(() => ([
+    'lead',
+    'pad',
+    'dry',
+    'wide',
+    'short',
   ]), [])
-  const [worldNameInputValue, setWorldNameInputValue] = useState('')
-  const [factionNameInputValue, setFactionNameInputValue] = useState('')
-  const [createdWorldNames, setCreatedWorldNames] = useState<string[]>([])
-  const [createdFactionNames, setCreatedFactionNames] = useState<string[]>([])
-  const getRandomWorldName = useCallback(() => (
-    randomWorldNamePool[Math.floor(Math.random() * randomWorldNamePool.length)] ?? ''
-  ), [randomWorldNamePool])
-  const getRandomFactionName = useCallback(() => (
-    randomFactionNamePool[Math.floor(Math.random() * randomFactionNamePool.length)] ?? ''
-  ), [randomFactionNamePool])
+  const [presetNameInputValue, setPresetNameInputValue] = useState('')
+  const [tagNameInputValue, setTagNameInputValue] = useState('')
+  const [createdPresetNames, setCreatedPresetNames] = useState<string[]>([])
+  const [createdTagNames, setCreatedTagNames] = useState<string[]>([])
+  const getRandomPresetName = useCallback(() => (
+    randomPresetNamePool[Math.floor(Math.random() * randomPresetNamePool.length)] ?? ''
+  ), [randomPresetNamePool])
+  const getRandomTag = useCallback(() => (
+    randomTagPool[Math.floor(Math.random() * randomTagPool.length)] ?? ''
+  ), [randomTagPool])
   const themeOptions = useMemo(() => ([
     {
       value: 'dark',
@@ -1006,9 +1001,9 @@ function App() {
                   <div className="docs-icon-row">
                     <IconButton
                       behavior="cycle"
-                      options={weatherOptions}
-                      value={weatherMode}
-                      onChange={(value) => setWeatherMode(value)}
+                      options={statusOptions}
+                      value={statusMode}
+                      onChange={(value) => setStatusMode(value)}
                       fontSize={16}
                       borderStyle="a"
                       colorA={flexoki.blue['600']}
@@ -1205,7 +1200,7 @@ function App() {
               <div className="docs-code-section">
                 <div className="docs-radio-stack">
                   <RadioList
-                    label="Render Profile"
+                    label="Control Mode"
                     showLabel
                     options={radioListOptions}
                     value={radioListValue}
@@ -1216,7 +1211,7 @@ function App() {
                     fontSize={12}
                   />
                   <RadioList
-                    label="Render Profile (2 Columns)"
+                    label="Control Mode (2 Columns)"
                     showLabel
                     options={radioListOptions}
                     value={radioListValue}
@@ -1239,7 +1234,7 @@ function App() {
                     fontSize={12}
                   />
                   <RadioList
-                    label="Mode Presets (3 Columns)"
+                    label="Monitor Mix (3 Columns)"
                     showLabel
                     options={radioListDenseOptions}
                     value={radioListDenseValue}
@@ -1349,52 +1344,52 @@ function App() {
               <div className="docs-code-section">
                 <div className="docs-radio-stack">
                   <NameInputRow
-                    value={worldNameInputValue}
-                    onValueChange={setWorldNameInputValue}
-                    placeholder="New world..."
+                    value={presetNameInputValue}
+                    onValueChange={setPresetNameInputValue}
+                    placeholder="Preset name..."
                     onCreate={(name) => {
-                      setCreatedWorldNames((prev) => [name, ...prev].slice(0, 6))
+                      setCreatedPresetNames((prev) => [name, ...prev].slice(0, 6))
                     }}
-                    onRandomize={getRandomWorldName}
+                    onRandomize={getRandomPresetName}
                     colorA={flexoki.orange['600']}
                     colorB={flexoki.orange['100']}
                     borderStyle="a"
                     fontSize={12}
                   />
                   <KeyValueRows
-                    rows={createdWorldNames.map((name, index) => ({
-                      key: `world-${index}-${name}`,
-                      label: `World ${String(index + 1).padStart(2, '0')}`,
+                    rows={createdPresetNames.map((name, index) => ({
+                      key: `preset-${index}-${name}`,
+                      label: `Preset ${String(index + 1).padStart(2, '0')}`,
                       value: name,
                     }))}
-                    emptyLabel="No created world names"
+                    emptyLabel="No preset names"
                     colorA={flexoki.orange['600']}
                     colorB={flexoki.orange['100']}
                     borderStyle="a"
                     fontSize={12}
                   />
                   <NameInputRow
-                    value={factionNameInputValue}
-                    onValueChange={setFactionNameInputValue}
-                    placeholder="Faction..."
+                    value={tagNameInputValue}
+                    onValueChange={setTagNameInputValue}
+                    placeholder="Tag..."
                     onCreate={(name) => {
-                      setCreatedFactionNames((prev) => [name, ...prev].slice(0, 6))
+                      setCreatedTagNames((prev) => [name, ...prev].slice(0, 6))
                     }}
-                    onRandomize={getRandomFactionName}
+                    onRandomize={getRandomTag}
                     randomizeMode="append"
-                    appendSeparator=" of "
+                    appendSeparator=" / "
                     colorA={flexoki.cyan['600']}
                     colorB={flexoki.cyan['100']}
                     borderStyle="a"
                     fontSize={12}
                   />
                   <KeyValueRows
-                    rows={createdFactionNames.map((name, index) => ({
-                      key: `faction-${index}-${name}`,
-                      label: `Faction ${String(index + 1).padStart(2, '0')}`,
+                    rows={createdTagNames.map((name, index) => ({
+                      key: `tag-${index}-${name}`,
+                      label: `Tag ${String(index + 1).padStart(2, '0')}`,
                       value: name,
                     }))}
-                    emptyLabel="No created faction names"
+                    emptyLabel="No tags"
                     colorA={flexoki.cyan['600']}
                     colorB={flexoki.cyan['100']}
                     borderStyle="a"
@@ -1454,7 +1449,7 @@ function App() {
                     fontSize={12}
                   />
                   <Dropdown
-                    label="Render Profile"
+                    label="Buffer Mode"
                     options={dropdownSubtextOptions}
                     value={subtextDropdownValue}
                     onChange={(value) => setSubtextDropdownValue(value)}
@@ -1465,7 +1460,7 @@ function App() {
                     width={280}
                   />
                   <IconDropdown
-                    label="Weather"
+                    label="Status"
                     options={iconDropdownOptions}
                     value={iconDropdownValue}
                     onChange={(value) => setIconDropdownValue(value)}
@@ -1489,12 +1484,12 @@ function App() {
                     paddingBottom={3}
                   >
                     <Folder
-                      label="Folder Container"
+                      label="Routing"
                       colorA={flexoki.purple['600']}
                       colorB={flexoki.purple['100']}
                     >
                       <Dropdown
-                        label="Long Menu"
+                        label="Output"
                         labelInline
                         options={nestedDropdownOptions}
                         value={nestedDropdownValue}

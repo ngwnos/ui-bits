@@ -1,88 +1,43 @@
 # ui-bits Integration Patterns
 
-This document captures production usage patterns across `tree`, `roots`, and `dm-to-survive`.
+These notes cover contracts implemented in `packages/ui-bits/src`.
 
-## 1) Pick one control state mode
+## State Modes
 
-Every control should use exactly one mode:
+Use one state mode per control.
 
-- Controlled mode:
-  - Pass `value`
-  - Update parent state in `onChange` / `onUserChange`
-- Store-bound mode:
-  - Pass `controlId`
-  - Do not pass controlled `value`
-- Uncontrolled mode:
-  - Pass `defaultValue`
-  - Optional callbacks for side effects
+- Controlled: pass `value` plus `onChange` or `onUserChange`.
+- Store-bound: pass a stable `controlId` and no controlled `value`.
+- Uncontrolled: pass `defaultValue` or the relevant `default*` props.
 
-Anti-pattern:
+Passing both a controlled value and `controlId` makes the controlled value win. Several controls emit a one-time development warning for that case.
 
-- Passing both `controlId` and `value`.
+## Presets
 
-Result:
+`PresetStoreProvider` and `PresetManager` snapshot values from the control store. Controls that should appear in presets need stable control ids, or the host app needs to mirror values into the store directly.
 
-- `value` wins, store binding is ignored.
-- Components now emit one-time dev warnings for this.
+## Realtime UIs
 
-## 2) Realtime scene integrations (Three/WebGPU)
+High-frequency callbacks should update refs, audio nodes, or render-loop inputs directly when possible. For `LFOSlider`, use `onUserChange` for direct edits and `onAnimatedUpdate` for frame-time modulation.
 
-For high-frequency rendering loops:
+## Styles
 
-- Keep render-loop inputs in refs or GPU buffers.
-- In slider/color callbacks, update refs directly.
-- Avoid large React tree updates on each pointer move.
+Import `ui-bits/style.css` once in the host app. Individual components expose `colorA`, `colorB`, border, font size, and spacing props for local composition.
 
-Use this split:
+## Terrain Previews
 
-- `onUserChange`: immediate user edits.
-- `onAnimatedUpdate`: per-frame modulation output.
+`GradientSelectionGrid` accepts a `terrainAssets` prop. The package does not bundle terrain images; docs load their sample tiles from `apps/docs/src/assets/terrain/tiles`.
 
-## 3) Preset contract
-
-If you use `PresetStoreProvider` + `PresetManager`:
-
-- Ensure relevant controls are represented in the control store.
-- Use stable `controlId`s and keep naming consistent.
-- When `presets` is controlled, provide `onPresetsChange`.
-
-Common failure mode:
-
-- Visual controls update scene state, but control store is not updated.
-- Symptom: "current settings" comparisons and copied preset snapshots look stuck/default.
-
-## 4) Color controls
-
-For `ColorField`:
-
-- `value`/`defaultValue` must be hex (`#rgb` or `#rrggbb`).
-- Use `pickerDisplay="inline"` for always-visible picker.
-- Use `pickerDisplay="popup"` for swatch-triggered popover.
-
-## 5) Theming and panel composition
-
-Observed common structure:
-
-- `FloatingPanel` as shell
-- `Folder` for grouped sections
-- `ControlGroup` / `ControlRow` for dense control layouts
-- Theme variables (`colorA`, `colorB`, border style, font size) defined once and threaded through components
-
-## 6) Minimal robust template
+## Minimal Example
 
 ```tsx
-import {
-  FrameLoopProvider,
-  PresetStoreProvider,
-  LFOSlider,
-  ColorField,
-} from "ui-bits/core";
+import { ColorField, FrameLoopProvider, LFOSlider, PresetStoreProvider } from "ui-bits/core";
 import "ui-bits/style.css";
 
 export function Controls() {
   return (
     <FrameLoopProvider>
-      <PresetStoreProvider autoIds controlIdPrefix="scene" storageKey="scene-presets">
+      <PresetStoreProvider storageKey="scene-presets">
         <LFOSlider
           label="Growth"
           controlId="scene.growth"
@@ -90,10 +45,6 @@ export function Controls() {
           max={1}
           step={0.001}
           defaultValue={0.35}
-          onUserChange={(v) => {
-            // Update scene ref/buffer directly when possible.
-            void v;
-          }}
         />
 
         <ColorField
@@ -102,23 +53,9 @@ export function Controls() {
           alphaControlId="scene.leafAlpha"
           defaultValue="#78a35b"
           defaultAlpha={255}
-          pickerDisplay="inline"
         />
       </PresetStoreProvider>
     </FrameLoopProvider>
   );
 }
-```
-
-## 7) Prompt hint block for code models
-
-Use this verbatim when asking a model to add controls with `ui-bits`:
-
-```text
-Use ui-bits with strict state-mode rules:
-- For each control, choose exactly one mode: controlled (value+callback), store-bound (controlId), or uncontrolled (defaultValue).
-- Never pass both value and controlId.
-- For preset support, bind controls to stable controlIds so snapshots stay accurate.
-- For realtime scenes, update refs/buffers in callbacks and avoid triggering heavy React rerenders per pointer move.
-- Use FrameLoopProvider at the root and import ui-bits/style.css once.
 ```

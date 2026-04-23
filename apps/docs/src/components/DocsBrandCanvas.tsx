@@ -47,6 +47,32 @@ const DEFAULT_TICK_MS = 350;
 const DEFAULT_COLOR_CYCLE_MS = 2000;
 const OFFSCREEN_ROWS = 5;
 
+const parseHexColor = (color: string): [number, number, number] => {
+  const normalized = color.trim();
+  if (normalized.startsWith("#")) {
+    if (normalized.length === 7) {
+      return [
+        Number.parseInt(normalized.slice(1, 3), 16) / 255,
+        Number.parseInt(normalized.slice(3, 5), 16) / 255,
+        Number.parseInt(normalized.slice(5, 7), 16) / 255,
+      ];
+    }
+    if (normalized.length === 4) {
+      return [
+        Number.parseInt(normalized[1] + normalized[1], 16) / 255,
+        Number.parseInt(normalized[2] + normalized[2], 16) / 255,
+        Number.parseInt(normalized[3] + normalized[3], 16) / 255,
+      ];
+    }
+  }
+  return [0, 0, 0];
+};
+
+const parseHexBytes = (color: string): [number, number, number] => {
+  const [r, g, b] = parseHexColor(color);
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+};
+
 export default function DocsBrandCanvas({
   palette = ["#205EA6", "#879A39", "#D0A215", "#DA702C"],
   backgroundColor = "#1C1B1A",
@@ -125,32 +151,6 @@ export default function DocsBrandCanvas({
     charCount: number;
   } | null>(null);
   const configuredSizeRef = useRef<{ width: number; height: number } | null>(null);
-
-  const parseHexColor = (color: string): [number, number, number] => {
-    const normalized = color.trim();
-    if (normalized.startsWith("#")) {
-      if (normalized.length === 7) {
-        return [
-          Number.parseInt(normalized.slice(1, 3), 16) / 255,
-          Number.parseInt(normalized.slice(3, 5), 16) / 255,
-          Number.parseInt(normalized.slice(5, 7), 16) / 255,
-        ];
-      }
-      if (normalized.length === 4) {
-        return [
-          Number.parseInt(normalized[1] + normalized[1], 16) / 255,
-          Number.parseInt(normalized[2] + normalized[2], 16) / 255,
-          Number.parseInt(normalized[3] + normalized[3], 16) / 255,
-        ];
-      }
-    }
-    return [0, 0, 0];
-  };
-
-  const parseHexBytes = (color: string): [number, number, number] => {
-    const [r, g, b] = parseHexColor(color);
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-  };
 
   const buildAtlas = async (device: GPUDevice) => {
     if (typeof document === "undefined") return null;

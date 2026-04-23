@@ -819,7 +819,7 @@ export default function AudioFFTWindow({
       disposeResources(resourcesRef.current);
       resourcesRef.current = null;
     };
-  }, [supportsWebGPU, size.width, size.height, binCapacity, rawCapacity, rawFftDataRef, rawBinCount]);
+  }, [supportsWebGPU, size.width, size.height, binCapacity, rawCapacity, rawFftDataRef, rawBinCount, showPlaybackIndicator]);
 
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth ?? "100%";
   const widthPx = Math.round(size.width);

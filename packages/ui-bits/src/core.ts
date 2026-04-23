@@ -54,19 +54,7 @@ export {
   type GradientDefinition,
 } from "./gradients/matplotlib";
 export { DEFAULT_SELECTION_GRID_ID } from "./selectionGridIds";
-export { loadHeightTexture, type HeightTextureEntry } from "./utils/loadHeightTexture";
-export { loadTerrainTileAssets, loadTerrainTileUrls, type TerrainTileAsset } from "./assets/terrain/tiles";
 
-export {
-  AudioControls,
-  AudioFFTWindow,
-  type AudioControlsProps,
-  type AudioControlsControlIds,
-  type AudioControlsBorder,
-  type AudioControlsBinInterpolation,
-  type AudioControlsSource,
-  type AudioFFTWindowProps,
-} from "./components/AudioControls";
 export {
   default as SelectionGrid,
   GradientSelectionGrid,
@@ -76,6 +64,7 @@ export {
   type SelectionGridGridProps,
   type SelectionGridGradientProps,
   type SelectionGridPreview,
+  type TerrainTileAsset,
 } from "./components/SelectionGrid";
 export { default as Dropdown, type DropdownProps, type DropdownOption } from "./components/Dropdown";
 export { default as IconDropdown, type IconDropdownProps, type IconDropdownOption } from "./components/IconDropdown";

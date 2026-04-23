@@ -448,9 +448,13 @@ function SliderCore({
     ? (storedRange as [number, number])
     : undefined;
   const rangeProp = lfoRange ?? defaultLfoRange ?? drawerLines;
+  const rangePropStart = rangeProp?.[0];
+  const rangePropEnd = rangeProp?.[1];
   const isDrawerControlled = lfoRange !== undefined;
   const shouldStoreRange = !isBasic && lfoRangeControlId !== undefined && !isDrawerControlled;
   const initialDrawerRange = rangeProp ?? storedRangeValue ?? [min, max];
+  const storedRangeStart = storedRangeValue?.[0];
+  const storedRangeEnd = storedRangeValue?.[1];
   const [drawerLineValues, setDrawerLineValues] = useState<[number, number]>(() => (
     [...initialDrawerRange] as [number, number]
   ));
@@ -479,23 +483,23 @@ function SliderCore({
     });
   }, [min, max, step]);
   useEffect(() => {
-    if (!isDrawerControlled || !rangeProp) return;
+    if (!isDrawerControlled || rangePropStart === undefined || rangePropEnd === undefined) return;
     setDrawerLineValues((prev) => {
-      if (Math.abs(prev[0] - rangeProp[0]) < 1e-6 && Math.abs(prev[1] - rangeProp[1]) < 1e-6) {
+      if (Math.abs(prev[0] - rangePropStart) < 1e-6 && Math.abs(prev[1] - rangePropEnd) < 1e-6) {
         return prev;
       }
-      return [...rangeProp] as [number, number];
+      return [rangePropStart, rangePropEnd];
     });
-  }, [isDrawerControlled, rangeProp?.[0], rangeProp?.[1]]);
+  }, [isDrawerControlled, rangePropEnd, rangePropStart]);
   useEffect(() => {
-    if (isDrawerControlled || !storedRangeValue) return;
+    if (isDrawerControlled || storedRangeStart === undefined || storedRangeEnd === undefined) return;
     setDrawerLineValues((prev) => {
-      if (Math.abs(prev[0] - storedRangeValue[0]) < 1e-6 && Math.abs(prev[1] - storedRangeValue[1]) < 1e-6) {
+      if (Math.abs(prev[0] - storedRangeStart) < 1e-6 && Math.abs(prev[1] - storedRangeEnd) < 1e-6) {
         return prev;
       }
-      return [...storedRangeValue] as [number, number];
+      return [storedRangeStart, storedRangeEnd];
     });
-  }, [isDrawerControlled, storedRangeValue?.[0], storedRangeValue?.[1]]);
+  }, [isDrawerControlled, storedRangeEnd, storedRangeStart]);
   useEffect(() => {
     if (!shouldStoreRange || storedRangeValue !== undefined) return;
     setStoredRange(drawerLineValues);
@@ -1092,11 +1096,11 @@ function SliderCore({
   const accessibleLabel = (ariaLabel ?? label).trim();
   const hasSelection = allowTextEditing && selStart !== selEnd;
   const caret = selEnd;
-  const setSelection = (a: number, b: number, maxLen: number = text.length) => {
+  const setSelection = useCallback((a: number, b: number, maxLen: number = textRef.current.length) => {
     const [s, e] = normalizeSelection(a, b, maxLen);
     setSelStart(s);
     setSelEnd(e);
-  };
+  }, []);
   useEffect(() => {
     if (!formatEditingValue) return;
     if (editingRef.current || focused) return;
@@ -1412,13 +1416,13 @@ function SliderCore({
     if (!b) return false;
     return clientX >= b.left && clientX <= b.right;
   };
-  const getSplitFromX = (clientX: number) => {
+  const getSplitFromX = useCallback((clientX: number) => {
     const host = containerRef.current;
     if (!host) return split;
     const r = host.getBoundingClientRect();
     const pct = (clientX - r.left) / r.width;
     return clamp(pct, 0, 1);
-  };
+  }, [split]);
   const isOnHandle = (clientX: number, radiusPx: number = 12) => {
     const host = containerRef.current;
     if (!host) return false;
@@ -1439,7 +1443,7 @@ function SliderCore({
     setText(formatted);
     setSelection(formatted.length, formatted.length);
     emitUserChange(val);
-  }, [formatEditingText, getSplitFromX, max, min, onUserChange, precision, reflectValueToDom, setSelection, step, writeSplitVars]);
+  }, [emitUserChange, formatEditingText, getSplitFromX, max, min, precision, reflectValueToDom, setSelection, step, writeSplitVars]);
 
   // Edit operations
   const replaceSelection = (insertStr: string) => {

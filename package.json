@@ -3,10 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "./packages/ui-bits/dist/lfoslider.cjs.js",
-  "module": "./packages/ui-bits/dist/lfoslider.es.js",
+  "main": "./packages/ui-bits/dist/index.cjs.js",
+  "module": "./packages/ui-bits/dist/index.es.js",
   "types": "./packages/ui-bits/dist/types/library.d.ts",
-  "style": "./packages/ui-bits/dist/ui-bits-internal.css",
+  "style": "./packages/ui-bits/dist/ui-bits.css",
   "sideEffects": [
     "**/*.css"
   ],
@@ -16,10 +16,10 @@
   "exports": {
     ".": {
       "types": "./packages/ui-bits/dist/types/library.d.ts",
-      "import": "./packages/ui-bits/dist/lfoslider.es.js",
-      "require": "./packages/ui-bits/dist/lfoslider.cjs.js"
+      "import": "./packages/ui-bits/dist/index.es.js",
+      "require": "./packages/ui-bits/dist/index.cjs.js"
     },
-    "./style.css": "./packages/ui-bits/dist/ui-bits-internal.css",
+    "./style.css": "./packages/ui-bits/dist/ui-bits.css",
     "./core": {
       "types": "./packages/ui-bits/dist/types/core.d.ts",
       "import": "./packages/ui-bits/dist/core.es.js",
@@ -30,41 +30,153 @@
       "import": "./packages/ui-bits/dist/audio.es.js",
       "require": "./packages/ui-bits/dist/audio.cjs.js"
     },
-    "./components/LFOSlider": {
-      "types": "./packages/ui-bits/dist/types/components/LFOSlider/LFOSlider.d.ts",
-      "import": "./packages/ui-bits/dist/core.es.js",
-      "require": "./packages/ui-bits/dist/core.cjs.js"
+    "./terrain": {
+      "types": "./packages/ui-bits/dist/types/terrain.d.ts",
+      "import": "./packages/ui-bits/dist/terrain.es.js",
+      "require": "./packages/ui-bits/dist/terrain.cjs.js"
     },
-    "./components/SelectionGrid": {
-      "types": "./packages/ui-bits/dist/types/components/SelectionGrid/SelectionGrid.d.ts",
-      "import": "./packages/ui-bits/dist/core.es.js",
-      "require": "./packages/ui-bits/dist/core.cjs.js"
+    "./components/AudioControls": {
+      "types": "./packages/ui-bits/dist/types/components/AudioControls/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/AudioControls.es.js",
+      "require": "./packages/ui-bits/dist/components/AudioControls.cjs.js"
+    },
+    "./components/BasicButton": {
+      "types": "./packages/ui-bits/dist/types/components/BasicButton/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/BasicButton.es.js",
+      "require": "./packages/ui-bits/dist/components/BasicButton.cjs.js"
+    },
+    "./components/ColorField": {
+      "types": "./packages/ui-bits/dist/types/components/ColorField/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/ColorField.es.js",
+      "require": "./packages/ui-bits/dist/components/ColorField.cjs.js"
+    },
+    "./components/ColorFieldPicker": {
+      "types": "./packages/ui-bits/dist/types/components/ColorFieldPicker/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/ColorFieldPicker.es.js",
+      "require": "./packages/ui-bits/dist/components/ColorFieldPicker.cjs.js"
+    },
+    "./components/ColorPicker": {
+      "types": "./packages/ui-bits/dist/types/components/ColorPicker/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/ColorPicker.es.js",
+      "require": "./packages/ui-bits/dist/components/ColorPicker.cjs.js"
+    },
+    "./components/Dial": {
+      "types": "./packages/ui-bits/dist/types/components/Dial/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/Dial.es.js",
+      "require": "./packages/ui-bits/dist/components/Dial.cjs.js"
+    },
+    "./components/LFOSlider": {
+      "types": "./packages/ui-bits/dist/types/components/LFOSlider/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/LFOSlider.es.js",
+      "require": "./packages/ui-bits/dist/components/LFOSlider.cjs.js"
     },
     "./components/Dropdown": {
-      "types": "./packages/ui-bits/dist/types/components/Dropdown/Dropdown.d.ts",
-      "import": "./packages/ui-bits/dist/core.es.js",
-      "require": "./packages/ui-bits/dist/core.cjs.js"
+      "types": "./packages/ui-bits/dist/types/components/Dropdown/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/Dropdown.es.js",
+      "require": "./packages/ui-bits/dist/components/Dropdown.cjs.js"
+    },
+    "./components/FloatingPanel": {
+      "types": "./packages/ui-bits/dist/types/components/FloatingPanel/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/FloatingPanel.es.js",
+      "require": "./packages/ui-bits/dist/components/FloatingPanel.cjs.js"
+    },
+    "./components/Folder": {
+      "types": "./packages/ui-bits/dist/types/components/Folder/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/Folder.es.js",
+      "require": "./packages/ui-bits/dist/components/Folder.cjs.js"
+    },
+    "./components/IconButton": {
+      "types": "./packages/ui-bits/dist/types/components/IconButton/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/IconButton.es.js",
+      "require": "./packages/ui-bits/dist/components/IconButton.cjs.js"
+    },
+    "./components/IconDropdown": {
+      "types": "./packages/ui-bits/dist/types/components/IconDropdown/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/IconDropdown.es.js",
+      "require": "./packages/ui-bits/dist/components/IconDropdown.cjs.js"
+    },
+    "./components/KeyValueAccordion": {
+      "types": "./packages/ui-bits/dist/types/components/KeyValueAccordion/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/KeyValueAccordion.es.js",
+      "require": "./packages/ui-bits/dist/components/KeyValueAccordion.cjs.js"
+    },
+    "./components/KeyValueRows": {
+      "types": "./packages/ui-bits/dist/types/components/KeyValueRows/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/KeyValueRows.es.js",
+      "require": "./packages/ui-bits/dist/components/KeyValueRows.cjs.js"
+    },
+    "./components/ListRow": {
+      "types": "./packages/ui-bits/dist/types/components/ListRow/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/ListRow.es.js",
+      "require": "./packages/ui-bits/dist/components/ListRow.cjs.js"
+    },
+    "./components/ListSurface": {
+      "types": "./packages/ui-bits/dist/types/components/ListSurface/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/ListSurface.es.js",
+      "require": "./packages/ui-bits/dist/components/ListSurface.cjs.js"
+    },
+    "./components/LoadingBar": {
+      "types": "./packages/ui-bits/dist/types/components/LoadingBar/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/LoadingBar.es.js",
+      "require": "./packages/ui-bits/dist/components/LoadingBar.cjs.js"
+    },
+    "./components/NameInputRow": {
+      "types": "./packages/ui-bits/dist/types/components/NameInputRow/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/NameInputRow.es.js",
+      "require": "./packages/ui-bits/dist/components/NameInputRow.cjs.js"
+    },
+    "./components/PresetManager": {
+      "types": "./packages/ui-bits/dist/types/components/PresetManager/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/PresetManager.es.js",
+      "require": "./packages/ui-bits/dist/components/PresetManager.cjs.js"
+    },
+    "./components/RadioList": {
+      "types": "./packages/ui-bits/dist/types/components/RadioList/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/RadioList.es.js",
+      "require": "./packages/ui-bits/dist/components/RadioList.cjs.js"
+    },
+    "./components/SelectionGrid": {
+      "types": "./packages/ui-bits/dist/types/components/SelectionGrid/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/SelectionGrid.es.js",
+      "require": "./packages/ui-bits/dist/components/SelectionGrid.cjs.js"
+    },
+    "./components/SegmentBar": {
+      "types": "./packages/ui-bits/dist/types/components/SegmentBar/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/SegmentBar.es.js",
+      "require": "./packages/ui-bits/dist/components/SegmentBar.cjs.js"
+    },
+    "./components/Sequencer": {
+      "types": "./packages/ui-bits/dist/types/components/Sequencer/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/Sequencer.es.js",
+      "require": "./packages/ui-bits/dist/components/Sequencer.cjs.js"
+    },
+    "./components/TextInput": {
+      "types": "./packages/ui-bits/dist/types/components/TextInput/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/TextInput.es.js",
+      "require": "./packages/ui-bits/dist/components/TextInput.cjs.js"
     },
     "./components/VirtualKeyboard": {
-      "types": "./packages/ui-bits/dist/types/components/VirtualKeyboard/VirtualKeyboard.d.ts",
-      "import": "./packages/ui-bits/dist/audio.es.js",
-      "require": "./packages/ui-bits/dist/audio.cjs.js"
+      "types": "./packages/ui-bits/dist/types/components/VirtualKeyboard/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/VirtualKeyboard.es.js",
+      "require": "./packages/ui-bits/dist/components/VirtualKeyboard.cjs.js"
+    },
+    "./components/WebGpuStatus": {
+      "types": "./packages/ui-bits/dist/types/components/WebGpuStatus/index.d.ts",
+      "import": "./packages/ui-bits/dist/components/WebGpuStatus.es.js",
+      "require": "./packages/ui-bits/dist/components/WebGpuStatus.cjs.js"
     },
     "./package.json": "./package.json"
   },
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/docs"
   ],
   "scripts": {
     "dev": "bun --cwd apps/docs dev",
     "build": "bun --cwd packages/ui-bits build && bun --cwd apps/docs build",
-    "build:demo": "bun --cwd apps/demo build",
     "build:docs": "bun --cwd apps/docs build",
     "lint": "bun --cwd packages/ui-bits lint && bun --cwd apps/docs lint",
-    "lint:demo": "bun --cwd apps/demo lint",
-    "preview": "bun --cwd apps/docs build && bun --cwd apps/docs preview",
-    "preview:demo": "bun --cwd apps/demo build && bun --cwd apps/demo preview"
+    "preview": "bun --cwd apps/docs build && bun --cwd apps/docs preview"
   },
   "peerDependencies": {
     "lucide-react": "^0.562.0",

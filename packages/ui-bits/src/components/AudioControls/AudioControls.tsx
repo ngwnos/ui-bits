@@ -1183,6 +1183,7 @@ function AudioLiveEngine({
 
     }
     setup();
+    const gaussianKernelCache = gaussianKernelCacheRef.current;
     return () => {
       cancelled = true;
       disconnectChain();
@@ -1203,7 +1204,7 @@ function AudioLiveEngine({
       };
       blurBufferRef.current = null;
       resampleBufferRef.current = null;
-      gaussianKernelCacheRef.current.clear();
+      gaussianKernelCache.clear();
       lastBinCountRef.current = null;
       clearedRef.current = false;
     };

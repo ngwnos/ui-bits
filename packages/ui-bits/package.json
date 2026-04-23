@@ -3,10 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "./dist/lfoslider.cjs.js",
-  "module": "./dist/lfoslider.es.js",
+  "main": "./dist/index.cjs.js",
+  "module": "./dist/index.es.js",
   "types": "./dist/types/library.d.ts",
-  "style": "./dist/ui-bits-internal.css",
+  "style": "./dist/ui-bits.css",
   "sideEffects": [
     "**/*.css"
   ],
@@ -16,10 +16,10 @@
   "exports": {
     ".": {
       "types": "./dist/types/library.d.ts",
-      "import": "./dist/lfoslider.es.js",
-      "require": "./dist/lfoslider.cjs.js"
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.cjs.js"
     },
-    "./style.css": "./dist/ui-bits-internal.css",
+    "./style.css": "./dist/ui-bits.css",
     "./core": {
       "types": "./dist/types/core.d.ts",
       "import": "./dist/core.es.js",
@@ -30,25 +30,140 @@
       "import": "./dist/audio.es.js",
       "require": "./dist/audio.cjs.js"
     },
-    "./components/LFOSlider": {
-      "types": "./dist/types/components/LFOSlider/LFOSlider.d.ts",
-      "import": "./dist/core.es.js",
-      "require": "./dist/core.cjs.js"
+    "./terrain": {
+      "types": "./dist/types/terrain.d.ts",
+      "import": "./dist/terrain.es.js",
+      "require": "./dist/terrain.cjs.js"
     },
-    "./components/SelectionGrid": {
-      "types": "./dist/types/components/SelectionGrid/SelectionGrid.d.ts",
-      "import": "./dist/core.es.js",
-      "require": "./dist/core.cjs.js"
+    "./components/AudioControls": {
+      "types": "./dist/types/components/AudioControls/index.d.ts",
+      "import": "./dist/components/AudioControls.es.js",
+      "require": "./dist/components/AudioControls.cjs.js"
+    },
+    "./components/BasicButton": {
+      "types": "./dist/types/components/BasicButton/index.d.ts",
+      "import": "./dist/components/BasicButton.es.js",
+      "require": "./dist/components/BasicButton.cjs.js"
+    },
+    "./components/ColorField": {
+      "types": "./dist/types/components/ColorField/index.d.ts",
+      "import": "./dist/components/ColorField.es.js",
+      "require": "./dist/components/ColorField.cjs.js"
+    },
+    "./components/ColorFieldPicker": {
+      "types": "./dist/types/components/ColorFieldPicker/index.d.ts",
+      "import": "./dist/components/ColorFieldPicker.es.js",
+      "require": "./dist/components/ColorFieldPicker.cjs.js"
+    },
+    "./components/ColorPicker": {
+      "types": "./dist/types/components/ColorPicker/index.d.ts",
+      "import": "./dist/components/ColorPicker.es.js",
+      "require": "./dist/components/ColorPicker.cjs.js"
+    },
+    "./components/Dial": {
+      "types": "./dist/types/components/Dial/index.d.ts",
+      "import": "./dist/components/Dial.es.js",
+      "require": "./dist/components/Dial.cjs.js"
+    },
+    "./components/LFOSlider": {
+      "types": "./dist/types/components/LFOSlider/index.d.ts",
+      "import": "./dist/components/LFOSlider.es.js",
+      "require": "./dist/components/LFOSlider.cjs.js"
     },
     "./components/Dropdown": {
-      "types": "./dist/types/components/Dropdown/Dropdown.d.ts",
-      "import": "./dist/core.es.js",
-      "require": "./dist/core.cjs.js"
+      "types": "./dist/types/components/Dropdown/index.d.ts",
+      "import": "./dist/components/Dropdown.es.js",
+      "require": "./dist/components/Dropdown.cjs.js"
+    },
+    "./components/FloatingPanel": {
+      "types": "./dist/types/components/FloatingPanel/index.d.ts",
+      "import": "./dist/components/FloatingPanel.es.js",
+      "require": "./dist/components/FloatingPanel.cjs.js"
+    },
+    "./components/Folder": {
+      "types": "./dist/types/components/Folder/index.d.ts",
+      "import": "./dist/components/Folder.es.js",
+      "require": "./dist/components/Folder.cjs.js"
+    },
+    "./components/IconButton": {
+      "types": "./dist/types/components/IconButton/index.d.ts",
+      "import": "./dist/components/IconButton.es.js",
+      "require": "./dist/components/IconButton.cjs.js"
+    },
+    "./components/IconDropdown": {
+      "types": "./dist/types/components/IconDropdown/index.d.ts",
+      "import": "./dist/components/IconDropdown.es.js",
+      "require": "./dist/components/IconDropdown.cjs.js"
+    },
+    "./components/KeyValueAccordion": {
+      "types": "./dist/types/components/KeyValueAccordion/index.d.ts",
+      "import": "./dist/components/KeyValueAccordion.es.js",
+      "require": "./dist/components/KeyValueAccordion.cjs.js"
+    },
+    "./components/KeyValueRows": {
+      "types": "./dist/types/components/KeyValueRows/index.d.ts",
+      "import": "./dist/components/KeyValueRows.es.js",
+      "require": "./dist/components/KeyValueRows.cjs.js"
+    },
+    "./components/ListRow": {
+      "types": "./dist/types/components/ListRow/index.d.ts",
+      "import": "./dist/components/ListRow.es.js",
+      "require": "./dist/components/ListRow.cjs.js"
+    },
+    "./components/ListSurface": {
+      "types": "./dist/types/components/ListSurface/index.d.ts",
+      "import": "./dist/components/ListSurface.es.js",
+      "require": "./dist/components/ListSurface.cjs.js"
+    },
+    "./components/LoadingBar": {
+      "types": "./dist/types/components/LoadingBar/index.d.ts",
+      "import": "./dist/components/LoadingBar.es.js",
+      "require": "./dist/components/LoadingBar.cjs.js"
+    },
+    "./components/NameInputRow": {
+      "types": "./dist/types/components/NameInputRow/index.d.ts",
+      "import": "./dist/components/NameInputRow.es.js",
+      "require": "./dist/components/NameInputRow.cjs.js"
+    },
+    "./components/PresetManager": {
+      "types": "./dist/types/components/PresetManager/index.d.ts",
+      "import": "./dist/components/PresetManager.es.js",
+      "require": "./dist/components/PresetManager.cjs.js"
+    },
+    "./components/RadioList": {
+      "types": "./dist/types/components/RadioList/index.d.ts",
+      "import": "./dist/components/RadioList.es.js",
+      "require": "./dist/components/RadioList.cjs.js"
+    },
+    "./components/SelectionGrid": {
+      "types": "./dist/types/components/SelectionGrid/index.d.ts",
+      "import": "./dist/components/SelectionGrid.es.js",
+      "require": "./dist/components/SelectionGrid.cjs.js"
+    },
+    "./components/SegmentBar": {
+      "types": "./dist/types/components/SegmentBar/index.d.ts",
+      "import": "./dist/components/SegmentBar.es.js",
+      "require": "./dist/components/SegmentBar.cjs.js"
+    },
+    "./components/Sequencer": {
+      "types": "./dist/types/components/Sequencer/index.d.ts",
+      "import": "./dist/components/Sequencer.es.js",
+      "require": "./dist/components/Sequencer.cjs.js"
+    },
+    "./components/TextInput": {
+      "types": "./dist/types/components/TextInput/index.d.ts",
+      "import": "./dist/components/TextInput.es.js",
+      "require": "./dist/components/TextInput.cjs.js"
     },
     "./components/VirtualKeyboard": {
-      "types": "./dist/types/components/VirtualKeyboard/VirtualKeyboard.d.ts",
-      "import": "./dist/audio.es.js",
-      "require": "./dist/audio.cjs.js"
+      "types": "./dist/types/components/VirtualKeyboard/index.d.ts",
+      "import": "./dist/components/VirtualKeyboard.es.js",
+      "require": "./dist/components/VirtualKeyboard.cjs.js"
+    },
+    "./components/WebGpuStatus": {
+      "types": "./dist/types/components/WebGpuStatus/index.d.ts",
+      "import": "./dist/components/WebGpuStatus.es.js",
+      "require": "./dist/components/WebGpuStatus.cjs.js"
     },
     "./package.json": "./package.json"
   },

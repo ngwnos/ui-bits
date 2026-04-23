@@ -1,6 +1,10 @@
 import React from "react";
 import { type SelectionGridId } from "../../sliderStore";
 import "./selectionGrid.css";
+export type TerrainTileAsset = {
+    name: string;
+    url: string;
+};
 type SelectionGridBaseProps = {
     layoutGap?: string;
     maxHeightUnits?: number;
@@ -12,6 +16,7 @@ type SelectionGridBaseProps = {
 export type SelectionGridGradientProps = SelectionGridBaseProps & {
     gridId?: SelectionGridId;
     previewDarkMode: boolean;
+    terrainAssets?: TerrainTileAsset[] | (() => Promise<TerrainTileAsset[]>);
     colorA?: string;
     colorB?: string;
     allowEmptySelection?: boolean;

@@ -20,12 +20,9 @@ import {
   PresetStoreProvider,
   RadioList,
   SliderStoreProvider,
-  GradientSelectionGrid,
-  SelectionGrid,
   SegmentBar,
   VirtualKeyboard,
   WebGpuStatus,
-  loadTerrainTileAssets,
   type VirtualKeyboardInstrumentOption,
   type VirtualKeyboardSoundfontConfig,
   type VirtualKeyboardSoundfontOption,
@@ -48,350 +45,9 @@ import {
 } from 'lucide-react'
 import CodeBlock from './components/CodeBlock'
 import DocsBrandCanvas, { type DocsBrandCanvasProps } from './components/DocsBrandCanvas'
+import SelectionGridExample from './components/SelectionGridExample'
+import { ROUTES } from './routes'
 import './App.css'
-
-const ROUTES = [
-  {
-    id: 'slider',
-    label: 'LFO Slider',
-    title: 'LFO Slider',
-    code: `<LFOSlider
-  label="Example Slider"
-  min={0}
-  max={100}
-  step={1}
-  defaultValue={50}
-  colorA={flexoki.orange["500"]}
-  colorB={flexoki.orange["100"]}
-  showLfoControls
-  drawerOpen
-/>`,
-  },
-  { id: 'icon-button', label: 'Icon Button', title: 'Icon Button', code: '' },
-  { id: 'loading-bar', label: 'Loading Bar', title: 'Loading Bar', code: '' },
-  {
-    id: 'audio-controls',
-    label: 'Audio Controls',
-    title: 'Audio Controls',
-    code: `<AudioControls
-  source={{ type: "buffer", src: "/audio/credits.mp3" }}
-  colorA={flexoki.red["600"]}
-  colorB={flexoki.red["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>`,
-  },
-  {
-    id: 'segment-bar',
-    label: 'Segment Bar',
-    title: 'Segment Bar',
-    code: `<SegmentBar
-  label="Band"
-  options={[
-    { value: "low", label: "Low" },
-    { value: "mid", label: "Mid" },
-    { value: "high", label: "High" },
-  ]}
-  defaultValue="mid"
-  colorA={flexoki.purple["600"]}
-  colorB={flexoki.purple["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>`,
-  },
-  {
-    id: 'radio-list',
-    label: 'Radio List',
-    title: 'Radio List',
-    code: `const options = [
-  { value: "draft", label: "Draft", description: "Fast iteration mode" },
-  { value: "balanced", label: "Balanced", description: "Everyday default" },
-  { value: "quality", label: "Quality", description: "Maximum fidelity" },
-];
-
-const [value, setValue] = useState("balanced");
-
-<RadioList
-  label="Render Profile"
-  showLabel
-  options={options}
-  value={value}
-  onChange={(nextValue) => setValue(nextValue)}
-  colorA={flexoki.blue["600"]}
-  colorB={flexoki.blue["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>`,
-  },
-  {
-    id: 'key-value-rows',
-    label: 'Key/Value Rows',
-    title: 'Key/Value Rows',
-    code: `const rows = [
-  { key: "status", label: "Status", value: "Available" },
-  { key: "fps", label: "FPS", value: "60" },
-  { key: "adapter", label: "Adapter", value: "Default" },
-  { key: "max-tex-2d", label: "Max Texture 2D", value: "8,192" },
-];
-
-<KeyValueRows
-  rows={rows}
-  colorA={flexoki.green["600"]}
-  colorB={flexoki.green["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>`,
-  },
-  {
-    id: 'key-value-accordion',
-    label: 'Key/Value Accordion',
-    title: 'Key/Value Accordion',
-    code: `const items = [
-  {
-    key: "render-profile",
-    label: "Render Profile",
-    value: "Balanced",
-    defaultExpanded: true,
-    children: (
-      <Dropdown
-        label="Profile"
-        labelInline
-        options={[
-          { value: "draft", label: "Draft" },
-          { value: "balanced", label: "Balanced" },
-          { value: "quality", label: "Quality" },
-        ]}
-        value={profile}
-        onChange={(value) => setProfile(value)}
-      />
-    ),
-  },
-  {
-    key: "modulation",
-    label: "Modulation",
-    value: "0.45",
-    children: (
-      <LFOSlider
-        label="Depth"
-        min={0}
-        max={1}
-        step={0.01}
-        defaultValue={0.45}
-        width="100%"
-      />
-    ),
-  },
-];
-
-<KeyValueAccordion
-  items={items}
-  mode="multiple"
-  colorA={flexoki.blue["600"]}
-  colorB={flexoki.blue["100"]}
-  borderStyle="a"
-  fontSize={12}
-  padding={8}
-  verticalGap={6}
-/>`,
-  },
-  {
-    id: 'name-input-row',
-    label: 'Name Input Row',
-    title: 'Name Input Row',
-    code: `const randomWorldNames = [
-  "Ironwake Reach",
-  "Ashen Hollow",
-  "Starfall Basin",
-  "Copper Fen",
-  "Mireglass Coast",
-]
-
-const [createdNames, setCreatedNames] = useState<string[]>([])
-
-<NameInputRow
-  placeholder="New world..."
-  onCreate={(name) => setCreatedNames((prev) => [name, ...prev].slice(0, 6))}
-  onRandomize={() => randomWorldNames[Math.floor(Math.random() * randomWorldNames.length)] ?? ""}
-  colorA={flexoki.orange["600"]}
-  colorB={flexoki.orange["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>`,
-  },
-  {
-    id: 'selection-grid',
-    label: 'Selection Grid',
-    title: 'Selection Grid',
-    code: `const items = [
-  { id: "rose", label: "Rose", color: "#D14D41" },
-  { id: "sun", label: "Sun", color: "#E2C37C" },
-  { id: "mint", label: "Mint", color: "#73A27E" },
-  { id: "sky", label: "Sky", color: "#5B88B3" },
-];
-
-const [selectedKey, setSelectedKey] = useState(items[0]?.id ?? null);
-const folders = [
-  { id: "warm", label: "Warm", items: [items[0], items[1]] },
-  { id: "cool", label: "Cool", items: [items[2], items[3]], defaultCollapsed: true },
-];
-
-<SelectionGrid
-  items={items}
-  getKey={(item) => item.id}
-  getLabel={(item) => item.label}
-  getPreview={(item) => ({ type: "color", color: item.color })}
-  selectedKey={selectedKey}
-  onSelect={(key) => setSelectedKey(key)}
-  layoutGap="6px"
-  colorA={flexoki.base["50"]}
-  colorB={flexoki.base["100"]}
-/>
-
-<SelectionGrid
-  folders={folders}
-  getKey={(item) => item.id}
-  getLabel={(item) => item.label}
-  getPreview={(item) => ({ type: "color", color: item.color })}
-  selectedKey={selectedKey}
-  onSelect={(key) => setSelectedKey(key)}
-  layoutGap="6px"
-  colorA={flexoki.base["700"]}
-  colorB={flexoki.base["100"]}
-/>
-
-<GradientSelectionGrid
-  previewDarkMode
-  layoutGap="6px"
-  colorA={flexoki.base["50"]}
-  colorB={flexoki.base["100"]}
-/>`,
-  },
-  {
-    id: 'dropdown',
-    label: 'Dropdown',
-    title: 'Dropdown',
-    code: `<Dropdown
-  label="Waveform"
-  options={[
-    { value: "sine", label: "Sine" },
-    { value: "triangle", label: "Triangle" },
-    { value: "square", label: "Square", disabled: true },
-  ]}
-  value="sine"
-  onChange={(value) => setWaveformValue(value)}
-  colorA={flexoki.blue["600"]}
-  colorB={flexoki.blue["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>`,
-  },
-  {
-    id: 'color-field',
-    label: 'Color Field',
-    title: 'Color Field',
-    code: `const [accentColor, setAccentColor] = useState("#d14d41")
-
-<ColorField
-  label="Accent"
-  value={accentColor}
-  onChange={(next) => setAccentColor(next)}
-  defaultAlpha={220}
-  colorA={flexoki.red["600"]}
-  colorB={flexoki.red["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>
-
-<ColorField
-  label="Accent (Popup)"
-  value={accentColor}
-  onChange={(next) => setAccentColor(next)}
-  pickerDisplay="popup"
-  colorA={flexoki.red["600"]}
-  colorB={flexoki.red["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>`,
-  },
-  {
-    id: 'floating-panel',
-    label: 'Floating Panel',
-    title: 'Floating Panel',
-    code: `const InspectorContent = () => {
-  const panelTheme = usePanelTheme()
-  // panelTheme exposes inherited colorA, colorB, fontSize, and borderStyle.
-
-  return (
-    <>
-      <PresetManager maxListHeight={120} />
-      <ColorField label="Accent" ariaLabel="Accent color" />
-      <Folder
-        label="WebGPU Status"
-        colorA={flexoki.green["500"]}
-        colorB={flexoki.green["100"]}
-      >
-        <WebGpuStatus />
-      </Folder>
-      <AudioControls source={{ type: "buffer", src: "/audio/credits.mp3" }} />
-      <VirtualKeyboard
-        defaultStartNote="C4"
-        defaultNoteCount={26}
-        defaultHeightUnits={2}
-        showHeightControl={false}
-        dialIndicatorColor={flexoki.red["600"]}
-        instrumentOptions={[
-          { value: "tonejs", label: "Tone.js", source: "tone" },
-        ]}
-        soundfontOptions={[
-          { value: "acoustic_grand_piano", label: "Grand Piano" },
-          { value: "electric_piano_1", label: "Electric Piano" },
-        ]}
-        defaultInstrument="acoustic_grand_piano"
-        whiteKeyColor={flexoki.paper}
-        blackKeyColor={flexoki.black}
-      />
-      <LFOSlider
-        label="Gain"
-        min={0}
-        max={1}
-        step={0.01}
-        defaultValue={0.65}
-        width="100%"
-      />
-      <LFOSlider
-        label="Mix"
-        min={0}
-        max={100}
-        step={1}
-        defaultValue={40}
-        width="100%"
-      />
-    </>
-  )
-}
-
-<PresetStoreProvider storageKey="ui-bits:docs:floating-panel">
-  <FloatingPanel
-    title="Inspector"
-    collapsible
-    colorA={flexoki.blue["500"]}
-    colorB={flexoki.blue["100"]}
-    borderStyle="a"
-    fontSize={12}
-    width={300}
-    showOpacityControl
-    defaultBodyOpacity={0.85}
-    bodyBlur={0}
-    verticalGap={6}
-    paddingLeft={3}
-    paddingRight={3}
-    paddingBottom={3}
-  >
-    <InspectorContent />
-  </FloatingPanel>
-</PresetStoreProvider>`,
-  },
-]
 
 const SIDEBAR_COLORS = [
   { colorA: flexoki.red['100'], colorB: flexoki.red['600'] },
@@ -427,235 +83,9 @@ const buildRandomCombos = (
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value))
 
-const buildLocalId = (prefix: string) => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return `${prefix}-${crypto.randomUUID()}`
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-const selectionGridSwatches = [
-  { id: 'rose', label: 'Rose', color: flexoki.red['400'] },
-  { id: 'sun', label: 'Sun', color: flexoki.yellow['300'] },
-  { id: 'mint', label: 'Mint', color: flexoki.green['400'] },
-  { id: 'sky', label: 'Sky', color: flexoki.blue['400'] },
-  { id: 'iris', label: 'Iris', color: flexoki.purple['400'] },
-  { id: 'berry', label: 'Berry', color: flexoki.magenta['400'] },
-  { id: 'ocean', label: 'Ocean', color: flexoki.cyan['400'] },
-  { id: 'ember', label: 'Ember', color: flexoki.orange['400'] },
-]
-const selectionGridFolders = [
-  {
-    id: 'warm',
-    label: 'Warm',
-    items: [
-      selectionGridSwatches[0],
-      selectionGridSwatches[1],
-      selectionGridSwatches[5],
-      selectionGridSwatches[7],
-    ],
-  },
-  {
-    id: 'cool',
-    label: 'Cool',
-    items: [
-      selectionGridSwatches[2],
-      selectionGridSwatches[3],
-      selectionGridSwatches[4],
-      selectionGridSwatches[6],
-    ],
-    defaultCollapsed: true,
-  },
-]
-
-type TerrainGridItem = {
-  id: string
-  label: string
-  thumbSrc: string
-  fullSrc: string
-}
-
 const AudioBinsDriver = ({ onFrame }: { onFrame: (nowSec: number, dtSec: number) => void }) => {
   useFrame(onFrame)
   return null
-}
-
-const SelectionGridDemo = () => {
-  const [selectedSwatch, setSelectedSwatch] = useState<string | null>(selectionGridSwatches[0]?.id ?? null)
-  const [selectedFolderSwatch, setSelectedFolderSwatch] = useState<string | null>(
-    selectionGridFolders[0]?.items[0]?.id ?? null
-  )
-  const activeSwatch = selectionGridSwatches.find((swatch) => swatch.id === selectedSwatch)
-  const activeFolderSwatch = selectionGridSwatches.find((swatch) => swatch.id === selectedFolderSwatch)
-  const [terrainItems, setTerrainItems] = useState<TerrainGridItem[]>([])
-  const [selectedTerrainId, setSelectedTerrainId] = useState<string | null>(null)
-  const activeTerrain = terrainItems.find((item) => item.id === selectedTerrainId) ?? null
-  useEffect(() => {
-    let cancelled = false
-    loadTerrainTileAssets().then((assets) => {
-      if (cancelled) return
-      const nextItems = assets.map((asset, index) => ({
-        id: `terrain-${index}-${asset.name}`,
-        label: asset.name.replace(/\.png$/i, ''),
-        thumbSrc: asset.url,
-        fullSrc: asset.url,
-      }))
-      setTerrainItems(nextItems)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-  useEffect(() => {
-    if (selectedTerrainId != null) return
-    if (terrainItems.length === 0) return
-    setSelectedTerrainId(terrainItems[0]?.id ?? null)
-  }, [selectedTerrainId, terrainItems])
-  return (
-    <>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          fontSize: 12,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: flexoki.base['200'],
-        }}
-      >
-        <div
-          style={{
-            width: 18,
-            height: 18,
-            borderRadius: 4,
-            border: `1px solid ${flexoki.base['600']}`,
-            background: activeSwatch?.color ?? flexoki.base['600'],
-          }}
-        />
-        {activeSwatch?.label ?? 'None'}
-      </div>
-      <SelectionGrid
-        items={selectionGridSwatches}
-        getKey={(item) => item.id}
-        getLabel={(item) => item.label}
-        getPreview={(item) => ({ type: 'color', color: item.color })}
-        selectedKey={selectedSwatch}
-        onSelect={(key) => setSelectedSwatch(key)}
-        layoutGap="6px"
-        colorA={flexoki.base['50']}
-        colorB={flexoki.base['100']}
-        maxHeightUnits={12}
-      />
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          fontSize: 11,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: flexoki.base['200'],
-        }}
-      >
-        <div
-          style={{
-            width: 14,
-            height: 14,
-            borderRadius: 4,
-            border: `1px solid ${flexoki.base['600']}`,
-            background: activeFolderSwatch?.color ?? flexoki.base['600'],
-          }}
-        />
-        {activeFolderSwatch?.label ?? 'None'}
-      </div>
-      <SelectionGrid
-        folders={selectionGridFolders}
-        getKey={(item) => item.id}
-        getLabel={(item) => item.label}
-        getPreview={(item) => ({ type: 'color', color: item.color })}
-        selectedKey={selectedFolderSwatch}
-        onSelect={(key) => setSelectedFolderSwatch(key)}
-        layoutGap="6px"
-        colorA={flexoki.base['700']}
-        colorB={flexoki.base['100']}
-        maxHeightUnits={12}
-      />
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          fontSize: 11,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: flexoki.base['200'],
-        }}
-      >
-        <div
-          style={{
-            width: 14,
-            height: 14,
-            borderRadius: 4,
-            border: `1px solid ${flexoki.base['600']}`,
-            background: flexoki.base['800'],
-            overflow: 'hidden',
-          }}
-        >
-          {activeTerrain && (
-            <img
-              src={activeTerrain.thumbSrc}
-              alt={activeTerrain.label}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            />
-          )}
-        </div>
-        {activeTerrain?.label ?? 'Terrain Tiles'}
-      </div>
-      <SelectionGrid
-        folders={[
-          {
-            id: 'terrain-tiles',
-            label: 'Terrain Tiles',
-            items: terrainItems,
-            addTile: {
-              label: 'Add terrain tiles',
-              accept: 'image/*',
-              multiple: true,
-              autoAppend: false,
-              createItem: (file, url) => ({
-                id: buildLocalId('terrain'),
-                label: file.name.replace(/\.[^/.]+$/, ''),
-                thumbSrc: url,
-                fullSrc: url,
-              }),
-              onAddItems: (items) => {
-                setTerrainItems((prev) => [...prev, ...items])
-              },
-            },
-          },
-        ]}
-        getKey={(item) => item.id}
-        getLabel={(item) => item.label}
-        getPreview={(item) => ({ type: 'image', src: item.thumbSrc })}
-        selectedKey={selectedTerrainId}
-        onSelect={(key, item) => {
-          setSelectedTerrainId(item?.id ?? key)
-        }}
-        layoutGap="6px"
-        colorA={flexoki.base['700']}
-        colorB={flexoki.base['100']}
-        maxHeightUnits={12}
-      />
-      <GradientSelectionGrid
-        previewDarkMode
-        layoutGap="6px"
-        colorA={flexoki.base['50']}
-        colorB={flexoki.base['100']}
-        maxHeightUnits={20}
-      />
-    </>
-  )
 }
 
 const getRouteFromHash = () => {
@@ -796,10 +226,10 @@ function App() {
     { value: 'high', label: 'High' },
   ]), [])
   const radioListOptions = useMemo(() => ([
-    { value: 'draft', label: 'Draft', description: 'Fast iteration mode' },
-    { value: 'balanced', label: 'Balanced', description: 'Everyday default' },
-    { value: 'quality', label: 'Quality', description: 'Maximum fidelity' },
-    { value: 'locked', label: 'Locked', description: 'Unavailable in this project', disabled: true },
+    { value: 'draft', label: 'Draft', description: 'Draft output' },
+    { value: 'balanced', label: 'Balanced', description: 'Balanced output' },
+    { value: 'quality', label: 'Quality', description: 'Quality output' },
+    { value: 'locked', label: 'Locked', description: 'Disabled', disabled: true },
   ]), [])
   const radioListCompactOptions = useMemo(() => ([
     { value: 'mono', label: 'Mono' },
@@ -843,10 +273,10 @@ function App() {
     { value: 'square', label: 'Square', disabled: true },
   ]), [])
   const dropdownSubtextOptions = useMemo(() => ([
-    { value: 'draft', label: 'Draft', description: 'Fast iteration with lighter passes' },
-    { value: 'balanced', label: 'Balanced', description: 'Default profile for daily use' },
-    { value: 'quality', label: 'Quality', description: 'Highest quality with longer renders' },
-    { value: 'safe', label: 'Safe', description: 'Conservative profile for stability', disabled: true },
+    { value: 'draft', label: 'Draft', description: 'Draft output' },
+    { value: 'balanced', label: 'Balanced', description: 'Balanced output' },
+    { value: 'quality', label: 'Quality', description: 'Quality output' },
+    { value: 'safe', label: 'Safe', description: 'Disabled', disabled: true },
   ]), [])
   const nestedDropdownOptions = useMemo(() => (
     Array.from({ length: 24 }, (_, index) => {
@@ -1502,17 +932,14 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  LFOSlider is designed to feel like an instrument: you can let it own its state with
-                  <code>defaultValue</code> and other <code>default*</code> props, or control it with{" "}
-                  <code>value</code> plus <code>onUserChange</code>/<code>onAnimatedUpdate</code> for
-                  app-driven state.
+                  LFOSlider supports uncontrolled, controlled, and store-bound use. Use{" "}
+                  <code>defaultValue</code> for local state, <code>value</code> with{" "}
+                  <code>onUserChange</code> for parent state, or <code>controlId</code> for the shared
+                  slider store.
                 </p>
                 <p>
-                  LFO controls are opt-in via <code>showLfoControls</code>, and{" "}
-                  <code>defaultWaveform</code>, <code>defaultFrequency</code>, and{" "}
-                  <code>defaultLfoRange</code> give you expressive defaults without forcing control.
-                  Keep <code>colorA</code> for text/lines and <code>colorB</code> for the fill so the
-                  slider stacks cleanly with other controls.
+                  <code>showLfoControls</code> adds waveform and range controls.{" "}
+                  <code>onAnimatedUpdate</code> reports frame-time values when the LFO is running.
                 </p>
               </div>
             </>
@@ -1623,18 +1050,15 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  IconButton matches slider sizing so it can live inside the same bars. Use{" "}
-                  <code>behavior="momentary"</code> for press-and-hold,{" "}
-                  <code>behavior="toggle"</code> for on/off, and{" "}
-                  <code>behavior="cycle"</code> with <code>options</code> for multi-state controls.
+                  IconButton supports momentary, toggle, and cycle modes. Cycle mode reads{" "}
+                  <code>options</code> and emits the selected option value through{" "}
+                  <code>onChange</code>.
                 </p>
                 <p>
-                  For state, use <code>defaultToggled</code>/<code>defaultPressed</code> when the
-                  button can manage itself, or switch to controlled props like{" "}
-                  <code>toggled</code>/<code>pressed</code> with{" "}
-                  <code>onToggle</code>/<code>onPressChange</code>. Use{" "}
-                  <code>borderStyle</code> and <code>borderMask</code> to keep borders flush with
-                  neighboring controls.
+                  Use <code>defaultPressed</code> or <code>defaultToggled</code> for local state, or{" "}
+                  <code>pressed</code>/<code>toggled</code> with callbacks for controlled state.{" "}
+                  <code>borderStyle</code> and <code>borderMask</code> control how the button joins
+                  adjacent controls.
                 </p>
               </div>
             </>
@@ -1671,14 +1095,12 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  LoadingBar is a display-only control: you drive <code>value</code> from your app,
-                  an animation loop, or an LFO. It intentionally has no input handling so it stays
-                  lightweight and predictable.
+                  LoadingBar renders a <code>value</code> between <code>0</code> and <code>1</code>.
+                  It does not handle input.
                 </p>
                 <p>
-                  Use <code>barStyle</code> and <code>barSegmentCount</code> to mirror slider
-                  visuals, and keep <code>colorA</code>/<code>colorB</code> consistent so it reads
-                  like part of the same instrument rack.
+                  Use <code>barStyle</code> and <code>barSegmentCount</code> for the fill style. Set{" "}
+                  <code>colorA</code>/<code>colorB</code> to match surrounding controls.
                 </p>
               </div>
             </>
@@ -1804,23 +1226,19 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  AudioControls can run standalone, but to share FFT data with sliders, wrap your
-                  UI in <code>AudioAnalysisProvider</code> or pass an{" "}
-                  <code>audioAnalysisStore</code> directly. Any slider using the{" "}
-                  <code>"audio"</code> waveform will read from the same analysis stream.
+                  AudioControls creates or uses an analysis store for a buffer, media stream, or{" "}
+                  <code>AudioNode</code> source. Wrap related controls in{" "}
+                  <code>AudioAnalysisProvider</code> or pass <code>audioAnalysisStore</code> directly
+                  to share FFT data.
                 </p>
                 <p>
-                  Use <code>source</code> to choose buffer playback or live input (media stream or
-                  audio node). Use <code>default*</code> props for initial UI behavior, or controlled
-                  props like <code>playing</code>, <code>binCount</code>, and{" "}
-                  <code>binInterpolation</code> if you need to synchronize with app state. Frequency
-                  limits are in Hz, and the FFT controls are tuned for quick performance shaping.
+                  Sliders with <code>defaultWaveform="audio"</code> read that analysis data. Use
+                  controlled props such as <code>playing</code>, <code>binCount</code>, and{" "}
+                  <code>binInterpolation</code> only when the host owns those values.
                 </p>
                 <p>
-                  VirtualKeyboard can play soundfonts by passing <code>soundfontOptions</code>{" "}
-                  (for a dropdown) or a fixed <code>soundfont</code> prop. Provide a custom{" "}
-                  <code>url</code> to host samples locally, or a destination node so the keyboard
-                  and AudioControls share the same analysis stream.
+                  VirtualKeyboard can use Tone.js or SoundFont options. Pass a destination node when
+                  keyboard output should feed the same AudioControls analysis path.
                 </p>
               </div>
             </>
@@ -1840,15 +1258,13 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  SegmentBar is a discrete selector: pass an array of{" "}
-                  <code>{`{ value, label }`}</code> options and let it manage selection with{" "}
-                  <code>defaultValue</code>, or control it with <code>value</code> and{" "}
-                  <code>onChange</code>.
+                  SegmentBar renders one selected option from a fixed option list. Use{" "}
+                  <code>defaultValue</code> for local state or <code>value</code>/<code>onChange</code>{" "}
+                  for controlled state.
                 </p>
                 <p>
-                  It supports keyboard navigation and keeps the same sizing rhythm as sliders. Use{" "}
-                  <code>borderStyle</code>, <code>colorA</code>, and <code>colorB</code> so it blends
-                  into stacked control rows.
+                  It supports keyboard navigation and the same color and border props as the other
+                  controls.
                 </p>
               </div>
             </>
@@ -1923,13 +1339,12 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  RadioList is a single-select list built on ListSurface and ListRow. It uses click
-                  selection by default and supports keyboard navigation with arrow keys, Home, and End.
+                  RadioList renders one selected value from an option list. Descriptions and disabled
+                  options are supported.
                 </p>
                 <p>
-                  Use <code>defaultValue</code> for uncontrolled usage, or <code>value</code> with{' '}
-                  <code>onChange</code> to bind it to app state. Set <code>columns</code> for denser
-                  option layouts.
+                  Use <code>defaultValue</code> for local state or <code>value</code>/<code>onChange</code>{" "}
+                  for controlled state. Set <code>columns</code> when the list needs a denser layout.
                 </p>
               </div>
             </>
@@ -1968,12 +1383,10 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  KeyValueRows is a single bordered surface for status/detail pairs. Rows are joined
-                  with internal separators, so there is no inter-row gap and only the outer corners are rounded.
+                  KeyValueRows renders read-only label/value rows in one bordered surface.
                 </p>
                 <p>
-                  Use it when you need <code>label:value</code> data presentation instead of selectable
-                  list items. It inherits panel theme colors and font size by default.
+                  Use it for status or metadata. It is not selectable and has no state model.
                 </p>
               </div>
             </>
@@ -2024,13 +1437,13 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  KeyValueAccordion keeps the joined-row look from KeyValueRows, but each row can
-                  expand into a full control body.
+                  KeyValueAccordion renders label/value rows that can expand to show controls or
+                  custom content.
                 </p>
                 <p>
-                  It supports <code>mode="multiple"</code> (folder stack behavior) and{' '}
-                  <code>mode="single"</code> (accordion behavior). The expanded area uses Folder-like
-                  spacing controls with <code>padding</code> and <code>verticalGap</code>.
+                  <code>mode="multiple"</code> allows several open rows. <code>mode="single"</code>{" "}
+                  keeps one row open. Use <code>expandedKeys</code>/<code>onExpandedKeysChange</code>{" "}
+                  to control expansion.
                 </p>
               </div>
             </>
@@ -2112,13 +1525,12 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  NameInputRow is a compact create row: text input plus a primary <code>+</code>{" "}
-                  action and optional randomize action with <code>Dice6</code>.
+                  NameInputRow combines a text input, create action, and optional randomize action.
                 </p>
                 <p>
-                  Pass <code>onRandomize</code> as a callback (sync or async) so name generation can
-                  come from your own list, service, or procedural generator without hard-coding data
-                  in the component.
+                  <code>onCreate</code> receives the current text. <code>onRandomize</code> may return
+                  a string directly or asynchronously; <code>randomizeMode="append"</code> appends it
+                  to the current value.
                 </p>
               </div>
             </>
@@ -2127,21 +1539,20 @@ function App() {
               <div className="docs-code-section">
                 <SliderStoreProvider>
                   <div className="docs-selection-grid-stack">
-                    <SelectionGridDemo />
+                    <SelectionGridExample />
                   </div>
                 </SliderStoreProvider>
                 <CodeBlock code={activeRoute.code} />
               </div>
               <div className="docs-text-block">
                 <p>
-                  SelectionGrid is a generic square picker. Use it for colors, thumbnails, or any
-                  item that can be shown in a square. GradientSelectionGrid is the specialized
-                  palette picker with the header, invert toggle, and terrain preview mode.
+                  SelectionGrid renders selectable square items. Provide <code>getKey</code>,{" "}
+                  <code>getLabel</code>, and <code>getPreview</code> so it can stay data-agnostic.
                 </p>
                 <p>
-                  Keep the layout gap and colors aligned with your other controls so the grid feels
-                  like part of the same instrument panel. GradientSelectionGrid manages its own
-                  store unless you supply one via the shared slider store context.
+                  GradientSelectionGrid is the gradient-specific variant. Pass{" "}
+                  <code>terrainAssets</code> from the host app when terrain previews are needed; the
+                  package does not bundle terrain images.
                 </p>
               </div>
             </>
@@ -2183,7 +1594,7 @@ function App() {
                     showMenuIcons
                   />
                   <FloatingPanel
-                    title="Nested Dropdown Demo"
+                    title="Nested Dropdown"
                     colorA={flexoki.purple['600']}
                     colorB={flexoki.purple['100']}
                     borderStyle="a"
@@ -2219,9 +1630,9 @@ function App() {
                     code={`<Dropdown
   label="Render Profile"
   options={[
-    { value: "draft", label: "Draft", description: "Fast iteration with lighter passes" },
-    { value: "balanced", label: "Balanced", description: "Default profile for daily use" },
-    { value: "quality", label: "Quality", description: "Highest quality with longer renders" },
+    { value: "draft", label: "Draft", description: "Draft output" },
+    { value: "balanced", label: "Balanced", description: "Balanced output" },
+    { value: "quality", label: "Quality", description: "Quality output" },
   ]}
   value={profile}
   onChange={(value) => setProfile(value)}
@@ -2263,7 +1674,7 @@ function App() {
 })
 
 <FloatingPanel
-  title="Nested Dropdown Demo"
+  title="Nested Dropdown"
   colorA={flexoki.purple["600"]}
   colorB={flexoki.purple["100"]}
   borderStyle="a"
@@ -2293,14 +1704,13 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  Dropdown favors compact, keyboard-friendly selection with a clear label and
-                  explicit option list. Use <code>defaultValue</code> for uncontrolled menus or
-                  <code>value</code> + <code>onChange</code> to bind it to application state.
+                  Dropdown renders a labelled menu from an explicit option list. Use{" "}
+                  <code>defaultValue</code> for local state or <code>value</code>/<code>onChange</code>{" "}
+                  for controlled state.
                 </p>
                 <p>
-                  IconDropdown reuses the same menu and keyboard behavior, but uses an icon trigger.
-                  Give it a short label for accessibility and set a wider width so the menu text has
-                  breathing room.
+                  IconDropdown uses the same option contract with an icon trigger. Use{" "}
+                  <code>showMenuIcons</code> when option icons should appear inside the menu.
                 </p>
               </div>
             </>
@@ -2341,12 +1751,11 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  ColorField combines a swatch trigger, editable hex value, and alpha slider in one
-                  control row.
+                  ColorField binds a hex color and optional alpha value in one row.
                 </p>
                 <p>
-                  Default mode keeps the picker inline below the sliders. Set{" "}
-                  <code>pickerDisplay="popup"</code> to open it from the swatch instead.
+                  The picker is inline by default. Set <code>pickerDisplay="popup"</code> to open it
+                  from the swatch.
                 </p>
               </div>
             </>
@@ -2458,14 +1867,13 @@ function App() {
               </div>
               <div className="docs-text-block">
                 <p>
-                  FloatingPanel provides a compact header + body container for stacked controls. Use{" "}
-                  <code>collapsible</code> to add the toggle icon, and set <code>title</code> or{" "}
-                  <code>header</code> when you need a custom top row.
+                  FloatingPanel renders a header and body for stacked controls. <code>title</code>{" "}
+                  creates the default header; <code>header</code> replaces it with custom content.
                 </p>
                 <p>
-                  Use <code>draggable</code> + <code>showDockButton</code> when you want a true floating
-                  inspector. For dense stacks, <code>verticalGap</code> and the padding props control
-                  the spacing between controls without affecting their borders.
+                  <code>collapsible</code> controls body visibility. <code>draggable</code> and{" "}
+                  <code>showDockButton</code> add panel movement and docking. <code>padding</code>{" "}
+                  and <code>verticalGap</code> control body spacing.
                 </p>
               </div>
             </>

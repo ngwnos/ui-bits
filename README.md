@@ -1,6 +1,6 @@
 # ui-bits
 
-`ui-bits` is a React + TypeScript UI control library for realtime graphics/audio tools.
+`ui-bits` is a React + TypeScript control library for graphics and audio tools.
 
 ## Install
 
@@ -42,7 +42,7 @@ export default function App() {
 }
 ```
 
-## Integration Contract
+## State Contract
 
 - Use exactly one state mode per prop set:
   - Controlled: `value` + `onChange`/`onUserChange`
@@ -52,11 +52,15 @@ export default function App() {
 - For preset workflows, controls must either be store-bound or explicitly mirrored into the control store.
 - For animated controls (`LFOSlider`), use `onUserChange` for direct edits and `onAnimatedUpdate` for frame-time outputs.
 
-## Package entrypoints
+## Entry Points
 
-- `ui-bits/core`: main controls and providers.
-- `ui-bits/audio`: optional audio-oriented components.
-- `ui-bits`: compatibility root export (full surface area).
+- `ui-bits/core`: controls, stores, providers, gradients, and non-audio helpers.
+- `ui-bits/audio`: `ui-bits/core` plus `AudioControls` and `VirtualKeyboard`.
+- `ui-bits/terrain`: TIFF height-texture loading utilities.
+- `ui-bits/components/<Name>`: component-level subpath exports.
+- `ui-bits`: full compatibility export.
+
+The package stylesheet is exported as `ui-bits/style.css`. Sample terrain tiles and docs fonts live in the docs app, not in the package bundle.
 
 ## Development
 

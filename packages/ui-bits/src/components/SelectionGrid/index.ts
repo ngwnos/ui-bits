@@ -7,4 +7,8 @@ export {
   type SelectionGridGridProps,
   type SelectionGridPreview,
 } from "./SelectionGrid";
-export { default as GradientSelectionGrid, type SelectionGridGradientProps } from "./SelectionGridGradient";
+export {
+  default as GradientSelectionGrid,
+  type SelectionGridGradientProps,
+  type TerrainTileAsset,
+} from "./SelectionGridGradient";

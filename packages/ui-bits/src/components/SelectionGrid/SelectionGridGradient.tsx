@@ -15,10 +15,14 @@ import {
   createGradientCss,
   type GradientDefinition,
 } from "../../gradients/matplotlib";
-import { loadTerrainTileAssets, type TerrainTileAsset } from "../../assets/terrain/tiles";
 import IconButton from "../IconButton";
 import SelectionGridWorker from "./selectionGrid.worker?worker&inline";
 import "./selectionGrid.css";
+
+export type TerrainTileAsset = {
+  name: string;
+  url: string;
+};
 
 type PaletteInfo = {
   data: Uint8ClampedArray;
@@ -201,6 +205,7 @@ type SelectionGridBaseProps = {
 export type SelectionGridGradientProps = SelectionGridBaseProps & {
   gridId?: SelectionGridId;
   previewDarkMode: boolean;
+  terrainAssets?: TerrainTileAsset[] | (() => Promise<TerrainTileAsset[]>);
   colorA?: string;
   colorB?: string;
   allowEmptySelection?: boolean;
@@ -209,6 +214,7 @@ export type SelectionGridGradientProps = SelectionGridBaseProps & {
 function GradientSelectionGridContent({
   gridId = DEFAULT_SELECTION_GRID_ID,
   previewDarkMode,
+  terrainAssets,
   layoutGap = "6px",
   colorA = FALLBACK_COLOR_A,
   colorB = FALLBACK_COLOR_B,
@@ -242,7 +248,10 @@ function GradientSelectionGridContent({
       setTerrainTiles([]);
       return;
     }
-    loadTerrainTileAssets()
+    const resolvedAssets = typeof terrainAssets === "function"
+      ? terrainAssets()
+      : Promise.resolve(terrainAssets ?? []);
+    resolvedAssets
       .then((assets) => {
         if (!cancelled) setTerrainTiles(assets);
       })
@@ -252,7 +261,7 @@ function GradientSelectionGridContent({
     return () => {
       cancelled = true;
     };
-  }, [usesTerrainTiles]);
+  }, [terrainAssets, usesTerrainTiles]);
 
   React.useEffect(() => {
     if (!usesTerrainTiles) {
@@ -373,15 +382,18 @@ function GradientSelectionGridContent({
       flushQueue();
       requestRender();
     };
+    const tileCache = tileCacheRef.current;
+    const pending = pendingRef.current;
+    const tileRequests = tileRequestRef.current;
     return () => {
       worker.terminate();
       workerRef.current = null;
-      tileCacheRef.current.forEach((entry) => entry.bitmap?.close());
-      tileCacheRef.current.clear();
-      pendingRef.current.clear();
+      tileCache.forEach((entry) => entry.bitmap?.close());
+      tileCache.clear();
+      pending.clear();
       queuedRef.current.clear();
       queueRef.current = [];
-      tileRequestRef.current.clear();
+      tileRequests.clear();
       atlasCanvasRef.current = null;
       atlasContextRef.current = null;
       atlasLayoutRef.current = null;

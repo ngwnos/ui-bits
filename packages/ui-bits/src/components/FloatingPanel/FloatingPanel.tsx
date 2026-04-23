@@ -145,14 +145,18 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const [dragPosition, setDragPosition] = React.useState<{ x: number; y: number } | null>(() => (
     defaultPosition ? { x: defaultPosition.x, y: defaultPosition.y } : null
   ));
+  const defaultPositionX = defaultPosition?.x;
+  const defaultPositionY = defaultPosition?.y;
+  const positionX = position?.x;
+  const positionY = position?.y;
   React.useEffect(() => {
-    if (position) {
-      setDragPosition({ x: position.x, y: position.y });
+    if (positionX !== undefined && positionY !== undefined) {
+      setDragPosition({ x: positionX, y: positionY });
       return;
     }
-    if (!defaultPosition) return;
+    if (defaultPositionX === undefined || defaultPositionY === undefined) return;
     if (typeof window === "undefined") {
-      setDragPosition({ x: defaultPosition.x, y: defaultPosition.y });
+      setDragPosition({ x: defaultPositionX, y: defaultPositionY });
       return;
     }
     const panelNode = panelRef.current;
@@ -162,10 +166,10 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     const minVisibleHeight = computeHeaderHeight(fontSize ?? 12) + 6;
     const maxY = Math.max(0, window.innerHeight - minVisibleHeight);
     setDragPosition({
-      x: clampBetween(defaultPosition.x, 0, maxX),
-      y: clampBetween(defaultPosition.y, 0, maxY),
+      x: clampBetween(defaultPositionX, 0, maxX),
+      y: clampBetween(defaultPositionY, 0, maxY),
     });
-  }, [defaultPosition?.x, defaultPosition?.y, position?.x, position?.y]);
+  }, [defaultPositionX, defaultPositionY, fontSize, positionX, positionY]);
   const resolvedFontSize = fontSize ?? 12;
   const isCollapsedControlled = collapsed !== undefined;
   const [internalCollapsed, setInternalCollapsed] = React.useState(defaultCollapsed);

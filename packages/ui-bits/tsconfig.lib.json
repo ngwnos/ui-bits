@@ -7,18 +7,5 @@
     "noEmit": false,
     "stripInternal": true
   },
-  "include": [
-    "src/library.ts",
-    "src/core.ts",
-    "src/audio.ts",
-    "src/components/LFOSlider/**/*",
-    "src/components/SelectionGrid/**/*",
-    "src/components/Dropdown/**/*",
-    "src/frameLoop.tsx",
-    "src/useStoreMirror.ts",
-    "src/lfo.ts",
-    "src/utils/loadHeightTexture.ts",
-    "src/utils/tileColorize.ts",
-    "src/assets/terrain/tiles.ts"
-  ]
+  "include": ["src"]
 }

@@ -189,10 +189,10 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   const resolvedSquareScale = Number.isFinite(squareScale) && squareScale > 0 ? squareScale : 1;
   const resolvedSquareAlignment = squareAlignment ?? "left";
 
-  const resolvedItems = items ?? [];
-  const resolvedFolders = folders ?? [];
+  const resolvedItems = React.useMemo(() => items ?? [], [items]);
+  const resolvedFolders = React.useMemo(() => folders ?? [], [folders]);
   const usesFolders = resolvedFolders.length > 0;
-  const resolvedSelectionSlots = selectionSlots ?? [];
+  const resolvedSelectionSlots = React.useMemo(() => selectionSlots ?? [], [selectionSlots]);
   const usesMultiSelect = resolvedSelectionSlots.length > 0;
 
   const resolvedFolderItems = React.useMemo(() => {
@@ -592,11 +592,12 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
   }, [setInternalFolderItems]);
 
   React.useEffect(() => {
+    const objectUrls = objectUrlsRef.current;
     return () => {
-      objectUrlsRef.current.forEach((urls) => {
+      objectUrls.forEach((urls) => {
         urls.forEach((url) => URL.revokeObjectURL(url));
       });
-      objectUrlsRef.current.clear();
+      objectUrls.clear();
     };
   }, []);
 
@@ -662,15 +663,18 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
       flushQueue();
       requestRender();
     };
+    const tileCache = tileCacheRef.current;
+    const pending = pendingRef.current;
+    const tileRequests = tileRequestRef.current;
     return () => {
       worker.terminate();
       workerRef.current = null;
-      tileCacheRef.current.forEach((entry) => entry.bitmap?.close());
-      tileCacheRef.current.clear();
-      pendingRef.current.clear();
+      tileCache.forEach((entry) => entry.bitmap?.close());
+      tileCache.clear();
+      pending.clear();
       queuedRef.current.clear();
       queueRef.current = [];
-      tileRequestRef.current.clear();
+      tileRequests.clear();
       atlasCanvasRef.current = null;
       atlasContextRef.current = null;
       atlasLayoutRef.current = null;

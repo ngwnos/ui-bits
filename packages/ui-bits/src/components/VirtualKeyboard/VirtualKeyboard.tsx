@@ -510,9 +510,11 @@ export default function VirtualKeyboard({
     || effectiveInstrument === toneInstrumentValue
   );
   const resolvedSoundfontConfig = selectedInstrument?.soundfontConfig ?? soundfontConfig ?? null;
-  const baseSoundfont = showInstrumentControl && !usesTone && resolvedSoundfontConfig
-    ? { ...resolvedSoundfontConfig, instrument: effectiveInstrument }
-    : null;
+  const baseSoundfont = React.useMemo(() => (
+    showInstrumentControl && !usesTone && resolvedSoundfontConfig
+      ? { ...resolvedSoundfontConfig, instrument: effectiveInstrument }
+      : null
+  ), [effectiveInstrument, resolvedSoundfontConfig, showInstrumentControl, usesTone]);
   const resolvedSoundfont = React.useMemo(() => {
     const source = soundfont ?? baseSoundfont;
     if (!source) return null;
@@ -1102,11 +1104,12 @@ export default function VirtualKeyboard({
     };
     window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("keyup", handleKeyUp, true);
+    const pressedKeys = pressedKeysRef.current;
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("keyup", handleKeyUp, true);
-      pressedKeysRef.current.forEach((note) => triggerOffRef.current(note));
-      pressedKeysRef.current.clear();
+      pressedKeys.forEach((note) => triggerOffRef.current(note));
+      pressedKeys.clear();
     };
   }, [shortcutsEnabled]);
 

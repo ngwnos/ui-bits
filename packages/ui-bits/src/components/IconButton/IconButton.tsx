@@ -93,7 +93,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
   const baseColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
   const baseColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
   const baseBorderStyle = borderStyleProp ?? panelTheme?.borderStyle ?? "none";
-  const cycleOptions = options ?? [];
+  const cycleOptions = React.useMemo(() => options ?? [], [options]);
   const [uncontrolledPressed, setUncontrolledPressed] = React.useState(defaultPressed);
   const isPressedControlled = pressed !== undefined;
   const shouldUseStorePressed = resolvedControlId !== undefined
@@ -164,7 +164,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>((props, 
     if (defaultPressed) {
       setStoreValue(true);
     }
-  }, [defaultPressed, setStoreValue, shouldUseStorePressed, storeValue]);
+  }, [defaultPressed, setStoreValue, shouldPersistPressed, storeValue]);
   React.useEffect(() => {
     if (!shouldUseStoreCycle || storeValue !== undefined) return;
     setStoreValue(uncontrolledValue);

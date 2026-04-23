@@ -1,36 +1,39 @@
 # LFOSlider
 
-Reusable React slider component with built-in support for displaying and animating values using low-frequency oscillators (LFOs). The slider exposes a rich set of callbacks so host applications can own all state while the component handles pointer interaction, keyboard editing, and visual presentation.
+React slider with optional low-frequency oscillator controls.
 
 ## Importing
 
 ```tsx
-import { LFOSlider, type LFOSliderProps } from "../components";
+import { LFOSlider, type LFOSliderProps } from "ui-bits/core";
+import "ui-bits/style.css";
 ```
 
-You can also import directly from `../components/LFOSlider` if you prefer.
+Direct component export:
+
+```tsx
+import { LFOSlider } from "ui-bits/components/LFOSlider";
+```
 
 ## Basic Usage
 
 ```tsx
-const Example = () => {
-  const [value, setValue] = useState(0.4);
+const [value, setValue] = useState(0.4);
 
-  return (
-    <LFOSlider
-      label="Depth"
-      min={0}
-      max={1}
-      step={0.01}
-      defaultValue={value}
-      colorA="#24837B"
-      colorB="#FFFCF0"
-      onUserChange={setValue}
-      onAnimatedUpdate={setValue}
-    />
-  );
-};
+<LFOSlider
+  label="Depth"
+  min={0}
+  max={1}
+  step={0.01}
+  value={value}
+  colorA="#24837B"
+  colorB="#FFFCF0"
+  onUserChange={setValue}
+  onAnimatedUpdate={setValue}
+/>
 ```
+
+Use `defaultValue` instead of `value` when the slider should keep local state.
 
 ## Key Props
 
@@ -43,8 +46,9 @@ const Example = () => {
 | `variant` | `'full' \| 'basic'` | `basic` disables text editing + LFO drawer controls to create a minimal slider for nested usage. |
 | `barStyle` | `'continuous' \| 'discrete' \| 'step-aligned'` | Controls how the bar fill renders; `discrete` snaps to `barSegmentCount`, `step-aligned` snaps to the slider step. |
 | `barSegmentCount` | `number` | Visual segment count used when `barStyle="discrete"`. |
-| `defaultValue` | `number` | Initial numerical value; the component keeps its own local text buffer. |
-| `value` | `number` | Controlled value used for external mode; overrides `defaultValue` for initial display. |
+| `defaultValue` | `number` | Initial value for uncontrolled state. |
+| `value` | `number` | Controlled value. Pair with `onUserChange` or `onAnimatedUpdate`. |
+| `controlId` | `string` | Store-bound value id. Do not use with `value`. |
 | `defaultLfoRange` | `[number, number]` | Initial min/max markers shown in the drawer track. |
 | `lfoRange` | `[number, number]` | Controlled min/max markers shown in the drawer track. |
 | `colorA`, `colorB` | `string` | Hex colours for the segmented background. When omitted the slider falls back to neutral grey/white. |
@@ -65,21 +69,21 @@ const Example = () => {
 
 Refer to `LFOSliderProps` for the full list of optional callbacks and configuration flags.
 
-## Frame Loop & Mirroring
+## State Modes
 
-The component uses the local `frameLoop` and `useStoreMirror` helpers from this project. If you embed the slider in another application you can either:
+Use one state mode per slider.
 
-1. Reuse the same helpers (copy `frameLoop.tsx` and `useStoreMirror.ts`), or
-2. Replace the hook implementations with equivalents that fit your environment.
+- Controlled: `value` with callbacks.
+- Store-bound: `controlId` with no controlled `value`.
+- Uncontrolled: `defaultValue`.
 
-The hooks are optional – leaving `mode="manual"`, `mirrorToStore={undefined}`, and `readExternal={undefined}` (or `value={undefined}`) disables the extra animation/mirroring features.
+`FrameLoopProvider` is required for LFO animation. Store-bound controls also need the relevant store provider from `ui-bits/core`.
 
 ## Audio LFO Input
 
 When the active waveform is `audio`, the slider samples FFT bins to drive its value. You can either pass
 `audioBins`/`audioBinCount`/`audioMaxMagnitude` directly, or wrap your UI in `AudioAnalysisProvider` and push
-updates with `useAudioAnalysisActions` so nested sliders pick up the same analysis stream. The `AudioControls`
-component ships a full playback + FFT UI that feeds this provider for you.
+updates with `useAudioAnalysisActions`. `AudioControls` can feed the same provider.
 
 ## Suspension
 
@@ -88,22 +92,12 @@ set an `AnimationSuspensionProvider` while collapsed so nested sliders pause aut
 
 ## Styling
 
-The slider uses inline styles for layout and colours, so it does not ship with any external CSS. Provide `colorA`/`colorB` values to match your theme.
+Import `ui-bits/style.css` once. Use `colorA`, `colorB`, border, font size, and bar props for local styling.
 
 ## Types
 
 ```ts
-import { LFOSliderMode, LFOSliderProps, SliderBarStyle, SliderVariant } from "../components";
+import { LFOSliderMode, LFOSliderProps, SliderBarStyle, SliderVariant } from "ui-bits/core";
 ```
 
 `LFOSliderMode` enumerates the allowed LFO behaviour hints (`'auto' | 'manual' | 'lfo' | 'external'`). `SliderVariant` toggles full vs. basic interaction, and `SliderBarStyle` controls continuous vs. discrete bar rendering.
-
-## Example Integration
-
-The `src/App.tsx` file in this repository shows how to:
-
-- Coordinate multiple sliders via a store,
-- Mirror drawer state and LFO controls,
-- Expose colour pickers that feed straight into the slider.
-
-Use it as a reference when embedding `LFOSlider` in your own project.

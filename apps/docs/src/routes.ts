@@ -3,7 +3,12 @@ export type DocsRoute = {
   label: string
   title: string
   code: string
+  snippets?: Record<string, string>
 }
+
+export const routeSnippet = (route: DocsRoute, key = 'main') => (
+  key === 'main' ? route.code : route.snippets?.[key] ?? ''
+)
 
 export const ROUTES: DocsRoute[] = [
   {
@@ -21,9 +26,62 @@ export const ROUTES: DocsRoute[] = [
   showLfoControls
   drawerOpen
 />`,
+    snippets: {
+      discrete: `barStyle="discrete"
+barSegmentCount={32}`,
+      stepAligned: `barStyle="step-aligned"`,
+      continuous: `barStyle="continuous"`,
+      sine: `defaultWaveform="sine"
+defaultFrequency={0.2}
+defaultLfoRange={[20, 80]}`,
+      triangle: `defaultWaveform="triangle"
+defaultFrequency={0.2}
+defaultLfoRange={[20, 80]}`,
+      saw: `defaultWaveform="saw"
+defaultFrequency={0.4}
+defaultPhase={0.5}
+defaultLfoRange={[20, 80]}`,
+      square: `defaultWaveform="square"
+defaultFrequency={0.4}
+defaultLfoRange={[20, 80]}`,
+      audio: `defaultWaveform="audio"
+defaultFrequency={0.2}
+defaultLfoRange={[20, 80]}`,
+    },
   },
-  { id: 'icon-button', label: 'Icon Button', title: 'Icon Button', code: '' },
-  { id: 'loading-bar', label: 'Loading Bar', title: 'Loading Bar', code: '' },
+  {
+    id: 'icon-button',
+    label: 'Icon Button',
+    title: 'Icon Button',
+    code: `<IconButton
+  behavior="cycle"
+  options={[
+    { value: "dark", icon: <MoonStar /> },
+    { value: "light", icon: <Sun /> },
+  ]}
+  value="dark"
+  onChange={(value) => setThemeMode(value)}
+/>`,
+    snippets: {
+      momentary: `behavior="momentary"`,
+      toggle: `behavior="toggle"`,
+      cycle: `behavior="cycle"`,
+    },
+  },
+  {
+    id: 'loading-bar',
+    label: 'Loading Bar',
+    title: 'Loading Bar',
+    code: `<LoadingBar
+  value={progress}
+  colorA={flexoki.green["600"]}
+  colorB={flexoki.green["100"]}
+  border="a"
+  fontSize={12}
+  barStyle="discrete"
+  barSegmentCount={24}
+/>`,
+  },
   {
     id: 'audio-controls',
     label: 'Audio Controls',
@@ -35,6 +93,64 @@ export const ROUTES: DocsRoute[] = [
   borderStyle="a"
   fontSize={12}
 />`,
+    snippets: {
+      analysis: `<AudioAnalysisProvider>
+  <AudioControls
+    source={{ type: "buffer", src: "/audio/credits.mp3" }}
+    colorA={flexoki.red["600"]}
+    colorB={flexoki.red["100"]}
+    borderStyle="a"
+    fontSize={12}
+  />
+  <LFOSlider
+    label="Audio LFO"
+    min={0}
+    max={100}
+    step={1}
+    defaultValue={50}
+    showLfoControls
+    defaultLfoRunning
+    defaultWaveform="audio"
+  />
+</AudioAnalysisProvider>`,
+      liveInput: `const keyboardOutput = masterGain
+
+<AudioControls
+  source={{ type: "audioNode", node: keyboardOutput }}
+  audioAnalysisStore={analysisStore}
+  colorA={flexoki.red["600"]}
+  colorB={flexoki.red["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>
+<VirtualKeyboard
+  defaultStartNote={21}
+  defaultNoteCount={88}
+  defaultHeightUnits={3}
+  instrumentOptions={[
+    { value: "tonejs", label: "Tone.js", source: "tone" },
+  ]}
+  soundfontOptions={[
+    { value: "acoustic_grand_piano", label: "Grand Piano" },
+    { value: "electric_piano_1", label: "Electric Piano" },
+  ]}
+  defaultInstrument="acoustic_grand_piano"
+  soundfontConfig={{
+    soundfont: "MusyngKite",
+    format: "mp3",
+    destination: keyboardOutput,
+  }}
+  toneConfig={{
+    destination: keyboardOutput,
+    context: keyboardOutput.context,
+    polyphony: 32,
+  }}
+  colorA={flexoki.red["100"]}
+  colorB={flexoki.red["600"]}
+  whiteKeyColor={flexoki.paper}
+  blackKeyColor={flexoki.black}
+/>`,
+    },
   },
   {
     id: 'segment-bar',
@@ -77,6 +193,20 @@ const [value, setValue] = useState("balanced");
   borderStyle="a"
   fontSize={12}
 />`,
+    snippets: {
+      columns: `<RadioList
+  label="Render Profile (2 Columns)"
+  showLabel
+  options={options}
+  value={value}
+  onChange={(nextValue) => setValue(nextValue)}
+  columns={2}
+  colorA={flexoki.blue["600"]}
+  colorB={flexoki.blue["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>`,
+    },
   },
   {
     id: 'key-value-rows',
@@ -96,6 +226,16 @@ const [value, setValue] = useState("balanced");
   borderStyle="a"
   fontSize={12}
 />`,
+    snippets: {
+      bordered: `<KeyValueRows
+  rows={rows}
+  colorA={flexoki.purple["600"]}
+  colorB={flexoki.purple["100"]}
+  borderStyle="b"
+  fontSize={12}
+  rowHeight={26}
+/>`,
+    },
   },
   {
     id: 'key-value-accordion',
@@ -148,6 +288,20 @@ const [value, setValue] = useState("balanced");
   padding={8}
   verticalGap={6}
 />`,
+    snippets: {
+      single: `<KeyValueAccordion
+  items={items}
+  mode="single"
+  expandedKeys={expandedKeys}
+  onExpandedKeysChange={(keys) => setExpandedKeys(keys)}
+  colorA={flexoki.cyan["600"]}
+  colorB={flexoki.cyan["100"]}
+  borderStyle="a"
+  fontSize={12}
+  padding={8}
+  verticalGap={6}
+/>`,
+    },
   },
   {
     id: 'name-input-row',
@@ -172,6 +326,21 @@ const [createdNames, setCreatedNames] = useState<string[]>([])
   borderStyle="a"
   fontSize={12}
 />`,
+    snippets: {
+      append: `<NameInputRow
+  value={factionName}
+  onValueChange={setFactionName}
+  placeholder="Faction..."
+  onCreate={(name) => saveFaction(name)}
+  onRandomize={() => randomFactionName()}
+  randomizeMode="append"
+  appendSeparator=" of "
+  colorA={flexoki.cyan["600"]}
+  colorB={flexoki.cyan["100"]}
+  borderStyle="a"
+  fontSize={12}
+/>`,
+    },
   },
   {
     id: 'selection-grid',
@@ -240,6 +409,76 @@ const folders = [
   borderStyle="a"
   fontSize={12}
 />`,
+    snippets: {
+      subtext: `<Dropdown
+  label="Render Profile"
+  options={[
+    { value: "draft", label: "Draft", description: "Draft output" },
+    { value: "balanced", label: "Balanced", description: "Balanced output" },
+    { value: "quality", label: "Quality", description: "Quality output" },
+  ]}
+  value={profile}
+  onChange={(value) => setProfile(value)}
+  colorA={flexoki.purple["600"]}
+  colorB={flexoki.purple["100"]}
+  borderStyle="a"
+  fontSize={12}
+  width={280}
+/>`,
+      icon: `<IconDropdown
+  label="Weather"
+  options={[
+    { value: "drizzle", label: "Drizzle", icon: <CloudDrizzle /> },
+    { value: "lightning", label: "Lightning", icon: <CloudLightning /> },
+    { value: "snow", label: "Snow", icon: <CloudSnow /> },
+    { value: "sun", label: "Sun", icon: <Sun /> },
+  ]}
+  value="drizzle"
+  onChange={(value) => setIconDropdownValue(value)}
+  colorA={flexoki.cyan["600"]}
+  colorB={flexoki.cyan["100"]}
+  borderStyle="a"
+  fontSize={12}
+  showMenuIcons
+/>`,
+      nested: `const longOptions = Array.from({ length: 24 }, (_, index) => {
+  const number = String(index + 1).padStart(2, "0")
+  const isExtendedLabel = index === 11
+  return {
+    value: \`destination-\${number}\`,
+    label: isExtendedLabel
+      ? \`Destination \${number} - Macro \${number} - Ultra-wide modulation routing lane\`
+      : \`Destination \${number} - Macro \${number}\`,
+  }
+})
+
+<FloatingPanel
+  title="Nested Dropdown"
+  colorA={flexoki.purple["600"]}
+  colorB={flexoki.purple["100"]}
+  borderStyle="a"
+  fontSize={12}
+  width={320}
+>
+  <Folder
+    label="Folder Container"
+    colorA={flexoki.purple["600"]}
+    colorB={flexoki.purple["100"]}
+  >
+    <Dropdown
+      label="Long Menu"
+      labelInline
+      options={longOptions}
+      value={nestedDropdownValue}
+      onChange={(value) => setNestedDropdownValue(value)}
+      colorA={flexoki.purple["600"]}
+      colorB={flexoki.purple["100"]}
+      borderStyle="a"
+      fontSize={12}
+    />
+  </Folder>
+</FloatingPanel>`,
+    },
   },
   {
     id: 'color-field',

@@ -46,7 +46,7 @@ import {
 import CodeBlock from './components/CodeBlock'
 import DocsBrandCanvas, { type DocsBrandCanvasProps } from './components/DocsBrandCanvas'
 import SelectionGridExample from './components/SelectionGridExample'
-import { ROUTES } from './routes'
+import { ROUTES, routeSnippet } from './routes'
 import './App.css'
 
 const SIDEBAR_COLORS = [
@@ -653,7 +653,7 @@ function App() {
                   drawerOpen={exampleDrawerOpen}
                   onDrawerOpenChange={setExampleDrawerOpen}
                 />
-                <CodeBlock code={activeRoute.code} />
+                <CodeBlock code={routeSnippet(activeRoute)} />
               </div>
               <h2 className="docs-section-title">Bar Style</h2>
               <div className="docs-slider-grid">
@@ -678,7 +678,7 @@ function App() {
                     barStyle="discrete"
                     barSegmentCount={32}
                   />
-                  <CodeBlock code={`barStyle="discrete"\nbarSegmentCount={32}`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'discrete')} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -700,7 +700,7 @@ function App() {
                     defaultFrequency={0.1}
                     barStyle="step-aligned"
                   />
-                  <CodeBlock code={`barStyle="step-aligned"\n`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'stepAligned')} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -722,7 +722,7 @@ function App() {
                     defaultFrequency={0.1}
                     barStyle="continuous"
                   />
-                  <CodeBlock code={`barStyle="continuous"\n`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'continuous')} />
                 </div>
               </div>
               <h2 className="docs-section-title">LFO Waveforms</h2>
@@ -748,7 +748,7 @@ function App() {
                     defaultFrequency={0.2}
                     barStyle="continuous"
                   />
-                  <CodeBlock code={`defaultWaveform="sine"\ndefaultFrequency={0.2}\ndefaultLfoRange={[20, 80]}`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'sine')} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -771,7 +771,7 @@ function App() {
                     defaultFrequency={0.2}
                     barStyle="continuous"
                   />
-                  <CodeBlock code={`defaultWaveform="triangle"\ndefaultFrequency={0.2}\ndefaultLfoRange={[20, 80]}`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'triangle')} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -795,7 +795,7 @@ function App() {
                     defaultPhase={0.5}
                     barStyle="continuous"
                   />
-                  <CodeBlock code={`defaultWaveform="saw"\ndefaultFrequency={0.4}\ndefaultPhase={0.5}\ndefaultLfoRange={[20, 80]}`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'saw')} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -818,7 +818,7 @@ function App() {
                     defaultFrequency={0.4}
                     barStyle="continuous"
                   />
-                  <CodeBlock code={`defaultWaveform="square"\ndefaultFrequency={0.4}\ndefaultLfoRange={[20, 80]}`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'square')} />
                 </div>
                 <div className="docs-slider-item">
                   <LFOSlider
@@ -844,7 +844,7 @@ function App() {
                     audioBinCount={AUDIO_BIN_COUNT}
                     audioMaxMagnitude={1}
                   />
-                  <CodeBlock code={`defaultWaveform="audio"\ndefaultFrequency={0.2}\ndefaultLfoRange={[20, 80]}`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'audio')} />
                 </div>
               </div>
               <h2 className="docs-section-title">Font Size</h2>
@@ -956,17 +956,7 @@ function App() {
                     borderStyle="a"
                   />
                 </div>
-                <CodeBlock
-                  code={`<IconButton
-  behavior="cycle"
-  options={[
-    { value: "dark", icon: <MoonStar /> },
-    { value: "light", icon: <Sun /> },
-  ]}
-  value="dark"
-  onChange={(value) => setThemeMode(value)}
-/>`}
-                />
+                <CodeBlock code={routeSnippet(activeRoute)} />
               </div>
               <h2 className="docs-section-title">Behavior</h2>
               <div className="docs-icon-grid">
@@ -981,7 +971,7 @@ function App() {
                   >
                     <Paintbrush />
                   </IconButton>
-                  <CodeBlock code={`behavior="momentary"`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'momentary')} />
                 </div>
                 <div className="docs-icon-item">
                   <div className="docs-icon-row">
@@ -1010,7 +1000,7 @@ function App() {
                       {powerToggled ? <Power /> : <PowerOff />}
                     </IconButton>
                   </div>
-                  <CodeBlock code={`behavior="toggle"`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'toggle')} />
                 </div>
                 <div className="docs-icon-item">
                   <div className="docs-icon-row">
@@ -1025,7 +1015,7 @@ function App() {
                       colorB={flexoki.blue['150']}
                     />
                   </div>
-                  <CodeBlock code={`behavior="cycle"`} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'cycle')} />
                 </div>
               </div>
               <h2 className="docs-section-title">Font Size</h2>
@@ -1091,7 +1081,7 @@ function App() {
                   onAnimatedUpdate={setLoadingBarValue}
                   formatDisplayValue={(value) => value.toFixed(2)}
                 />
-                <CodeBlock code={activeRoute.code} />
+                <CodeBlock code={routeSnippet(activeRoute)} />
               </div>
               <div className="docs-text-block">
                 <p>
@@ -1131,27 +1121,7 @@ function App() {
                     defaultWaveform="audio"
                   />
                 </div>
-                <CodeBlock
-                  code={`<AudioAnalysisProvider>
-  <AudioControls
-    source={{ type: "buffer", src: "/audio/credits.mp3" }}
-    colorA={flexoki.red["600"]}
-    colorB={flexoki.red["100"]}
-    borderStyle="a"
-    fontSize={12}
-  />
-  <LFOSlider
-    label="Audio LFO"
-    min={0}
-    max={100}
-    step={1}
-    defaultValue={50}
-    showLfoControls
-    defaultLfoRunning
-    defaultWaveform="audio"
-  />
-</AudioAnalysisProvider>`}
-                />
+                <CodeBlock code={routeSnippet(activeRoute, 'analysis')} />
               </div>
               <h3 className="docs-section-title">Live Input</h3>
               <div className="docs-code-section">
@@ -1184,45 +1154,7 @@ function App() {
                     blackKeyColor={flexoki.black}
                   />
                 </div>
-                <CodeBlock
-                  code={`const keyboardOutput = masterGain
-
-<AudioControls
-  source={{ type: "audioNode", node: keyboardOutput }}
-  audioAnalysisStore={analysisStore}
-  colorA={flexoki.red["600"]}
-  colorB={flexoki.red["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>
-<VirtualKeyboard
-  defaultStartNote={21}
-  defaultNoteCount={88}
-  defaultHeightUnits={3}
-  instrumentOptions={[
-    { value: "tonejs", label: "Tone.js", source: "tone" },
-  ]}
-  soundfontOptions={[
-    { value: "acoustic_grand_piano", label: "Grand Piano" },
-    { value: "electric_piano_1", label: "Electric Piano" },
-  ]}
-  defaultInstrument="acoustic_grand_piano"
-  soundfontConfig={{
-    soundfont: "MusyngKite",
-    format: "mp3",
-    destination: keyboardOutput,
-  }}
-  toneConfig={{
-    destination: keyboardOutput,
-    context: keyboardOutput.context,
-    polyphony: 32,
-  }}
-  colorA={flexoki.red["100"]}
-  colorB={flexoki.red["600"]}
-  whiteKeyColor={flexoki.paper}
-  blackKeyColor={flexoki.black}
-/>`}
-                />
+                <CodeBlock code={routeSnippet(activeRoute, 'liveInput')} />
               </div>
               <div className="docs-text-block">
                 <p>
@@ -1254,7 +1186,7 @@ function App() {
                   borderStyle="a"
                   fontSize={12}
                 />
-                <CodeBlock code={activeRoute.code} />
+                <CodeBlock code={routeSnippet(activeRoute)} />
               </div>
               <div className="docs-text-block">
                 <p>
@@ -1320,21 +1252,8 @@ function App() {
                   />
                 </div>
                 <div className="docs-code-stack">
-                  <CodeBlock code={activeRoute.code} />
-                  <CodeBlock
-                    code={`<RadioList
-  label="Render Profile (2 Columns)"
-  showLabel
-  options={options}
-  value={value}
-  onChange={(nextValue) => setValue(nextValue)}
-  columns={2}
-  colorA={flexoki.blue["600"]}
-  colorB={flexoki.blue["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>`}
-                  />
+                  <CodeBlock code={routeSnippet(activeRoute)} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'columns')} />
                 </div>
               </div>
               <div className="docs-text-block">
@@ -1368,17 +1287,8 @@ function App() {
                   />
                 </div>
                 <div className="docs-code-stack">
-                  <CodeBlock code={activeRoute.code} />
-                  <CodeBlock
-                    code={`<KeyValueRows
-  rows={rows}
-  colorA={flexoki.purple["600"]}
-  colorB={flexoki.purple["100"]}
-  borderStyle="b"
-  fontSize={12}
-  rowHeight={26}
-/>`}
-                  />
+                  <CodeBlock code={routeSnippet(activeRoute)} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'bordered')} />
                 </div>
               </div>
               <div className="docs-text-block">
@@ -1418,21 +1328,8 @@ function App() {
                   />
                 </div>
                 <div className="docs-code-stack">
-                  <CodeBlock code={activeRoute.code} />
-                  <CodeBlock
-                    code={`<KeyValueAccordion
-  items={items}
-  mode="single"
-  expandedKeys={expandedKeys}
-  onExpandedKeysChange={(keys) => setExpandedKeys(keys)}
-  colorA={flexoki.cyan["600"]}
-  colorB={flexoki.cyan["100"]}
-  borderStyle="a"
-  fontSize={12}
-  padding={8}
-  verticalGap={6}
-/>`}
-                  />
+                  <CodeBlock code={routeSnippet(activeRoute)} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'single')} />
                 </div>
               </div>
               <div className="docs-text-block">
@@ -1505,22 +1402,8 @@ function App() {
                   />
                 </div>
                 <div className="docs-code-stack">
-                  <CodeBlock code={activeRoute.code} />
-                  <CodeBlock
-                    code={`<NameInputRow
-  value={factionName}
-  onValueChange={setFactionName}
-  placeholder="Faction..."
-  onCreate={(name) => saveFaction(name)}
-  onRandomize={() => randomFactionName()}
-  randomizeMode="append"
-  appendSeparator=" of "
-  colorA={flexoki.cyan["600"]}
-  colorB={flexoki.cyan["100"]}
-  borderStyle="a"
-  fontSize={12}
-/>`}
-                  />
+                  <CodeBlock code={routeSnippet(activeRoute)} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'append')} />
                 </div>
               </div>
               <div className="docs-text-block">
@@ -1542,7 +1425,7 @@ function App() {
                     <SelectionGridExample />
                   </div>
                 </SliderStoreProvider>
-                <CodeBlock code={activeRoute.code} />
+                <CodeBlock code={routeSnippet(activeRoute)} />
               </div>
               <div className="docs-text-block">
                 <p>
@@ -1625,81 +1508,10 @@ function App() {
                   </FloatingPanel>
                 </div>
                 <div className="docs-code-stack">
-                  <CodeBlock code={activeRoute.code} />
-                  <CodeBlock
-                    code={`<Dropdown
-  label="Render Profile"
-  options={[
-    { value: "draft", label: "Draft", description: "Draft output" },
-    { value: "balanced", label: "Balanced", description: "Balanced output" },
-    { value: "quality", label: "Quality", description: "Quality output" },
-  ]}
-  value={profile}
-  onChange={(value) => setProfile(value)}
-  colorA={flexoki.purple["600"]}
-  colorB={flexoki.purple["100"]}
-  borderStyle="a"
-  fontSize={12}
-  width={280}
-/>`}
-                  />
-                  <CodeBlock
-                    code={`<IconDropdown
-  label="Weather"
-  options={[
-    { value: "drizzle", label: "Drizzle", icon: <CloudDrizzle /> },
-    { value: "lightning", label: "Lightning", icon: <CloudLightning /> },
-    { value: "snow", label: "Snow", icon: <CloudSnow /> },
-    { value: "sun", label: "Sun", icon: <Sun /> },
-  ]}
-  value="drizzle"
-  onChange={(value) => setIconDropdownValue(value)}
-  colorA={flexoki.cyan["600"]}
-  colorB={flexoki.cyan["100"]}
-  borderStyle="a"
-  fontSize={12}
-  showMenuIcons
-/>`}
-                  />
-                  <CodeBlock
-                    code={`const longOptions = Array.from({ length: 24 }, (_, index) => {
-  const number = String(index + 1).padStart(2, "0")
-  const isExtendedLabel = index === 11
-  return {
-    value: \`destination-\${number}\`,
-    label: isExtendedLabel
-      ? \`Destination \${number} - Macro \${number} - Ultra-wide modulation routing lane\`
-      : \`Destination \${number} - Macro \${number}\`,
-  }
-})
-
-<FloatingPanel
-  title="Nested Dropdown"
-  colorA={flexoki.purple["600"]}
-  colorB={flexoki.purple["100"]}
-  borderStyle="a"
-  fontSize={12}
-  width={320}
->
-  <Folder
-    label="Folder Container"
-    colorA={flexoki.purple["600"]}
-    colorB={flexoki.purple["100"]}
-  >
-    <Dropdown
-      label="Long Menu"
-      labelInline
-      options={longOptions}
-      value={nestedDropdownValue}
-      onChange={(value) => setNestedDropdownValue(value)}
-      colorA={flexoki.purple["600"]}
-      colorB={flexoki.purple["100"]}
-      borderStyle="a"
-      fontSize={12}
-    />
-  </Folder>
-</FloatingPanel>`}
-                  />
+                  <CodeBlock code={routeSnippet(activeRoute)} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'subtext')} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'icon')} />
+                  <CodeBlock code={routeSnippet(activeRoute, 'nested')} />
                 </div>
               </div>
               <div className="docs-text-block">
@@ -1747,7 +1559,7 @@ function App() {
                     fontSize={12}
                   />
                 </div>
-                <CodeBlock code={activeRoute.code} />
+                <CodeBlock code={routeSnippet(activeRoute)} />
               </div>
               <div className="docs-text-block">
                 <p>
@@ -1863,7 +1675,7 @@ function App() {
                     />
                   </FloatingPanel>
                 </PresetStoreProvider>
-                <CodeBlock code={activeRoute.code} />
+                <CodeBlock code={routeSnippet(activeRoute)} />
               </div>
               <div className="docs-text-block">
                 <p>
@@ -1878,7 +1690,7 @@ function App() {
               </div>
             </>
           ) : (
-            <CodeBlock code={activeRoute.code} />
+            <CodeBlock code={routeSnippet(activeRoute)} />
           )}
         </main>
         <FloatingPanel

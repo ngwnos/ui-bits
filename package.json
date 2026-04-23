@@ -175,6 +175,7 @@
     "dev": "bun --cwd apps/docs dev",
     "build": "bun --cwd packages/ui-bits build && bun --cwd apps/docs build",
     "build:docs": "bun --cwd apps/docs build",
+    "check:exports": "node scripts/verify-exports.mjs",
     "lint": "bun --cwd packages/ui-bits lint && bun --cwd apps/docs lint",
     "preview": "bun --cwd apps/docs build && bun --cwd apps/docs preview"
   },

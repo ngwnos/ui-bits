@@ -1,4 +1,5 @@
 import React from "react";
+import { usePanelTheme } from "../../panelGap";
 
 export type BasicButtonBorderStyle = "a" | "b" | "none";
 
@@ -21,10 +22,10 @@ function resolveSize(value?: number | string): string | undefined {
 
 const BasicButton = React.forwardRef<HTMLButtonElement, BasicButtonProps>((props, ref) => {
   const {
-    colorA = FALLBACK_COLOR_A,
-    colorB = FALLBACK_COLOR_B,
-    borderStyle = "a",
-    fontSize = 12,
+    colorA,
+    colorB,
+    borderStyle,
+    fontSize,
     padding,
     style,
     type,
@@ -32,13 +33,18 @@ const BasicButton = React.forwardRef<HTMLButtonElement, BasicButtonProps>((props
     children,
     ...rest
   } = props;
-  const resolvedBorderColor = borderStyle === "a"
-    ? colorA
-    : borderStyle === "b"
-      ? colorB
+  const panelTheme = usePanelTheme();
+  const resolvedColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
+  const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
+  const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? "a";
+  const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
+  const resolvedBorderColor = resolvedBorderStyle === "a"
+    ? resolvedColorA
+    : resolvedBorderStyle === "b"
+      ? resolvedColorB
       : "transparent";
   const resolvedPadding = resolveSize(padding)
-    ?? `${Math.round(fontSize * 0.35)}px ${Math.round(fontSize * 0.7)}px`;
+    ?? `${Math.round(resolvedFontSize * 0.35)}px ${Math.round(resolvedFontSize * 0.7)}px`;
 
   return (
     <button
@@ -46,12 +52,12 @@ const BasicButton = React.forwardRef<HTMLButtonElement, BasicButtonProps>((props
       type={type ?? "button"}
       disabled={disabled}
       style={{
-        fontSize,
+        fontSize: resolvedFontSize,
         fontFamily: "inherit",
         fontWeight: "inherit",
         lineHeight: 1,
-        color: colorA,
-        background: colorB,
+        color: resolvedColorA,
+        background: resolvedColorB,
         border: `1px solid ${resolvedBorderColor}`,
         borderRadius: 3,
         padding: resolvedPadding,

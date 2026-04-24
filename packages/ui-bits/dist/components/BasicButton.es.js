@@ -1,4 +1,4 @@
-import { B as f } from "../BasicButton-CQkPQMVi.js";
+import { B as f } from "../BasicButton-EcIYDsTq.js";
 export {
   f as default
 };

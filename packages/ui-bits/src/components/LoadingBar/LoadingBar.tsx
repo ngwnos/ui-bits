@@ -1,5 +1,6 @@
 import React from "react";
 import { clamp } from "../../lfo";
+import { usePanelTheme } from "../../panelGap";
 import type { SliderBorder } from "../LFOSlider";
 
 export type LoadingBarStyle = "continuous" | "discrete";
@@ -36,18 +37,23 @@ function computeBarHeight(fontSize: number) {
 export default function LoadingBar({
   value,
   defaultValue = 0,
-  colorA = FALLBACK_COLOR_A,
-  colorB = FALLBACK_COLOR_B,
+  colorA,
+  colorB,
   barStyle = "continuous",
   barSegmentCount = 32,
-  border = "a",
+  border,
   borderMask,
   width,
-  fontSize = 12,
+  fontSize,
   className,
   style,
   ...rest
 }: LoadingBarProps) {
+  const panelTheme = usePanelTheme();
+  const resolvedColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
+  const resolvedColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
+  const resolvedBorder = border ?? panelTheme?.borderStyle ?? "a";
+  const resolvedFontSize = fontSize ?? panelTheme?.fontSize ?? 12;
   const rawValue = typeof value === "number" && Number.isFinite(value) ? value : defaultValue;
   const clampedValue = clamp(rawValue, 0, 1);
   const segmentCount = Number.isFinite(barSegmentCount)
@@ -58,15 +64,15 @@ export default function LoadingBar({
     : clampedValue;
   const splitPct = `${(clamp(quantizedValue, 0, 1) * 100).toFixed(3)}%`;
   const resolvedWidth = resolveSize(width);
-  const resolvedBorderColor = border === "b" ? colorB : colorA;
+  const resolvedBorderColor = resolvedBorder === "b" ? resolvedColorB : resolvedColorA;
   const resolvedBorderMask = {
     top: borderMask?.top ?? true,
     right: borderMask?.right ?? true,
     bottom: borderMask?.bottom ?? true,
     left: borderMask?.left ?? true,
   };
-  const borderValue = border === "none" ? "1px solid transparent" : `1px solid ${resolvedBorderColor}`;
-  const height = computeBarHeight(fontSize);
+  const borderValue = resolvedBorder === "none" ? "1px solid transparent" : `1px solid ${resolvedBorderColor}`;
+  const height = computeBarHeight(resolvedFontSize);
 
   return (
     <div
@@ -83,7 +89,7 @@ export default function LoadingBar({
         borderRight: resolvedBorderMask.right ? borderValue : "none",
         borderBottom: resolvedBorderMask.bottom ? borderValue : "none",
         borderLeft: resolvedBorderMask.left ? borderValue : "none",
-        backgroundImage: `linear-gradient(90deg, ${colorA} 0%, ${colorA} ${splitPct}, ${colorB} ${splitPct}, ${colorB} 100%)`,
+        backgroundImage: `linear-gradient(90deg, ${resolvedColorA} 0%, ${resolvedColorA} ${splitPct}, ${resolvedColorB} ${splitPct}, ${resolvedColorB} 100%)`,
         backgroundRepeat: "no-repeat",
         backgroundSize: "100% 100%",
         backgroundOrigin: "padding-box",

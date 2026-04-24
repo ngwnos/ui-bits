@@ -392,6 +392,31 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     ));
   }, [isFloating, resolvedPosition]);
 
+  const clampFloatingPositionToViewport = React.useCallback(() => {
+    if (!draggable || !resolvedPosition || typeof window === "undefined") return;
+    if (position && !onPositionChange) return;
+    const panelNode = panelRef.current;
+    const rect = panelNode?.getBoundingClientRect();
+    const width = rect?.width ?? 0;
+    const maxX = Math.max(0, window.innerWidth - width);
+    const maxY = Math.max(0, window.innerHeight - headerMinHeight - 6);
+    const nextPosition = {
+      x: clampBetween(resolvedPosition.x, 0, maxX),
+      y: clampBetween(resolvedPosition.y, 0, maxY),
+    };
+    if (
+      Math.abs(nextPosition.x - resolvedPosition.x) < 0.5
+      && Math.abs(nextPosition.y - resolvedPosition.y) < 0.5
+    ) {
+      return;
+    }
+    if (position && onPositionChange) {
+      onPositionChange(nextPosition);
+    } else {
+      setDragPosition(nextPosition);
+    }
+  }, [draggable, headerMinHeight, onPositionChange, position, resolvedPosition]);
+
   const updateScrollMetrics = React.useCallback(() => {
     const node = bodyRef.current;
     if (!node) return;
@@ -447,6 +472,21 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
       observer?.disconnect();
     };
   }, [shouldClampBodyToViewport, updatePanelViewportTop]);
+
+  React.useEffect(() => {
+    if (!draggable || !resolvedPosition || typeof window === "undefined") return;
+    const handleViewportChange = () => clampFloatingPositionToViewport();
+    window.addEventListener("resize", handleViewportChange);
+    const panelNode = panelRef.current;
+    const observer = panelNode && typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(handleViewportChange)
+      : null;
+    observer?.observe(panelNode as Element);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      observer?.disconnect();
+    };
+  }, [clampFloatingPositionToViewport, draggable, resolvedPosition]);
 
   React.useEffect(() => () => {
     if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current);

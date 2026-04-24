@@ -27,7 +27,7 @@ import { I as Ee } from "./IconButton-BvvMagK1.js";
 import { D as Ne } from "./Dial-C7q_hztm.js";
 import { B as _e } from "./BasicButton-CQkPQMVi.js";
 import { F as je } from "./Folder-B-XHBECm.js";
-import { F as Ue } from "./FloatingPanel-DKAdzTas.js";
+import { F as Ue } from "./FloatingPanel-fh7zaLej.js";
 import { C as ze, a as He, u as Je, e as Qe, d as Xe, b as Ze, c as $e } from "./hooks-KNH81MTH.js";
 export {
   L as AnimationSuspensionProvider,

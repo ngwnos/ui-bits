@@ -18,6 +18,7 @@ import { flexoki } from "../../flexoki";
 import { usePanelTheme } from "../../panelGap";
 import IconButton from "../IconButton";
 import LFOSlider from "../LFOSlider";
+import SegmentBar from "../SegmentBar";
 import AudioFFTWindow from "./AudioFFTWindow";
 
 export type AudioControlsBorder = 'a' | 'b' | 'none';
@@ -104,6 +105,10 @@ const MAX_ENVELOPE_MS = 500;
 const DEFAULT_ATTACK_MS = 20;
 const DEFAULT_RELEASE_MS = 80;
 const PEAK_DECAY_DT_SEC = 1 / 60;
+const BIN_INTERPOLATION_OPTIONS = [
+  { value: "discrete", label: "Step" },
+  { value: "interpolated", label: "Interp" },
+];
 const roundUnit = (value: number) => Math.round(clamp01(value) * 10) / 10;
 const roundSigma = (value: number) => Math.round(clampBetween(value, 0, 3) * 10) / 10;
 const roundMs = (value: number) => Math.round(clampBetween(value, 0, MAX_ENVELOPE_MS) / ENVELOPE_STEP_MS) * ENVELOPE_STEP_MS;
@@ -291,7 +296,7 @@ export default function AudioControls({
     onFftBlurSigmaChange,
     resolveControlId("fftBlurSigma"),
   );
-  const [binInterpolationValue] = useControllableState(
+  const [binInterpolationValue, setBinInterpolationValue] = useControllableState(
     binInterpolation,
     normalizeBinInterpolation(defaultBinInterpolation, "discrete"),
     onBinInterpolationChange,
@@ -475,7 +480,7 @@ export default function AudioControls({
               colorB={safeB}
             />
           </div>
-          <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: CONTROL_GAP_PX }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: CONTROL_GAP_PX }}>
             <div ref={sliderMeasureRef} style={{ display: 'flex', minWidth: 0 }}>
               <LFOSlider
                 label="Bins"
@@ -500,6 +505,24 @@ export default function AudioControls({
                 style={{ gap: 0 }}
               />
             </div>
+            <SegmentBar
+              ariaLabel="Bin interpolation"
+              showLabel={false}
+              options={BIN_INTERPOLATION_OPTIONS}
+              value={resolvedBinInterpolation}
+              onChange={(nextValue) => {
+                setBinInterpolationValue(normalizeBinInterpolation(
+                  nextValue as AudioControlsBinInterpolation,
+                  "discrete",
+                ));
+              }}
+              colorA={safeA}
+              colorB={safeB}
+              borderStyle="a"
+              borderMask={{ top: false, bottom: false, right: true, left: true }}
+              fontSize={resolvedFontSize}
+              style={{ gap: 0, minWidth: 0 }}
+            />
             <LFOSlider
               label="Min"
               variant="basic"

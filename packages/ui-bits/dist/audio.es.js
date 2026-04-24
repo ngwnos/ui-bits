@@ -28,7 +28,7 @@ import { D as Ne } from "./Dial-C7q_hztm.js";
 import { B as _e } from "./BasicButton-CQkPQMVi.js";
 import { F as je } from "./Folder-B-XHBECm.js";
 import { F as Ue } from "./FloatingPanel-fh7zaLej.js";
-import { A as ze, a as He } from "./AudioControls-Bcjr-qzb.js";
+import { A as ze, a as He } from "./AudioControls-BhDnAmM9.js";
 import { V as Qe } from "./VirtualKeyboard-C3lGocCp.js";
 import { C as Ze, a as $e, u as eo, e as oo, d as ro, b as so, c as ao } from "./hooks-KNH81MTH.js";
 export {

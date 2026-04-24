@@ -1,4 +1,4 @@
-import { C as f } from "../ColorPicker-D6KNi5pW.js";
+import { C as f } from "../ColorPicker-MnwzfDC5.js";
 export {
   f as default
 };

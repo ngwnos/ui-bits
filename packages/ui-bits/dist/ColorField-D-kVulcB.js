@@ -4,7 +4,7 @@ import { createPortal as Ue } from "react-dom";
 import { u as Ve } from "./panelGap-DjV8XIAA.js";
 import { w as F } from "./warnOnceDev-BPubHnZA.js";
 import { C as de } from "./ColorFieldPicker-DAQDqStX.js";
-import { C as Oe } from "./ColorPicker-D6KNi5pW.js";
+import { C as Oe } from "./ColorPicker-MnwzfDC5.js";
 import { L as ue } from "./LFOSlider-Cv0xjz_G.js";
 import { b as fe, d as he } from "./hooks-KNH81MTH.js";
 const We = "var(--ui-bits-color-a, #2f2f2f)", je = "var(--ui-bits-color-b, #f0f0f0)", J = "#ffffff", ve = 255, Ke = 1, Ge = 0.35, Ye = 1, qe = 6;
@@ -67,9 +67,9 @@ const Ze = n.forwardRef((o, t) => {
     ariaLabel: ye,
     controlId: Fe,
     className: $e,
-    style: Re,
-    ...ke
-  } = o, $ = Ve(), R = u.trim(), f = ye ?? R, A = fe(Fe, f), s = A ?? (R || "unlabeled"), [T, k] = he(A), S = A !== void 0 && r === void 0, b = S ? T : r, _ = b !== void 0, P = fe(
+    style: ke,
+    ...Re
+  } = o, $ = Ve(), k = u.trim(), f = ye ?? k, A = fe(Fe, f), s = A ?? (k || "unlabeled"), [T, R] = he(A), S = A !== void 0 && r === void 0, b = S ? T : r, _ = b !== void 0, P = fe(
     ge,
     f ? `${f} alpha` : void 0
   ), [N, z] = he(P), L = P !== void 0 && v === void 0, ee = L ? N : v, U = ee !== void 0, V = x(l), a = Le ?? $?.fontSize ?? 12, E = we ?? $?.colorA ?? We, I = xe ?? $?.colorB ?? je, y = Ae ?? $?.borderStyle ?? "a", i = Se === "popup", Pe = Je(Ie), O = Math.max(1, Math.round(Ee ?? qe)), h = V ?? J, [ze, De] = n.useState(h), W = b === void 0 ? void 0 : x(b), p = _ ? W ?? h : ze, He = be(Ce(p) ?? 0), [Me, Be] = n.useState(() => Q(X)), D = Q(
@@ -96,13 +96,13 @@ const Ze = n.forwardRef((o, t) => {
       `[ui-bits] ColorField expected \`value\` to be a hex color (#rgb or #rrggbb). Received "${b}". Falling back to ${h}.`
     );
   }, [h, W, b, s]), n.useEffect(() => {
-    !S || T !== void 0 || k(p);
-  }, [p, k, S, T]), n.useEffect(() => {
+    !S || T !== void 0 || R(p);
+  }, [p, R, S, T]), n.useEffect(() => {
     !L || N !== void 0 || z(D);
   }, [D, z, L, N]);
   const j = n.useCallback((e) => {
-    _ || De(e), S && k(e), c?.(e);
-  }, [_, c, k, S]), Te = n.useCallback((e) => {
+    _ || De(e), S && R(e), c?.(e);
+  }, [_, c, R, S]), Te = n.useCallback((e) => {
     U || Be(e), L && z(e), Z?.(e);
   }, [U, Z, z, L]), K = n.useCallback((e) => {
     const d = x(e);
@@ -160,9 +160,9 @@ const Ze = n.forwardRef((o, t) => {
         gap: i ? 0 : oe,
         position: "relative",
         overflow: "visible",
-        ...Re ?? {}
+        ...ke ?? {}
       },
-      ...ke,
+      ...Re,
       children: [
         /* @__PURE__ */ ce("div", { style: { display: "flex", alignItems: "center", gap: oe }, children: [
           /* @__PURE__ */ w(
@@ -170,6 +170,7 @@ const Ze = n.forwardRef((o, t) => {
             {
               value: p,
               onChange: K,
+              nativePicker: !1,
               colorA: E,
               colorB: I,
               borderStyle: y,
@@ -185,9 +186,9 @@ const Ze = n.forwardRef((o, t) => {
           /* @__PURE__ */ w(
             ue,
             {
-              label: R,
+              label: k,
               ariaLabel: f ? `${f} hex` : "Hex color value",
-              showLabel: R.length > 0,
+              showLabel: k.length > 0,
               variant: "full",
               min: 0,
               max: 16777215,
@@ -278,4 +279,4 @@ Ze.displayName = "ColorField";
 export {
   Ze as C
 };
-//# sourceMappingURL=ColorField-C-S0SuRr.js.map
+//# sourceMappingURL=ColorField-D-kVulcB.js.map

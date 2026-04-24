@@ -5,6 +5,7 @@ export interface ColorPickerProps extends Omit<React.ButtonHTMLAttributes<HTMLBu
     value?: string;
     defaultValue?: string;
     onChange?: (value: string) => void;
+    nativePicker?: boolean;
     colorA?: string;
     colorB?: string;
     borderStyle?: ColorPickerBorderStyle;

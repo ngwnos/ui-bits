@@ -10,6 +10,7 @@ export interface ColorPickerProps
   value?: string;
   defaultValue?: string;
   onChange?: (value: string) => void;
+  nativePicker?: boolean;
   colorA?: string;
   colorB?: string;
   borderStyle?: ColorPickerBorderStyle;
@@ -47,6 +48,7 @@ const ColorPicker = React.forwardRef<HTMLButtonElement, ColorPickerProps>((props
     value,
     defaultValue = DEFAULT_COLOR,
     onChange,
+    nativePicker = true,
     colorA,
     colorB,
     borderStyle,
@@ -68,6 +70,7 @@ const ColorPicker = React.forwardRef<HTMLButtonElement, ColorPickerProps>((props
   const [storeValue, setStoreValue] = useControlValue<string>(resolvedControlId);
   const shouldUseStore = resolvedControlId !== undefined && value === undefined;
   const resolvedValueProp = shouldUseStore ? storeValue : value;
+  const isControlled = resolvedValueProp !== undefined;
   const baseColorA = colorA ?? panelTheme?.colorA ?? FALLBACK_COLOR_A;
   const baseColorB = colorB ?? panelTheme?.colorB ?? FALLBACK_COLOR_B;
   const resolvedBorderStyle = borderStyle ?? panelTheme?.borderStyle ?? "none";
@@ -86,61 +89,95 @@ const ColorPicker = React.forwardRef<HTMLButtonElement, ColorPickerProps>((props
   const resolvedSize = computeButtonSize(resolvedFontSize);
   const resolvedRadius = Math.max(2, Math.round(resolvedFontSize * 0.25));
   const padding = Math.max(1, Math.round(resolvedFontSize * 0.1));
-  const resolvedValue = resolvedValueProp ?? defaultValue;
+  const normalizedDefaultValue = normalizeHex(defaultValue) ?? DEFAULT_COLOR;
+  const [internalValue, setInternalValue] = React.useState(normalizedDefaultValue);
+  const resolvedValue = isControlled ? resolvedValueProp ?? normalizedDefaultValue : internalValue;
   const normalizedValue = normalizeHex(resolvedValue) ?? normalizeHex(defaultValue) ?? DEFAULT_COLOR;
   const maskedBorderColor = normalizedValue;
-  void onChange;
-  void onChange;
+  const nativeInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
     if (!shouldUseStore || storeValue !== undefined) return;
     setStoreValue(normalizedValue);
   }, [normalizedValue, setStoreValue, shouldUseStore, storeValue]);
 
+  const commitValue = React.useCallback((nextValue: string) => {
+    const normalized = normalizeHex(nextValue);
+    if (!normalized) return;
+    if (!isControlled) {
+      setInternalValue(normalized);
+    }
+    if (shouldUseStore) {
+      setStoreValue(normalized);
+    }
+    onChange?.(normalized);
+  }, [isControlled, onChange, setStoreValue, shouldUseStore]);
+
   const handleButtonClick: React.MouseEventHandler<HTMLButtonElement> = (event) => {
     onClick?.(event);
+    if (event.defaultPrevented || disabled || !nativePicker) return;
+    nativeInputRef.current?.click();
   };
 
   const handleButtonKeyDown: React.KeyboardEventHandler<HTMLButtonElement> = (event) => {
-    if (event.key === " " || event.key === "Enter") {
-      event.preventDefault();
-    }
     onKeyDown?.(event);
   };
 
   return (
-    <button
-      ref={ref}
-      type={type ?? "button"}
-      className={className}
-      disabled={disabled}
-      onClick={handleButtonClick}
-      onKeyDown={handleButtonKeyDown}
-      title={title}
-      style={{
-        width: resolvedSize,
-        height: resolvedSize,
-        borderRadius: resolvedRadius,
-        borderStyle: "solid",
-        borderWidth: 1,
-        borderColor: resolvedBorderColor,
-        borderTopColor: resolvedBorderMask.top ? resolvedBorderColor : maskedBorderColor,
-        borderRightColor: resolvedBorderMask.right ? resolvedBorderColor : maskedBorderColor,
-        borderBottomColor: resolvedBorderMask.bottom ? resolvedBorderColor : maskedBorderColor,
-        borderLeftColor: resolvedBorderMask.left ? resolvedBorderColor : maskedBorderColor,
-        boxSizing: "border-box",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding,
-        backgroundClip: "padding-box",
-        background: normalizedValue,
-        cursor: disabled ? "not-allowed" : "pointer",
-        ...(disabled ? { opacity: 0.5 } : null),
-        ...(style ?? {}),
-      } as React.CSSProperties}
-      {...rest}
-    />
+    <>
+      <button
+        ref={ref}
+        type={type ?? "button"}
+        className={className}
+        disabled={disabled}
+        onClick={handleButtonClick}
+        onKeyDown={handleButtonKeyDown}
+        title={title}
+        style={{
+          width: resolvedSize,
+          height: resolvedSize,
+          borderRadius: resolvedRadius,
+          borderStyle: "solid",
+          borderWidth: 1,
+          borderColor: resolvedBorderColor,
+          borderTopColor: resolvedBorderMask.top ? resolvedBorderColor : maskedBorderColor,
+          borderRightColor: resolvedBorderMask.right ? resolvedBorderColor : maskedBorderColor,
+          borderBottomColor: resolvedBorderMask.bottom ? resolvedBorderColor : maskedBorderColor,
+          borderLeftColor: resolvedBorderMask.left ? resolvedBorderColor : maskedBorderColor,
+          boxSizing: "border-box",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding,
+          backgroundClip: "padding-box",
+          background: normalizedValue,
+          cursor: disabled ? "not-allowed" : nativePicker ? "pointer" : "default",
+          ...(disabled ? { opacity: 0.5 } : null),
+          ...(style ?? {}),
+        } as React.CSSProperties}
+        {...rest}
+      />
+      {nativePicker ? (
+        <input
+          ref={nativeInputRef}
+          type="color"
+          value={normalizedValue}
+          tabIndex={-1}
+          aria-hidden="true"
+          disabled={disabled}
+          onChange={(event) => commitValue(event.currentTarget.value)}
+          style={{
+            position: "fixed",
+            left: 0,
+            top: 0,
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: "none",
+          }}
+        />
+      ) : null}
+    </>
   );
 });
 

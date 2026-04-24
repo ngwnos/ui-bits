@@ -374,6 +374,7 @@ const ColorField = React.forwardRef<HTMLDivElement, ColorFieldProps>((props, ref
         <ColorPicker
           value={resolvedValue}
           onChange={handlePickerChange}
+          nativePicker={false}
           colorA={resolvedColorA}
           colorB={resolvedColorB}
           borderStyle={resolvedBorderStyle}

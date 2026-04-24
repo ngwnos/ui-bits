@@ -170,7 +170,8 @@
   "scripts": {
     "build": "bun run build:lib",
     "build:lib": "vite build && tsc -p tsconfig.lib.json",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "bun test"
   },
   "peerDependencies": {
     "lucide-react": "^0.562.0",

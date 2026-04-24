@@ -17,6 +17,19 @@ import {
 } from "../../gradients/matplotlib";
 import IconButton from "../IconButton";
 import SelectionGridWorker from "./selectionGrid.worker?worker&inline";
+import {
+  CELL_CORNER_RADIUS_PX,
+  FALLBACK_COLOR_A,
+  FALLBACK_COLOR_B,
+  MAX_TILE_INFLIGHT,
+  buildRoundedRectPath,
+  computeAtlasColumns,
+  createAtlasCanvas,
+  resolveWorkerUrl,
+  type AtlasLayout,
+  type CachedTile,
+  type CornerRadii,
+} from "./selectionGridCanvas";
 import "./selectionGrid.css";
 
 export type TerrainTileAsset = {
@@ -49,85 +62,6 @@ type GradientVisual = {
     cssFallback: string;
   };
 };
-
-const CELL_CORNER_RADIUS_PX = 3;
-const FALLBACK_COLOR_A = "var(--ui-bits-color-a, #2f2f2f)";
-const FALLBACK_COLOR_B = "var(--ui-bits-color-b, #f0f0f0)";
-const MAX_ATLAS_DIMENSION = 4096;
-const MAX_TILE_INFLIGHT = 6;
-
-type CachedTile = {
-  status: "loading" | "ready" | "error";
-  bitmap?: ImageBitmap;
-};
-
-type AtlasLayout = {
-  key: string;
-  columns: number;
-  rows: number;
-  tileSize: number;
-};
-
-type CornerRadii = {
-  tl: number;
-  tr: number;
-  br: number;
-  bl: number;
-};
-
-function resolveWorkerUrl(src: string) {
-  if (typeof window === "undefined") return src;
-  try {
-    return new URL(src, window.location.href).href;
-  } catch {
-    return src;
-  }
-}
-
-function computeAtlasColumns(count: number, size: number) {
-  const safeSize = Math.max(1, Math.floor(size));
-  const maxColumns = Math.max(1, Math.floor(MAX_ATLAS_DIMENSION / safeSize));
-  const maxRows = Math.max(1, Math.floor(MAX_ATLAS_DIMENSION / safeSize));
-  if (count <= 0) return 1;
-  return Math.min(maxColumns, Math.max(1, Math.ceil(count / maxRows)));
-}
-
-function createAtlasCanvas(width: number, height: number) {
-  if (typeof document === "undefined") return null;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
-}
-
-function buildRoundedRectPath(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  radii: CornerRadii,
-) {
-  const maxRadius = size / 2;
-  const tl = Math.min(maxRadius, Math.max(0, radii.tl));
-  const tr = Math.min(maxRadius, Math.max(0, radii.tr));
-  const br = Math.min(maxRadius, Math.max(0, radii.br));
-  const bl = Math.min(maxRadius, Math.max(0, radii.bl));
-  ctx.beginPath();
-  ctx.moveTo(x + tl, y);
-  ctx.lineTo(x + size - tr, y);
-  if (tr > 0) ctx.quadraticCurveTo(x + size, y, x + size, y + tr);
-  else ctx.lineTo(x + size, y);
-  ctx.lineTo(x + size, y + size - br);
-  if (br > 0) ctx.quadraticCurveTo(x + size, y + size, x + size - br, y + size);
-  else ctx.lineTo(x + size, y + size);
-  ctx.lineTo(x + bl, y + size);
-  if (bl > 0) ctx.quadraticCurveTo(x, y + size, x, y + size - bl);
-  else ctx.lineTo(x, y + size);
-  ctx.lineTo(x, y + tl);
-  if (tl > 0) ctx.quadraticCurveTo(x, y, x + tl, y);
-  else ctx.lineTo(x, y);
-  ctx.closePath();
-}
 
 function createSelectionGridWorker() {
   return new SelectionGridWorker();

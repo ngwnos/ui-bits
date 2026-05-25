@@ -1,4 +1,4 @@
-import { F as f } from "../FloatingPanel-fh7zaLej.js";
+import { F as f } from "../FloatingPanel-EMOgiXlc.js";
 export {
   f as default
 };

@@ -38,6 +38,7 @@ export interface FloatingPanelProps extends Omit<React.HTMLAttributes<HTMLDivEle
   onPositionChange?: (position: { x: number; y: number }) => void;
   defaultPosition?: { x: number; y: number };
   constrainBodyToViewport?: boolean;
+  viewportMargin?: number;
   onCollapseChange?: (collapsed: boolean) => void;
   width?: number | string;
   padding?: number | string;
@@ -118,6 +119,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     onPositionChange,
     defaultPosition,
     constrainBodyToViewport = true,
+    viewportMargin,
     onCollapseChange,
     width,
     padding,
@@ -145,6 +147,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const [dragPosition, setDragPosition] = React.useState<{ x: number; y: number } | null>(() => (
     defaultPosition ? { x: defaultPosition.x, y: defaultPosition.y } : null
   ));
+  const resolvedViewportMargin = Math.max(0, viewportMargin ?? 6);
   const defaultPositionX = defaultPosition?.x;
   const defaultPositionY = defaultPosition?.y;
   const positionX = position?.x;
@@ -163,13 +166,13 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     const rect = panelNode?.getBoundingClientRect();
     const maxX = rect ? Math.max(0, window.innerWidth - rect.width) : window.innerWidth;
     // Allow panel to be positioned lower - body will scroll when needed
-    const minVisibleHeight = computeHeaderHeight(fontSize ?? 12) + 6;
+    const minVisibleHeight = computeHeaderHeight(fontSize ?? 12) + resolvedViewportMargin;
     const maxY = Math.max(0, window.innerHeight - minVisibleHeight);
     setDragPosition({
       x: clampBetween(defaultPositionX, 0, maxX),
       y: clampBetween(defaultPositionY, 0, maxY),
     });
-  }, [defaultPositionX, defaultPositionY, fontSize, positionX, positionY]);
+  }, [defaultPositionX, defaultPositionY, fontSize, positionX, positionY, resolvedViewportMargin]);
   const resolvedFontSize = fontSize ?? 12;
   const isCollapsedControlled = collapsed !== undefined;
   const [internalCollapsed, setInternalCollapsed] = React.useState(defaultCollapsed);
@@ -192,6 +195,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const resolvedVerticalGap = useVerticalGap(verticalGap);
   const verticalGapValue = `${resolvedVerticalGap}px`;
   const headerMinHeight = computeHeaderHeight(resolvedFontSize);
+  const [viewportChromeHeight, setViewportChromeHeight] = React.useState(headerMinHeight);
   const headerBorderWidth = resolvedBorderWidth;
   const isBodyOpacityControlled = bodyOpacity !== undefined;
   const [internalBodyOpacity, setInternalBodyOpacity] = React.useState(() => (
@@ -372,25 +376,39 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
   const resolvedPosition = position ?? dragPosition;
   const isFloating = Boolean(draggable && resolvedPosition);
   const shouldClampBodyToViewport = constrainBodyToViewport;
-  const bottomMargin = 6;
   const effectivePanelTop = isFloating && resolvedPosition ? resolvedPosition.y : panelViewportTop;
+  const viewportChromeHeightForClamp = Math.max(headerMinHeight, viewportChromeHeight);
   const dynamicBodyMaxHeight = shouldClampBodyToViewport && effectivePanelTop !== null && typeof window !== "undefined"
-    ? Math.max(0, window.innerHeight - effectivePanelTop - headerMinHeight - bottomMargin)
+    ? Math.max(0, window.innerHeight - effectivePanelTop - viewportChromeHeightForClamp - resolvedViewportMargin)
     : undefined;
 
   const updatePanelViewportTop = React.useCallback(() => {
     if (typeof window === "undefined") return;
+    const panelNode = panelRef.current;
+    const panelRect = panelNode?.getBoundingClientRect();
+
     if (isFloating && resolvedPosition) {
       setPanelViewportTop(resolvedPosition.y);
+    } else if (panelRect) {
+      setPanelViewportTop((prev) => (
+        prev !== null && Math.abs(prev - panelRect.top) < 0.5 ? prev : panelRect.top
+      ));
+    }
+
+    const bodyNode = bodyRef.current;
+    if (!panelNode || !bodyNode || !panelRect) {
+      setViewportChromeHeight((prev) => (
+        Math.abs(prev - headerMinHeight) < 0.5 ? prev : headerMinHeight
+      ));
       return;
     }
-    const panelNode = panelRef.current;
-    if (!panelNode) return;
-    const rect = panelNode.getBoundingClientRect();
-    setPanelViewportTop((prev) => (
-      prev !== null && Math.abs(prev - rect.top) < 0.5 ? prev : rect.top
+
+    const bodyRect = bodyNode.getBoundingClientRect();
+    const nextChromeHeight = Math.max(headerMinHeight, panelRect.height - bodyRect.height);
+    setViewportChromeHeight((prev) => (
+      Math.abs(prev - nextChromeHeight) < 0.5 ? prev : nextChromeHeight
     ));
-  }, [isFloating, resolvedPosition]);
+  }, [headerMinHeight, isFloating, resolvedPosition]);
 
   const clampFloatingPositionToViewport = React.useCallback(() => {
     if (!draggable || !resolvedPosition || typeof window === "undefined") return;
@@ -399,7 +417,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     const rect = panelNode?.getBoundingClientRect();
     const width = rect?.width ?? 0;
     const maxX = Math.max(0, window.innerWidth - width);
-    const maxY = Math.max(0, window.innerHeight - headerMinHeight - 6);
+    const maxY = Math.max(0, window.innerHeight - headerMinHeight - resolvedViewportMargin);
     const nextPosition = {
       x: clampBetween(resolvedPosition.x, 0, maxX),
       y: clampBetween(resolvedPosition.y, 0, maxY),
@@ -415,7 +433,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     } else {
       setDragPosition(nextPosition);
     }
-  }, [draggable, headerMinHeight, onPositionChange, position, resolvedPosition]);
+  }, [draggable, headerMinHeight, onPositionChange, position, resolvedPosition, resolvedViewportMargin]);
 
   const updateScrollMetrics = React.useCallback(() => {
     const node = bodyRef.current;
@@ -539,7 +557,7 @@ const FloatingPanel = React.forwardRef<HTMLDivElement, FloatingPanelProps>((prop
     const width = rect?.width ?? 0;
     const maxX = Math.max(0, window.innerWidth - width);
     // Allow panel to move lower - only require header to stay visible
-    const maxY = Math.max(0, window.innerHeight - headerMinHeight - 6);
+    const maxY = Math.max(0, window.innerHeight - headerMinHeight - resolvedViewportMargin);
     const nextX = clampBetween(event.clientX - offset.x, 0, maxX);
     const nextY = clampBetween(event.clientY - offset.y, 0, maxY);
     const nextPosition = { x: nextX, y: nextY };

@@ -1,4 +1,4 @@
-import { G as r, S as t } from "../SelectionGridGradient-CtSFvGfu.js";
+import { G as r, S as t } from "../SelectionGridGradient-BgugjwNm.js";
 export {
   r as GradientSelectionGrid,
   t as default

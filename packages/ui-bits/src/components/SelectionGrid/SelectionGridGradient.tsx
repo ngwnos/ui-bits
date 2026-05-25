@@ -121,13 +121,6 @@ function drawGradientFallback(
   ctx.fillRect(x, y, size, size);
 }
 
-const GRADIENT_BASE_DATA: GradientBase[] = MATPLOTLIB_GRADIENTS.map((definition) => ({
-  name: definition.name,
-  stops: definition.stops,
-  normal: buildPalette(definition.stops, false),
-  inverted: buildPalette(definition.stops, true),
-}));
-
 type SelectionGridBaseProps = {
   layoutGap?: string;
   maxHeightUnits?: number;
@@ -139,6 +132,7 @@ type SelectionGridBaseProps = {
 export type SelectionGridGradientProps = SelectionGridBaseProps & {
   gridId?: SelectionGridId;
   previewDarkMode: boolean;
+  gradients?: GradientDefinition[];
   terrainAssets?: TerrainTileAsset[] | (() => Promise<TerrainTileAsset[]>);
   colorA?: string;
   colorB?: string;
@@ -148,6 +142,7 @@ export type SelectionGridGradientProps = SelectionGridBaseProps & {
 function GradientSelectionGridContent({
   gridId = DEFAULT_SELECTION_GRID_ID,
   previewDarkMode,
+  gradients = MATPLOTLIB_GRADIENTS,
   terrainAssets,
   layoutGap = "6px",
   colorA = FALLBACK_COLOR_A,
@@ -161,6 +156,12 @@ function GradientSelectionGridContent({
 }: SelectionGridGradientProps) {
   const [terrainTiles, setTerrainTiles] = React.useState<TerrainTileAsset[]>([]);
   const [tileAssignments, setTileAssignments] = React.useState<Record<string, TileAssignment>>({});
+  const gradientBaseData = React.useMemo<GradientBase[]>(() => gradients.map((definition) => ({
+    name: definition.name,
+    stops: definition.stops,
+    normal: buildPalette(definition.stops, false),
+    inverted: buildPalette(definition.stops, true),
+  })), [gradients]);
 
   const selectionGridState = useSelectionGridState(gridId);
   const selectionGridActions = useSelectionGridActions();
@@ -210,14 +211,14 @@ function GradientSelectionGridContent({
     const shuffled = shuffle(tiles);
     const pool = shuffled.length > 0 ? shuffled : tiles;
     const assignments: Record<string, TileAssignment> = {};
-    GRADIENT_BASE_DATA.forEach((gradient, index) => {
+    gradientBaseData.forEach((gradient, index) => {
       const tile = pool[index % pool.length];
       assignments[gradient.name] = tile;
     });
     setTileAssignments(assignments);
-  }, [terrainTiles, usesTerrainTiles]);
+  }, [gradientBaseData, terrainTiles, usesTerrainTiles]);
 
-  const gradientVisuals = React.useMemo<GradientVisual[]>(() => GRADIENT_BASE_DATA.map((base) => {
+  const gradientVisuals = React.useMemo<GradientVisual[]>(() => gradientBaseData.map((base) => {
     const assignment = usesTerrainTiles ? tileAssignments[base.name] : undefined;
     const tileUrl = assignment?.url ?? "";
     const tileName = assignment?.name ?? (tileUrl.split("/").pop() ?? tileUrl);
@@ -234,7 +235,7 @@ function GradientSelectionGridContent({
         cssFallback: createGradientCss(base.stops, true),
       },
     };
-  }), [tileAssignments, usesTerrainTiles]);
+  }), [gradientBaseData, tileAssignments, usesTerrainTiles]);
 
   const gridCellCount = gradientVisuals.length;
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
@@ -488,7 +489,7 @@ function GradientSelectionGridContent({
     const tileKeys: string[] = new Array(gridCellCount);
     const activeTileKeys = new Set<string>();
     for (let index = 0; index < gridCellCount; index += 1) {
-      const base = GRADIENT_BASE_DATA[index];
+      const base = gradientBaseData[index];
       const visual = gradientVisuals[index];
       const palette = invertGradients ? base.inverted.data : base.normal.data;
       const tileUrl = renderMode === "height" && usesTerrainTiles && visual.tileUrl
@@ -547,7 +548,7 @@ function GradientSelectionGridContent({
       for (let col = 0; col < rowCellCount; col += 1) {
         const index = rowBaseIndex + col;
         if (index >= gridCellCount) break;
-        const base = GRADIENT_BASE_DATA[index];
+        const base = gradientBaseData[index];
         const isSelected = selectedIndex === index;
         const hasTopNeighbor = index - rowCapacity >= 0;
         const hasBottomNeighbor = index + rowCapacity < gridCellCount;
@@ -679,7 +680,7 @@ function GradientSelectionGridContent({
     title: PREVIEW_MODE_TITLE[mode],
   }));
 
-  const activeGradient = selectedIndex != null ? MATPLOTLIB_GRADIENTS[selectedIndex] : null;
+  const activeGradient = selectedIndex != null ? gradients[selectedIndex] : null;
   const previewGradient = activeGradient ? createGradientCss(activeGradient.stops, invertGradients) : "transparent";
   const previewLabelBase = activeGradient ? activeGradient.name : "None";
   const previewLabel =

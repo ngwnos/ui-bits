@@ -1,5 +1,6 @@
 import React from "react";
 import { type SelectionGridId } from "../../sliderStore";
+import { type GradientDefinition } from "../../gradients/matplotlib";
 import "./selectionGrid.css";
 export type TerrainTileAsset = {
     name: string;
@@ -16,6 +17,7 @@ type SelectionGridBaseProps = {
 export type SelectionGridGradientProps = SelectionGridBaseProps & {
     gridId?: SelectionGridId;
     previewDarkMode: boolean;
+    gradients?: GradientDefinition[];
     terrainAssets?: TerrainTileAsset[] | (() => Promise<TerrainTileAsset[]>);
     colorA?: string;
     colorB?: string;

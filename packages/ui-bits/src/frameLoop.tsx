@@ -6,6 +6,8 @@ type FrameLoopApi = { subscribe: (fn: FrameSubscriber) => () => void };
 
 const FrameLoopContext = createContext<FrameLoopApi | null>(null);
 
+let lastSubscriberErrorMs = -Infinity;
+
 export const FrameLoopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const subs = useRef(new Set<FrameSubscriber>());
   const api = useMemo<FrameLoopApi>(() => ({
@@ -22,7 +24,17 @@ export const FrameLoopProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const nowSec = nowMs / 1000;
       const dtSec = (nowMs - prev) / 1000;
       prev = nowMs;
-      subs.current.forEach((fn) => fn(nowSec, dtSec));
+      subs.current.forEach((fn) => {
+        try {
+          fn(nowSec, dtSec);
+        } catch (err) {
+          // Throttled: a subscriber throwing every frame would otherwise log at ~60Hz.
+          if (nowMs - lastSubscriberErrorMs >= 1000) {
+            lastSubscriberErrorMs = nowMs;
+            console.error("ui-bits: frame subscriber threw", err);
+          }
+        }
+      });
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

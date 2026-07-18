@@ -9,6 +9,7 @@ export interface AudioFFTWindowProps {
   maxWidth?: number | string;
   maxBins?: number;
   playbackRatio?: number;
+  playbackRatioRef?: React.RefObject<number>;
   showPlaybackIndicator?: boolean;
   onScrubStart?: () => void;
   onScrub?: (ratio: number) => void;
@@ -19,6 +20,7 @@ export interface AudioFFTWindowProps {
   rawFftDataRef?: React.RefObject<Uint8Array | null>;
   rawFrameVersion?: number;
   rawBinCount?: number;
+  rawFftMetaRef?: React.RefObject<{ version: number; binCount: number }>;
   attackMs?: number;
   releaseMs?: number;
   blurSigma?: number;
@@ -447,6 +449,7 @@ export default function AudioFFTWindow({
   maxWidth,
   maxBins = 1024,
   playbackRatio = 0,
+  playbackRatioRef: externalPlaybackRatioRef,
   showPlaybackIndicator = true,
   onScrubStart,
   onScrub,
@@ -457,6 +460,7 @@ export default function AudioFFTWindow({
   rawFftDataRef,
   rawFrameVersion,
   rawBinCount = 0,
+  rawFftMetaRef,
   attackMs = DEFAULT_ATTACK_MS,
   releaseMs = DEFAULT_RELEASE_MS,
   blurSigma = 0,
@@ -486,6 +490,7 @@ export default function AudioFFTWindow({
   const freqMaxRef = React.useRef<number>(Math.max(0, Math.min(1, frequencyMax)));
   const maxBinCountRef = React.useRef<number>(Math.max(1, Math.floor(maxBins)));
   const rawUploadPendingRef = React.useRef<boolean>(false);
+  const lastRawVersionRef = React.useRef<number | null>(null);
   const lastTimestampRef = React.useRef<number>(typeof performance !== "undefined" ? performance.now() : Date.now());
   const uniformArrayRef = React.useRef<Float32Array>(new Float32Array(UNIFORM_FLOAT_COUNT));
   const resourcesRef = React.useRef<FftGpuResources | null>(null);
@@ -714,8 +719,23 @@ export default function AudioFFTWindow({
         const effectiveBinCount = Math.max(1, maxBinCountRef.current);
         const binStep = effectiveBinCount > 1 ? 1 / (effectiveBinCount - 1) : 1;
 
+        if (externalPlaybackRatioRef) {
+          playbackRatioRef.current = Math.max(0, Math.min(1, externalPlaybackRatioRef.current ?? 0));
+        }
+        const rawMeta = rawFftMetaRef?.current;
+        if (rawMeta) {
+          if (rawMeta.version !== lastRawVersionRef.current) {
+            lastRawVersionRef.current = rawMeta.version;
+            rawUploadPendingRef.current = true;
+          }
+          if (rawMeta.binCount > currentResources.rawCapacity) {
+            const nextRawCount = rawMeta.binCount;
+            setRawCapacity((prev) => (nextRawCount > prev ? Math.max(nextRawCount, prev) : prev));
+          }
+        }
+
         const uniformArray = uniformArrayRef.current;
-        const uniformRawCount = Math.max(1, rawBinCount || 0);
+        const uniformRawCount = Math.max(1, (rawMeta ? rawMeta.binCount : rawBinCount) || 0);
         uniformArray[0] = effectiveBinCount;
         uniformArray[1] = showPlaybackIndicator ? playbackRatioRef.current : -1;
         uniformArray[2] = blurSigmaRef.current;
@@ -819,7 +839,7 @@ export default function AudioFFTWindow({
       disposeResources(resourcesRef.current);
       resourcesRef.current = null;
     };
-  }, [supportsWebGPU, size.width, size.height, binCapacity, rawCapacity, rawFftDataRef, rawBinCount, showPlaybackIndicator]);
+  }, [supportsWebGPU, size.width, size.height, binCapacity, rawCapacity, rawFftDataRef, rawFftMetaRef, rawBinCount, externalPlaybackRatioRef, showPlaybackIndicator]);
 
   const resolvedMaxWidth = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth ?? "100%";
   const widthPx = Math.round(size.width);

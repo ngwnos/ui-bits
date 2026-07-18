@@ -1126,7 +1126,7 @@ function SliderCore({
     const stepValue = step > 0 && Number.isFinite(step) ? step : 1;
     const target = numeric + stepValue * dir;
     const clamped = clamp(target, min, max);
-    const snapped = snapToStep(clamped, min, step);
+    const snapped = snapToStep(clamped, min, step, max);
     const raw = snapped.toFixed(precision);
     const formatted = formatEditingText(snapped, 'value');
     const pos = formatted.length;
@@ -1143,17 +1143,18 @@ function SliderCore({
     emitUserChange(snapped);
     editingRef.current = true;
   };
-  const applyWaveValue = useCallback((value: number, nowSec?: number, forceTextSync: boolean = false) => {
+  const applyWaveValue = useCallback((value: number, nowSec?: number, forceTextSync: boolean | 'auto' = false) => {
     const lower = drawerValueMin;
     const upper = drawerValueMax;
     if (!Number.isFinite(lower) || !Number.isFinite(upper)) return;
     if (upper < lower) return;
     const clamped = clamp(value, lower, upper);
-    const snapped = snapToStep(clamped, min, step);
+    const snapped = snapToStep(clamped, min, step, max);
     const rawText = snapped.toFixed(precision);
     const formatted = formatEditingText(snapped, 'value');
     const caretPos = formatted.length;
-    const shouldSyncText = focused || editingRef.current || forceTextSync;
+    const shouldSyncText = focused || editingRef.current || forceTextSync === true
+      || (forceTextSync === 'auto' && textRef.current !== formatted);
     reflectValueToDom(snapped, rawText);
     if (shouldSyncText) {
       if (textRef.current !== formatted) {
@@ -1203,7 +1204,7 @@ function SliderCore({
     if (!hasExternalValue) return;
     if (draggingSplitRef.current || editingRef.current) return;
     const numeric = clamp(resolvedValueProp, min, max);
-    const snapped = snapToStep(numeric, min, step);
+    const snapped = snapToStep(numeric, min, step, max);
     const ratio = splitFromValue(snapped, min, max);
     const rawText = snapped.toFixed(precision);
     const formatted = formatEditingText(snapped, 'value');
@@ -1261,6 +1262,10 @@ function SliderCore({
       }
     }
     if (nextVal === undefined) return;
+    if (activeMode === 'external') {
+      applyWaveValue(nextVal, nowSec, 'auto');
+      return;
+    }
     applyWaveValue(nextVal, nowSec, activeMode === 'lfo' && lfoEnabled);
   }, [
     activeWaveform,
@@ -1323,14 +1328,6 @@ function SliderCore({
       resolvedLfoFrequencyMax,
     ));
   }, [lfoSettings.frequency, resolvedLfoFrequencyMax, resolvedLfoFrequencyMin, storedFrequencyValue]);
-
-  useEffect(() => {
-    if (!isAudioWaveform) return;
-    setKnobFrequency((prev) => {
-      const clamped = clamp(prev, resolvedAudioFrequencyMin, resolvedAudioFrequencyMax);
-      return Math.abs(prev - clamped) < 1e-6 ? prev : clamped;
-    });
-  }, [isAudioWaveform, resolvedAudioFrequencyMax, resolvedAudioFrequencyMin]);
 
   useEffect(() => {
     if (storedPhaseValue !== undefined) return;
@@ -1720,7 +1717,7 @@ function SliderCore({
       const parsed = parseTextToValue(textRef.current);
       if (parsed !== null) {
         const clamped = clamp(parsed, min, max);
-        const snapped = snapToStep(clamped, min, step);
+        const snapped = snapToStep(clamped, min, step, max);
         const raw = snapped.toFixed(precision);
         const formatted = formatEditingText(snapped, 'value');
         const ratio = splitFromValue(snapped, min, max);

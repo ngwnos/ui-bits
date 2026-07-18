@@ -236,10 +236,11 @@ export default function AudioControls({
     localStoreRef.current = localStore;
   }
   const resolvedStore = audioAnalysisStore ?? contextStore ?? localStore;
-  const analysisActions = React.useMemo<AudioAnalysisActions>(() => ({
+  const analysisActions = React.useMemo<EngineAnalysisActions>(() => ({
     setAudioBins: resolvedStore.setAudioBins,
     setAudioBinCount: resolvedStore.setAudioBinCount,
     setAudioMaxMagnitude: resolvedStore.setAudioMaxMagnitude,
+    getBinCount: () => resolvedStore.getSnapshot().bins.length,
   }), [resolvedStore]);
   const isBufferSource = source.type === "buffer";
   const resolvedControlPrefix = useResolvedControlIdPrefix(controlIdPrefix, ariaLabel);
@@ -261,7 +262,7 @@ export default function AudioControls({
     onMutedChange,
     resolveControlId("muted"),
   );
-  const [playheadRatio, setPlayheadRatio] = React.useState<number>(0);
+  const playheadRatioRef = React.useRef<number>(0);
   const [isScrubbing, setIsScrubbing] = React.useState<boolean>(false);
   const [seekCommand, setSeekCommand] = React.useState<{ ratio: number; token: number } | null>(null);
   const seekTokenRef = React.useRef<number>(0);
@@ -316,7 +317,7 @@ export default function AudioControls({
     resolveControlId("frequencyMax"),
   );
   const rawFftRef = React.useRef<Uint8Array | null>(null);
-  const [rawFftMeta, setRawFftMeta] = React.useState<{ version: number; binCount: number }>({ version: 0, binCount: 0 });
+  const rawFftMetaRef = React.useRef<{ version: number; binCount: number }>({ version: 0, binCount: 0 });
   const resolvedBinCount = clampBins(binCountValue);
   const smoothingValue = roundUnit(clamp01(smoothingValueRaw));
   const attackMs = roundMs(attackMsRaw);
@@ -405,17 +406,16 @@ export default function AudioControls({
       rawFftRef.current = new Uint8Array(data.length);
     }
     rawFftRef.current.set(data);
-    setRawFftMeta((prev) => ({
-      version: prev.version + 1,
-      binCount: data.length,
-    }));
+    const meta = rawFftMetaRef.current;
+    meta.version += 1;
+    meta.binCount = data.length;
   }, []);
 
   const handleProgress = React.useCallback((ratio: number) => {
     if (!isBufferSource) return;
     const clamped = clamp01(ratio);
     if (!isScrubbing) {
-      setPlayheadRatio(clamped);
+      playheadRatioRef.current = clamped;
     }
   }, [isBufferSource, isScrubbing]);
 
@@ -427,21 +427,21 @@ export default function AudioControls({
   const handleScrubMove = React.useCallback((ratio: number) => {
     if (!isBufferSource) return;
     const clamped = clamp01(ratio);
-    setPlayheadRatio(clamped);
+    playheadRatioRef.current = clamped;
     issueSeek(clamped);
   }, [isBufferSource, issueSeek]);
 
   const handleScrubEnd = React.useCallback((ratio: number) => {
     if (!isBufferSource) return;
     const clamped = clamp01(ratio);
-    setPlayheadRatio(clamped);
+    playheadRatioRef.current = clamped;
     issueSeek(clamped);
     setIsScrubbing(false);
   }, [isBufferSource, issueSeek]);
 
   React.useEffect(() => {
     if (isBufferSource) return;
-    setPlayheadRatio(0);
+    playheadRatioRef.current = 0;
     setIsScrubbing(false);
     setSeekCommand(null);
   }, [isBufferSource]);
@@ -618,7 +618,7 @@ export default function AudioControls({
             maxWidth="100%"
             maxBins={resolvedBinCount}
             peakDecay={peakDecayRate}
-            playbackRatio={isBufferSource ? playheadRatio : 0}
+            playbackRatioRef={playheadRatioRef}
             showPlaybackIndicator={isBufferSource}
             onScrubStart={isBufferSource ? handleScrubStart : undefined}
             onScrub={isBufferSource ? handleScrubMove : undefined}
@@ -626,8 +626,7 @@ export default function AudioControls({
           activeColor={safeA}
           inactiveColor={safeB}
           rawFftDataRef={rawFftRef}
-          rawFrameVersion={rawFftMeta.version}
-          rawBinCount={rawFftMeta.binCount}
+          rawFftMetaRef={rawFftMetaRef}
           attackMs={attackMsClamped}
           releaseMs={releaseMsClamped}
           blurSigma={blurValue}
@@ -761,11 +760,13 @@ export default function AudioControls({
   );
 }
 
+type EngineAnalysisActions = AudioAnalysisActions & { getBinCount: () => number };
+
 interface AudioBufferEngineProps {
   src: string;
   loop?: boolean;
   playing: boolean;
-  analysisActions: AudioAnalysisActions;
+  analysisActions: EngineAnalysisActions;
   seekTarget?: { ratio: number; token: number } | null;
   onProgress?: (ratio: number) => void;
   analyserSmoothing?: number;
@@ -801,7 +802,7 @@ function AudioBufferEngine({
   suspended,
 }: AudioBufferEngineProps) {
   const isSuspended = useAnimationSuspended(suspended);
-  const { setAudioBins, setAudioBinCount, setAudioMaxMagnitude } = analysisActions;
+  const { setAudioBins, setAudioBinCount, setAudioMaxMagnitude, getBinCount } = analysisActions;
   const audioContextRef = React.useRef<AudioContext | null>(null);
   const analyserRef = React.useRef<AnalyserNode | null>(null);
   const bufferRef = React.useRef<Uint8Array<ArrayBuffer> | null>(null);
@@ -819,6 +820,7 @@ function AudioBufferEngine({
   const resampleBufferRef = React.useRef<Float32Array | null>(null);
   const gaussianKernelCacheRef = React.useRef<Map<number, GaussianKernel>>(new Map());
   const lastBinCountRef = React.useRef<number | null>(null);
+  const clearedRef = React.useRef<boolean>(false);
 
   React.useEffect(() => {
     onProgressRef.current = onProgress;
@@ -927,6 +929,7 @@ function AudioBufferEngine({
       resampleBufferRef.current = null;
       kernelCache.clear();
       lastBinCountRef.current = null;
+      clearedRef.current = false;
     };
   }, [setAudioBinCount, setAudioMaxMagnitude, src, stopSourceImmediate]);
 
@@ -993,6 +996,23 @@ function AudioBufferEngine({
   }, [getDuration, playing, seekTarget, startPlayback, wrapOffset]);
 
   useFrame(isSuspended ? null : (_, dtSec) => {
+    if (!playing) {
+      if (!clearedRef.current) {
+        const length = lastBinCountRef.current ?? getBinCount();
+        if (length > 0) {
+          setAudioBins(new Array(length).fill(0));
+          setAudioBinCount(length);
+        }
+        const data = bufferRef.current;
+        if (data && onRawFftFrame) {
+          data.fill(0);
+          onRawFftFrame(data);
+        }
+        clearedRef.current = true;
+      }
+      return;
+    }
+    clearedRef.current = false;
     const analyser = analyserRef.current;
     const data = bufferRef.current;
     if (analyser && data) {
@@ -1038,7 +1058,7 @@ type AudioLiveSource = Extract<AudioControlsSource, { type: "mediaStream" | "aud
 interface AudioLiveEngineProps {
   source: AudioLiveSource;
   playing: boolean;
-  analysisActions: AudioAnalysisActions;
+  analysisActions: EngineAnalysisActions;
   analyserSmoothing?: number;
   attackMs?: number;
   releaseMs?: number;
@@ -1069,7 +1089,7 @@ function AudioLiveEngine({
   suspended,
 }: AudioLiveEngineProps) {
   const isSuspended = useAnimationSuspended(suspended);
-  const { setAudioBins, setAudioBinCount, setAudioMaxMagnitude } = analysisActions;
+  const { setAudioBins, setAudioBinCount, setAudioMaxMagnitude, getBinCount } = analysisActions;
   const audioContextRef = React.useRef<AudioContext | null>(null);
   const analyserRef = React.useRef<AnalyserNode | null>(null);
   const sourceNodeRef = React.useRef<AudioNode | null>(null);
@@ -1239,10 +1259,15 @@ function AudioLiveEngine({
   useFrame(isSuspended ? null : (_, dtSec) => {
     if (!playing || !connectedRef.current) {
       if (!clearedRef.current) {
-        const length = lastBinCountRef.current ?? 0;
+        const length = lastBinCountRef.current ?? getBinCount();
         if (length > 0) {
           setAudioBins(new Array(length).fill(0));
           setAudioBinCount(length);
+        }
+        const data = bufferRef.current;
+        if (data && onRawFftFrame) {
+          data.fill(0);
+          onRawFftFrame(data);
         }
         clearedRef.current = true;
       }

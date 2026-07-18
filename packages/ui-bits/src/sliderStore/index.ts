@@ -3,12 +3,8 @@ export type {
   SelectionGridId,
   SelectionGridPreviewMode,
   SelectionGridState,
-  SliderDefinition,
-  SliderId,
-  SliderRuntimeState,
   SliderStoreAction,
   SliderStoreState,
-  SliderColumn,
 } from "./state";
 
 export { SliderStoreProvider } from "./provider";
@@ -18,10 +14,4 @@ export {
   useSelectionGridActions,
   useSelectionGridIds,
   useSelectionGridState,
-  useSliderActions,
-  useSliderColumn,
-  useSliderDefinition,
-  useSliderLayout,
-  useSliderState,
-  useSliderStoreState,
 } from "./hooks";

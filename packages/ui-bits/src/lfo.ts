@@ -15,10 +15,10 @@ export function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
 
-export function snapToStep(n: number, min: number, step: number) {
+export function snapToStep(n: number, min: number, step: number, max = Infinity) {
   if (step <= 0 || !isFinite(step)) return n;
   const k = Math.round((n - min) / step);
-  return min + k * step;
+  return clamp(min + k * step, min, max);
 }
 
 export function splitFromValue(value: number, min: number, max: number) {
@@ -28,7 +28,7 @@ export function splitFromValue(value: number, min: number, max: number) {
 
 export function valueFromSplit(split: number, min: number, max: number, step: number) {
   const raw = min + clamp(split, 0, 1) * (max - min);
-  return snapToStep(raw, min, step);
+  return snapToStep(raw, min, step, max);
 }
 
 function evalWaveform(w: Waveform, phase: number): number {

@@ -624,6 +624,7 @@ export default function SelectionGrid<Item>(props: SelectionGridGridProps<Item>)
     atlasEntries,
     visibleEntries,
     resolvedSelectedKey,
+    slotByKey,
     containerWidth,
     cellSizePx,
     colorA,

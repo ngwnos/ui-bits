@@ -11,36 +11,40 @@ bun add github:ngwnos/ui-bits
 ## Quick start
 
 1. Import styles once.
-2. Wrap your UI in `FrameLoopProvider`.
+2. Wrap your UI in `FrameLoopProvider` (animation) and `ControlStoreProvider` (store bindings).
 3. Pick one state mode per control: controlled, store-bound, or uncontrolled.
 
 ```tsx
-import { FrameLoopProvider, LFOSlider, ColorField } from "ui-bits/core";
+import { ControlStoreProvider, FrameLoopProvider, LFOSlider, ColorField } from "ui-bits/core";
 import "ui-bits/style.css";
 
 export default function App() {
   return (
-    <FrameLoopProvider>
-      <LFOSlider
-        label="Wind"
-        min={0}
-        max={2}
-        step={0.01}
-        defaultValue={0.6}
-        controlId="scene.wind"
-      />
+    <ControlStoreProvider>
+      <FrameLoopProvider>
+        <LFOSlider
+          label="Wind"
+          min={0}
+          max={2}
+          step={0.01}
+          defaultValue={0.6}
+          controlId="scene.wind"
+        />
 
-      <ColorField
-        label="Leaf Color"
-        defaultValue="#78a35b"
-        defaultAlpha={255}
-        controlId="scene.leafColor"
-        alphaControlId="scene.leafAlpha"
-      />
-    </FrameLoopProvider>
+        <ColorField
+          label="Leaf Color"
+          defaultValue="#78a35b"
+          defaultAlpha={255}
+          controlId="scene.leafColor"
+          alphaControlId="scene.leafAlpha"
+        />
+      </FrameLoopProvider>
+    </ControlStoreProvider>
   );
 }
 ```
+
+`controlId` requires a control store in the tree: without `ControlStoreProvider` (or `PresetStoreProvider`, which provides one automatically when no store is in scope), `controlId` is silently ignored. Drop `ControlStoreProvider` and `controlId` if you only need controlled or uncontrolled state.
 
 ## State Contract
 
@@ -58,7 +62,7 @@ export default function App() {
 - `ui-bits/audio`: `ui-bits/core` plus `AudioControls` and `VirtualKeyboard`.
 - `ui-bits/terrain`: TIFF height-texture loading utilities.
 - `ui-bits/components/<Name>`: component-level subpath exports.
-- `ui-bits`: full compatibility export.
+- `ui-bits`: compatibility export; re-exports everything from `ui-bits/audio` (terrain stays subpath-only).
 
 The package stylesheet is exported as `ui-bits/style.css`. Sample terrain tiles and docs fonts live in the docs app, not in the package bundle.
 
@@ -71,7 +75,10 @@ bun run lint
 bun run build
 ```
 
-## Docs
+## Documentation
 
-- Integration patterns: `docs/INTEGRATION_PATTERNS.md`
+- Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- State contract: [`docs/STATE-CONTRACT.md`](docs/STATE-CONTRACT.md)
+- Conventions: [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md)
+- Integration patterns: [`docs/INTEGRATION_PATTERNS.md`](docs/INTEGRATION_PATTERNS.md)
 - Docs app setup: `apps/docs/README.md`

@@ -6,6 +6,7 @@ export interface AudioFFTWindowProps {
     maxWidth?: number | string;
     maxBins?: number;
     playbackRatio?: number;
+    playbackRatioRef?: React.RefObject<number>;
     showPlaybackIndicator?: boolean;
     onScrubStart?: () => void;
     onScrub?: (ratio: number) => void;
@@ -16,6 +17,10 @@ export interface AudioFFTWindowProps {
     rawFftDataRef?: React.RefObject<Uint8Array | null>;
     rawFrameVersion?: number;
     rawBinCount?: number;
+    rawFftMetaRef?: React.RefObject<{
+        version: number;
+        binCount: number;
+    }>;
     attackMs?: number;
     releaseMs?: number;
     blurSigma?: number;
@@ -24,4 +29,4 @@ export interface AudioFFTWindowProps {
     frequencyMax?: number;
     suspended?: boolean;
 }
-export default function AudioFFTWindow({ heightUnits, unitSizePx, maxWidth, maxBins, playbackRatio, showPlaybackIndicator, onScrubStart, onScrub, onScrubEnd, activeColor, inactiveColor, peakDecay, rawFftDataRef, rawFrameVersion, rawBinCount, attackMs, releaseMs, blurSigma, discreteBins, frequencyMin, frequencyMax, suspended, }: AudioFFTWindowProps): import("react/jsx-runtime").JSX.Element;
+export default function AudioFFTWindow({ heightUnits, unitSizePx, maxWidth, maxBins, playbackRatio, playbackRatioRef: externalPlaybackRatioRef, showPlaybackIndicator, onScrubStart, onScrub, onScrubEnd, activeColor, inactiveColor, peakDecay, rawFftDataRef, rawFrameVersion, rawBinCount, rawFftMetaRef, attackMs, releaseMs, blurSigma, discreteBins, frequencyMin, frequencyMax, suspended, }: AudioFFTWindowProps): import("react/jsx-runtime").JSX.Element;

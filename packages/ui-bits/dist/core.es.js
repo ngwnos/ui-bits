@@ -1,110 +1,104 @@
 import { C as r, P as s, c as a, s as t } from "./provider-CxPmtZVZ.js";
-import { A as l, L as u, b as n, c as d, a as p, d as S, e as m, f, u as x } from "./LFOSlider-Cv0xjz_G.js";
-import { F as C, u as A } from "./frameLoop-DbiGWmY_.js";
+import { A as l, L as n, b as p, c as u, a as d, d as m, e as f, f as S, u as x } from "./LFOSlider-C8Ho5u8z.js";
+import { F as C, u as P } from "./frameLoop-BrwpA-Gk.js";
 import { u as F } from "./panelGap-DjV8XIAA.js";
-import { A as L, u as D } from "./animationSuspension-BEQdvvQj.js";
-import { c as G, l as T, p as y, s as R, a as g, v as B } from "./lfo-DJ5JkDXn.js";
-import { f as h, a as k } from "./flexoki-DpJ9ZEpp.js";
-import { D as M, G as V, M as E, S as K, a as N, b as O, c as _, d as W, e as j, f as q, g as U, h as Y, i as z, j as H, k as J, u as Q, l as X } from "./SelectionGridGradient-CtSFvGfu.js";
-import { D as $ } from "./Dropdown-CDKlrgRO.js";
-import { I as oe } from "./IconDropdown-up2bKIx5.js";
-import { L as se, u as ae } from "./ListSurface-Bqnlmbhz.js";
-import { L as ie } from "./ListRow-BKWOKtFA.js";
-import { K as ue } from "./KeyValueRows-Czyi24Zz.js";
-import { K as de } from "./KeyValueAccordion-BcnxX8uP.js";
-import { R as Se } from "./RadioList-Cr2SL56l.js";
-import { C as fe } from "./ColorPicker-MnwzfDC5.js";
-import { C as ce } from "./ColorField-D-kVulcB.js";
-import { C as Ae } from "./ColorFieldPicker-DAQDqStX.js";
-import { L as Fe } from "./LoadingBar-Cjvtf3tJ.js";
-import { S as Le } from "./Sequencer-BtYDdnDi.js";
-import { W as ve } from "./WebGpuStatus-Byf9m4hA.js";
-import { S as Te } from "./SegmentBar-DTdbMbCH.js";
-import { P as Re, a as ge, c as Be, u as be } from "./PresetManager-DL60FxGg.js";
-import { N as ke } from "./NameInputRow-DlBQvums.js";
-import { T as Me } from "./TextInput-DYCLlEXP.js";
-import { I as Ee } from "./IconButton-BvvMagK1.js";
-import { D as Ne } from "./Dial-C7q_hztm.js";
-import { B as _e } from "./BasicButton-EcIYDsTq.js";
-import { F as je } from "./Folder-B-XHBECm.js";
-import { F as Ue } from "./FloatingPanel-fh7zaLej.js";
-import { C as ze, a as He, u as Je, e as Qe, d as Xe, b as Ze, c as $e } from "./hooks-KNH81MTH.js";
+import { A as L, u as v } from "./animationSuspension-BEQdvvQj.js";
+import { c as G, l as T, p as y, s as R, a as B, v as b } from "./lfo-oQ46pOIR.js";
+import { f as h, a as w } from "./flexoki-DpJ9ZEpp.js";
+import { D as V, G as k, M as E, S as K, a as N, b as O, c as _, d as W, e as q, f as U, u as Y } from "./SelectionGridGradient-Bn6BiSfX.js";
+import { D as z } from "./Dropdown-CDKlrgRO.js";
+import { I as J } from "./IconDropdown-up2bKIx5.js";
+import { L as X, u as Z } from "./ListSurface-Bqnlmbhz.js";
+import { L as ee } from "./ListRow-BKWOKtFA.js";
+import { K as re } from "./KeyValueRows-Czyi24Zz.js";
+import { K as ae } from "./KeyValueAccordion-BcnxX8uP.js";
+import { R as ie } from "./RadioList-Cr2SL56l.js";
+import { C as ne } from "./ColorPicker-MnwzfDC5.js";
+import { C as ue } from "./ColorField-62LES5_n.js";
+import { C as me } from "./ColorFieldPicker-CkngSmel.js";
+import { L as Se } from "./LoadingBar-BLzEyElp.js";
+import { S as ce } from "./Sequencer-C8rYSnAj.js";
+import { W as Pe } from "./WebGpuStatus-Byf9m4hA.js";
+import { S as Fe } from "./SegmentBar-CwLUWaLy.js";
+import { P as Le, a as ve, c as De, u as Ge } from "./PresetManager-DL60FxGg.js";
+import { N as ye } from "./NameInputRow-DlBQvums.js";
+import { T as Be } from "./TextInput-DYCLlEXP.js";
+import { I as ge } from "./IconButton-BvvMagK1.js";
+import { D as we } from "./Dial-cra7Boek.js";
+import { B as Ve } from "./BasicButton-EcIYDsTq.js";
+import { F as Ee } from "./Folder-B-XHBECm.js";
+import { F as Ne } from "./FloatingPanel-FkRcNvc5.js";
+import { C as _e, a as We, u as qe, e as Ue, d as Ye, b as je, c as ze } from "./hooks-KNH81MTH.js";
 export {
   L as AnimationSuspensionProvider,
   l as AudioAnalysisProvider,
-  _e as BasicButton,
-  ce as ColorField,
-  Ae as ColorFieldPicker,
-  fe as ColorPicker,
-  ze as ControlIdProvider,
+  Ve as BasicButton,
+  ue as ColorField,
+  me as ColorFieldPicker,
+  ne as ColorPicker,
+  _e as ControlIdProvider,
   r as ControlStoreProvider,
-  M as DEFAULT_SELECTION_GRID_ID,
-  Ne as Dial,
-  $ as Dropdown,
-  Ue as FloatingPanel,
-  je as Folder,
+  V as DEFAULT_SELECTION_GRID_ID,
+  we as Dial,
+  z as Dropdown,
+  Ne as FloatingPanel,
+  Ee as Folder,
   C as FrameLoopProvider,
-  V as GradientSelectionGrid,
-  Ee as IconButton,
-  oe as IconDropdown,
-  de as KeyValueAccordion,
-  ue as KeyValueRows,
-  u as LFOSlider,
-  ie as ListRow,
-  se as ListSurface,
-  Fe as LoadingBar,
+  k as GradientSelectionGrid,
+  ge as IconButton,
+  J as IconDropdown,
+  ae as KeyValueAccordion,
+  re as KeyValueRows,
+  n as LFOSlider,
+  ee as ListRow,
+  X as ListSurface,
+  Se as LoadingBar,
   E as MATPLOTLIB_GRADIENTS,
-  ke as NameInputRow,
-  Re as PresetManager,
+  ye as NameInputRow,
+  Le as PresetManager,
   s as PresetStoreProvider,
-  Se as RadioList,
-  Te as SegmentBar,
+  ie as RadioList,
+  Fe as SegmentBar,
   K as SelectionGrid,
-  Le as Sequencer,
+  ce as Sequencer,
   N as SliderStoreProvider,
-  Me as TextInput,
-  ve as WebGpuStatus,
-  ge as applyPresetSnapshot,
+  Be as TextInput,
+  Pe as WebGpuStatus,
+  ve as applyPresetSnapshot,
   O as buildPalette,
   G as clamp,
-  n as createAudioAnalysisStore,
+  p as createAudioAnalysisStore,
   a as createControlStore,
-  d as createDayOfYearFormatter,
+  u as createDayOfYearFormatter,
   _ as createGradientCss,
-  Be as createPresetSnapshot,
-  p as createTimeFormatter,
+  De as createPresetSnapshot,
+  d as createTimeFormatter,
   h as flexoki,
-  k as flexokiShades,
+  w as flexokiShades,
   T as lfoValue,
   y as phaseCaptureForTriangle,
   t as sliderColorCombos,
   R as snapToStep,
-  g as splitFromValue,
-  D as useAnimationSuspended,
-  S as useAudioAnalysisActions,
-  m as useAudioAnalysisState,
-  f as useAudioAnalysisStore,
-  He as useControlIdConfig,
-  Je as useControlStore,
-  Qe as useControlStoreState,
-  Xe as useControlValue,
-  A as useFrame,
-  ae as useListScrollMetrics,
+  B as splitFromValue,
+  v as useAnimationSuspended,
+  m as useAudioAnalysisActions,
+  f as useAudioAnalysisState,
+  S as useAudioAnalysisStore,
+  We as useControlIdConfig,
+  qe as useControlStore,
+  Ue as useControlStoreState,
+  Ye as useControlValue,
+  P as useFrame,
+  Z as useListScrollMetrics,
   F as usePanelTheme,
-  be as usePresetStore,
-  Ze as useResolvedControlId,
-  $e as useResolvedControlIdPrefix,
+  Ge as usePresetStore,
+  je as useResolvedControlId,
+  ze as useResolvedControlIdPrefix,
   W as useSelectionGridActions,
-  j as useSelectionGridIds,
-  q as useSelectionGridState,
-  U as useSliderActions,
-  Y as useSliderColumn,
-  z as useSliderDefinition,
-  H as useSliderLayout,
-  J as useSliderState,
-  Q as useSliderStore,
-  X as useSliderStoreState,
+  q as useSelectionGridIds,
+  U as useSelectionGridState,
+  Y as useSliderStore,
   x as useStoreMirror,
-  B as valueFromSplit
+  b as valueFromSplit
 };
 //# sourceMappingURL=core.es.js.map

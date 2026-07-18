@@ -1,7 +1,8 @@
 import React from "react";
 import { clamp, snapToStep, splitFromValue } from "../../lfo";
 import { useAnimationSuspended } from "../../animationSuspension";
-import { useControlValue, useResolvedControlId } from "../../controlStore";
+import { useControlIdConfig, useControlValue, useResolvedControlId } from "../../controlStore";
+import { warnOnceDev } from "../../utils/warnOnceDev";
 import "./dial.css";
 
 export type DialBorderStyle = "a" | "b" | "none";
@@ -73,7 +74,7 @@ export default function Dial({
   onControlModeChange,
   disabled = false,
   suspended,
-  ariaLabel = "Dial control",
+  ariaLabel,
   className,
   style,
   onPointerDown,
@@ -87,7 +88,24 @@ export default function Dial({
   ...rest
 }: DialProps) {
   const isSuspended = useAnimationSuspended(suspended);
-  const resolvedControlId = useResolvedControlId(controlId, ariaLabel);
+  const { autoIds } = useControlIdConfig();
+  const hasUserLabel = controlId !== undefined || ariaLabel !== undefined;
+  const autoResolvedControlId = useResolvedControlId(controlId, ariaLabel);
+  const resolvedControlId = hasUserLabel ? autoResolvedControlId : undefined;
+  React.useEffect(() => {
+    if (!autoIds || hasUserLabel) return;
+    warnOnceDev(
+      "Dial.auto-id-missing-label",
+      "[ui-bits] Dial cannot derive an automatic control id without an `ariaLabel` or `controlId`. Provide one to bind this dial to the control store.",
+    );
+  }, [autoIds, hasUserLabel]);
+  React.useEffect(() => {
+    if (controlId === undefined || value === undefined) return;
+    warnOnceDev(
+      `Dial.control-id-controlled-value.${controlId}`,
+      "[ui-bits] Dial received both `controlId` and controlled `value`. The control store binding is ignored while `value` is controlled.",
+    );
+  }, [controlId, value]);
   const [storeValue, setStoreValue] = useControlValue<number>(resolvedControlId);
   const shouldUseStore = resolvedControlId !== undefined && value === undefined;
   const resolvedValueProp = shouldUseStore ? storeValue : value;
@@ -313,7 +331,7 @@ export default function Dial({
       ref={dialRef}
       role="slider"
       tabIndex={disabled ? -1 : 0}
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? "Dial control"}
       aria-valuemin={min}
       aria-valuemax={max}
       aria-valuenow={resolvedValue}

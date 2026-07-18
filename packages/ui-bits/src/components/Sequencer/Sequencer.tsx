@@ -320,6 +320,15 @@ const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     void initGpu();
     return () => {
       cancelled = true;
+      const resources = resourcesRef.current;
+      if (resources) {
+        try {
+          resources.uniformBuffer.destroy();
+          resources.eventBuffer.destroy();
+        } catch {
+          // destroy() can throw if the device was already lost
+        }
+      }
       resourcesRef.current = null;
       setGpuReady(false);
     };
